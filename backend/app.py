@@ -1,16 +1,7 @@
-"""
-app.py
-------
-Flask application entry point.
-
-Run with:
-    python app.py
-"""
-
+import os
 from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_session import Session
-from sqlalchemy import create_engine
 
 from config import Config
 from db_init import init_db
@@ -20,11 +11,8 @@ def create_app() -> Flask:
     app = Flask(__name__)
     app.config.from_object(Config)
 
-    # ------------------------------------------------------------------ #
-    # Flask-Session — SQLAlchemy backend stored in the same SQLite file
-    # ------------------------------------------------------------------ #
-    engine = create_engine(f"sqlite:///{Config.DB_PATH}")
-    app.config["SESSION_SQLALCHEMY"] = engine
+    # Flask-Session — filesystem backend
+    os.makedirs(Config.SESSION_FILE_DIR, exist_ok=True)
     Session(app)
 
     # ------------------------------------------------------------------ #
