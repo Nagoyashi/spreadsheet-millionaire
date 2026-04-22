@@ -1,7 +1,6 @@
 flask==3.1.0
 flask-cors==5.0.0
 flask-session==0.8.0
-sqlalchemy==2.0.36
 bcrypt==4.2.1
 marshmallow==3.23.1
 python-dotenv==1.0.1

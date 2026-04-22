@@ -17,16 +17,15 @@ class Config:
     # ------------------------------------------------------------------ #
     DB_PATH = os.path.join(BASE_DIR, "fintrackr.db")
 
-    # ------------------------------------------------------------------ #
-    # Flask-Session  (server-side sessions stored in SQLite)
-    # ------------------------------------------------------------------ #
-    SESSION_TYPE = "sqlalchemy"
-    SESSION_SQLALCHEMY_TABLE = "flask_sessions"
+    # Flask-Session  (server-side sessions stored on filesystem)
+    SESSION_TYPE = "filesystem"
+    SESSION_FILE_DIR = os.path.join(BASE_DIR, "flask_session")
+    SESSION_FILE_THRESHOLD = 500
     SESSION_PERMANENT = False
-    SESSION_USE_SIGNER = True          # signs the session cookie for tamper detection
-    SESSION_COOKIE_HTTPONLY = True     # JS cannot read the cookie
-    SESSION_COOKIE_SAMESITE = "Lax"   # CSRF protection
-    SESSION_COOKIE_SECURE = False      # set True in production (HTTPS only)
+    SESSION_USE_SIGNER = True
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = "Lax"
+    SESSION_COOKIE_SECURE = False
 
     # ------------------------------------------------------------------ #
     # CORS
