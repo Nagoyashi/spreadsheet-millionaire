@@ -1,38 +1,28 @@
-from marshmallow import Schema, fields, validate, validates, ValidationError
+from marshmallow import Schema, fields, validate, ValidationError
 
-VALID_CALC_TYPES = ("fire", "compound", "sankey")
-
+VALID_CALC_TYPES = [
+    'fire',
+    'compound',
+    'sankey',
+    'investment_fee',
+    'inflation',
+    'dividend',
+    'withdrawal',
+    'debt_payoff',
+    'mortgage',
+    'coast_fire',
+    'emergency_fund',
+    'barista_fire',
+]
 
 class SaveCalculatorSchema(Schema):
-    name = fields.Str(
-        required=True,
-        validate=validate.Length(min=1, max=100, error="Name must be between 1 and 100 characters."),
-        error_messages={"required": "A name for this calculation is required."},
-    )
+    name = fields.Str(required=True, validate=validate.Length(min=1, max=100))
     calc_type = fields.Str(
         required=True,
-        validate=validate.OneOf(VALID_CALC_TYPES, error="calc_type must be one of: fire, compound, sankey."),
-        error_messages={"required": "calc_type is required."},
+        validate=validate.OneOf(VALID_CALC_TYPES)
     )
-    data = fields.Dict(
-        required=True,
-        error_messages={"required": "Calculator data is required."},
-    )
-
-    @validates("data")
-    def validate_data(self, value: dict):
-        if not value:
-            raise ValidationError("Calculator data cannot be empty.")
-
+    data = fields.Dict(required=True)
 
 class UpdateCalculatorSchema(Schema):
-    """Both fields are optional — allows renaming without re-sending data."""
-    name = fields.Str(
-        validate=validate.Length(min=1, max=100, error="Name must be between 1 and 100 characters."),
-    )
+    name = fields.Str(validate=validate.Length(min=1, max=100))
     data = fields.Dict()
-
-    @validates("data")
-    def validate_data(self, value: dict):
-        if value is not None and not value:
-            raise ValidationError("Calculator data cannot be empty.")
