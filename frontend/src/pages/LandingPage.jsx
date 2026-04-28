@@ -1,9 +1,53 @@
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BarChart2, ArrowRight, LogOut, User } from 'lucide-react'
-import { CALCULATORS } from '../calculators/registry'
+import { BarChart2, ArrowRight, LogOut, User, Star } from 'lucide-react'
+import { CALCULATORS, CATEGORIES } from '../calculators/registry'
+
+const FAVOURITES_KEY = 'fintrackr_favourites'
+
+function useFavourites() {
+  const [favourites, setFavourites] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(FAVOURITES_KEY)) || [] }
+    catch { return [] }
+  })
+
+  function toggle(type) {
+    setFavourites(prev => {
+      const next = prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
+      localStorage.setItem(FAVOURITES_KEY, JSON.stringify(next))
+      return next
+    })
+  }
+
+  return { favourites, toggle }
+}
 
 export default function LandingPage({ auth }) {
   const navigate = useNavigate()
+  const [activeCategory, setActiveCategory] = useState('All')
+  const { favourites, toggle } = useFavourites()
+
+  // Build the displayed list:
+  //   - Favourites tab: only starred calcs
+  //   - Any other tab: filter by category, starred calcs sorted to front
+  const displayed = (() => {
+    if (activeCategory === 'Favourites') {
+      return CALCULATORS.filter(c => favourites.includes(c.type))
+    }
+    const pool = activeCategory === 'All'
+      ? CALCULATORS
+      : CALCULATORS.filter(c => c.category === activeCategory)
+    const starred   = pool.filter(c => favourites.includes(c.type))
+    const unstarred = pool.filter(c => !favourites.includes(c.type))
+    return [...starred, ...unstarred]
+  })()
+
+  // All tabs: Favourites (if any starred) + All + categories
+  const tabs = [
+    ...(favourites.length > 0 ? ['Favourites'] : []),
+    'All',
+    ...CATEGORIES.filter(c => c !== 'All'),
+  ]
 
   return (
     <div className="min-h-screen flex">
@@ -87,7 +131,7 @@ export default function LandingPage({ auth }) {
 
         <main className="p-6 max-w-7xl mx-auto">
 
-          {/* Hero summary card */}
+          {/* Hero */}
           <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg p-6 text-white mb-6">
             <div className="max-w-xl">
               <span className="inline-block px-2 py-0.5 text-xs font-semibold rounded-full bg-white/20 text-white mb-3">
@@ -108,40 +152,101 @@ export default function LandingPage({ auth }) {
             </div>
           </div>
 
-          {/* Calculator cards — auto-generated from registry */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {CALCULATORS.map(({ type, label, subtitle, description, Icon, color, gradient, badge, badgeLabel }) => (
-              <div
-                key={type}
-                onClick={() => navigate(`/calculator/${type}`)}
-                className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg hover:-translate-y-1 transition cursor-pointer group"
-              >
-                {/* Gradient accent bar */}
-                <div className={`h-1.5 rounded-full bg-gradient-to-r ${gradient} mb-5`} />
+          {/* ── Filter bar ──────────────────────────────────────────────────── */}
+          <div className="flex items-center gap-2 flex-wrap mb-5">
+            {tabs.map(tab => {
+              const isFavTab = tab === 'Favourites'
+              const count = isFavTab
+                ? favourites.length
+                : tab === 'All'
+                  ? CALCULATORS.length
+                  : CALCULATORS.filter(c => c.category === tab).length
+              const isActive = activeCategory === tab
 
-                <div className="flex items-start justify-between mb-4">
-                  <div className="p-2 rounded-lg bg-gray-50">
-                    <Icon className={`w-6 h-6 ${color}`} />
-                  </div>
-                  <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${badge}`}>
-                    {badgeLabel}
+              return (
+                <button
+                  key={tab}
+                  onClick={() => setActiveCategory(tab)}
+                  className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+                    isActive
+                      ? 'bg-gray-900 text-white shadow-sm'
+                      : 'bg-white text-gray-600 border border-gray-200 hover:border-gray-400 hover:text-gray-900'
+                  }`}
+                >
+                  {isFavTab && (
+                    <Star className={`w-3.5 h-3.5 ${isActive ? 'text-amber-400 fill-amber-400' : 'text-amber-400 fill-amber-400'}`} />
+                  )}
+                  {tab}
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                    isActive ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'
+                  }`}>
+                    {count}
                   </span>
-                </div>
-
-                <p className="text-sm font-medium text-gray-500 mb-1">{subtitle}</p>
-                <h3 className="text-xl font-bold text-gray-800 mb-3">{label}</h3>
-                <p className="text-sm text-gray-500 leading-relaxed mb-5">{description}</p>
-
-                <div className="flex items-center gap-1 text-blue-600 group-hover:gap-2 transition-all text-sm font-medium">
-                  Open calculator <ArrowRight className="w-4 h-4" />
-                </div>
-              </div>
-            ))}
+                </button>
+              )
+            })}
           </div>
 
-          {/* Auth nudge for logged-out users */}
+          {/* ── Calculator grid ──────────────────────────────────────────────── */}
+          {displayed.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+              {displayed.map(({ type, label, subtitle, description, Icon, color, gradient, badge, category }) => {
+                const isStarred = favourites.includes(type)
+                return (
+                  <div
+                    key={type}
+                    onClick={() => navigate(`/calculator/${type}`)}
+                    className="relative bg-white rounded-lg shadow-sm border border-gray-100 p-5 hover:shadow-md hover:-translate-y-1 transition cursor-pointer group"
+                  >
+                    {/* Star button */}
+                    <button
+                      onClick={e => { e.stopPropagation(); toggle(type) }}
+                      className={`absolute top-3 right-3 p-1 rounded-full transition-colors ${
+                        isStarred
+                          ? 'text-amber-400'
+                          : 'text-gray-200 hover:text-amber-300'
+                      }`}
+                      title={isStarred ? 'Remove from favourites' : 'Add to favourites'}
+                    >
+                      <Star className={`w-4 h-4 ${isStarred ? 'fill-amber-400' : ''}`} />
+                    </button>
+
+                    {/* Gradient accent bar */}
+                    <div className={`h-1 rounded-full bg-gradient-to-r ${gradient} mb-4`} />
+
+                    <div className="flex items-start justify-between mb-3 pr-4">
+                      <div className="p-2 rounded-lg bg-gray-50">
+                        <Icon className={`w-5 h-5 ${color}`} />
+                      </div>
+                      {/* Badge now uses category — matches filter tabs exactly */}
+                      <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${badge}`}>
+                        {category}
+                      </span>
+                    </div>
+
+                    <p className="text-xs font-medium text-gray-400 mb-0.5">{subtitle}</p>
+                    <h3 className="text-base font-bold text-gray-800 mb-2">{label}</h3>
+                    <p className="text-xs text-gray-500 leading-relaxed mb-4">{description}</p>
+
+                    <div className="flex items-center gap-1 text-blue-600 group-hover:gap-2 transition-all text-xs font-medium">
+                      Open <ArrowRight className="w-3.5 h-3.5" />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-16 text-gray-400 text-sm">
+              {activeCategory === 'Favourites'
+                ? 'No favourites yet. Click the ★ on any calculator to add it here.'
+                : 'No calculators in this category yet.'
+              }
+            </div>
+          )}
+
+          {/* Auth nudge */}
           {!auth.isAuthenticated && (
-            <div className="mt-6 bg-white rounded-lg shadow-md p-6 flex items-center justify-between">
+            <div className="mt-6 bg-white rounded-lg shadow-sm border border-gray-100 p-6 flex items-center justify-between">
               <div>
                 <h3 className="text-base font-bold text-gray-800">Save your calculations</h3>
                 <p className="text-sm text-gray-500 mt-1">Create a free account to save, rename, and revisit your work.</p>

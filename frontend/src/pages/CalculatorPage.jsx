@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'react'
 import { useParams, useNavigate, Navigate } from 'react-router-dom'
 import { Save, Check, AlertCircle, Menu } from 'lucide-react'
 import { useCalculatorData } from '../hooks/useCalculatorData'
@@ -6,9 +6,50 @@ import { useSave } from '../hooks/useSave'
 import { CALC_MAP, VALID_TYPES } from '../calculators/registry'
 import CalculatorSidebar from '../components/CalculatorSidebar'
 import SaveNameModal from '../components/ui/SaveNameModal'
-import { Suspense } from 'react'
 
 const storageKey = (type) => `fintrackr_calc_${type}`
+
+// ─── Loading skeleton shown while a lazy calculator chunk downloads ───────────
+// Mirrors the visual structure of a typical calculator so the layout doesn't
+// jump when the real component appears.
+function CalculatorSkeleton() {
+  return (
+    <div className="space-y-6 animate-pulse">
+      {/* Stat cards row */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="bg-white rounded-lg shadow-sm p-5 h-28">
+            <div className="flex justify-between mb-3">
+              <div className="h-3 bg-gray-100 rounded w-24" />
+              <div className="w-8 h-8 bg-gray-100 rounded-lg" />
+            </div>
+            <div className="h-7 bg-gray-100 rounded w-32 mb-2" />
+            <div className="h-2 bg-gray-100 rounded w-20" />
+          </div>
+        ))}
+      </div>
+      {/* Chart area */}
+      <div className="bg-white rounded-lg shadow-sm p-6 h-72">
+        <div className="h-4 bg-gray-100 rounded w-48 mb-6" />
+        <div className="h-48 bg-gray-50 rounded-lg" />
+      </div>
+      {/* Input panels */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {[...Array(2)].map((_, i) => (
+          <div key={i} className="bg-white rounded-lg shadow-sm p-6 h-56">
+            <div className="h-4 bg-gray-100 rounded w-32 mb-5" />
+            {[...Array(3)].map((_, j) => (
+              <div key={j} className="mb-4">
+                <div className="h-2.5 bg-gray-100 rounded w-24 mb-2" />
+                <div className="h-9 bg-gray-50 rounded-lg border border-gray-100" />
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 export default function CalculatorPage({ auth }) {
   const { type } = useParams()
@@ -66,7 +107,6 @@ export default function CalculatorPage({ auth }) {
     },
   })
 
-  // Wrap deleteCalc to also clear initialData if the active calc is deleted
   const handleDeleteCalc = useCallback(async (id) => {
     await deleteCalc(id)
     handleDelete(id)
@@ -92,11 +132,6 @@ export default function CalculatorPage({ auth }) {
     : 'Save (sign in)'
 
   // ─── Memoized calculator render ─────────────────────────────────────────────
-  // CalcComponent, initialData, and handleDataChange are the only things that
-  // should trigger a re-render of the calculator itself. Input keystrokes inside
-  // the calculator don't change any of these, so the calculator manages its own
-  // re-renders internally. This prevents sidebar interactions, save button state
-  // changes, and modal open/close from re-rendering the calculator.
 
   const calculator = useMemo(() => (
     <CalcComponent
@@ -149,7 +184,6 @@ export default function CalculatorPage({ auth }) {
         <header className="bg-white border-b border-gray-200 px-6 py-4 shrink-0">
           <div className="flex items-center justify-between">
 
-            {/* Left: mobile menu + calculator title */}
             <div className="flex items-center gap-3">
               <button
                 className="md:hidden text-gray-500 hover:text-gray-800 mr-1"
@@ -163,13 +197,12 @@ export default function CalculatorPage({ auth }) {
               </div>
               <h1 className="text-3xl font-bold text-gray-800">{label}</h1>
               {activeSavedCalcId && activeCalc && (
-                <span className="px-2 py-0.5 text-xs font-semibond rounded-full bg-blue-100 text-blue-800">
+                <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
                   {activeCalc.name}
                 </span>
               )}
             </div>
 
-            {/* Right: save button + inline error */}
             <div className="flex flex-col items-end gap-1">
               <button
                 onClick={handleSaveClick}
@@ -189,14 +222,10 @@ export default function CalculatorPage({ auth }) {
           </div>
         </header>
 
-        {/* Calculator — memoized, only re-renders when initialData changes */}
+        {/* Calculator — lazy loaded, skeleton shown while chunk downloads */}
         <main className="flex-1 overflow-y-auto p-6">
           <div className="max-w-5xl mx-auto">
-            <Suspense fallback={
-              <div className="flex items-center justify-center py-24">
-                <span className="text-sm text-gray-400 animate-pulse">Loading…</span>
-              </div>
-            }>
+            <Suspense fallback={<CalculatorSkeleton />}>
               {calculator}
             </Suspense>
           </div>
