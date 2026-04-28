@@ -1,10 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
 
-// After successful login:
-//   1. Restore any calculator state that was saved to sessionStorage before redirect
-//   2. Navigate back to wherever the user came from (location.state.from)
-
 export default function LoginPage({ auth }) {
   const navigate = useNavigate()
   const location = useLocation()
@@ -26,8 +22,6 @@ export default function LoginPage({ auth }) {
     const result = await auth.login(email, password)
 
     if (result.success) {
-      // sessionStorage restoration happens automatically in CalculatorPage
-      // on mount — no action needed here, just navigate back.
       navigate(from, { replace: true })
     } else {
       if (result.errors) setFieldErrors(result.errors)
@@ -37,81 +31,76 @@ export default function LoginPage({ auth }) {
   }
 
   return (
-    <div className="min-h-screen bg-stone-950 flex flex-col">
-      {/* Nav */}
-      <nav className="border-b border-stone-800 px-8 py-4">
-        <Link to="/" className="font-display text-xl text-stone-100 tracking-tight">
+    <div className="min-h-screen bg-gray-100 flex flex-col">
+      {/* Top bar */}
+      <header className="bg-white border-b border-gray-200 px-6 py-4">
+        <Link to="/" className="text-xl font-bold text-gray-800 tracking-tight">
           FIN<span className="text-amber-400">trackr</span>
         </Link>
-      </nav>
+      </header>
 
-      <div className="flex-1 flex items-center justify-center px-4">
-        <div className="w-full max-w-sm">
-          <p className="font-mono text-xs text-amber-400 tracking-widest uppercase mb-2">
-            Welcome back
-          </p>
-          <h1 className="font-display text-4xl text-stone-100 mb-8">Sign in</h1>
+      {/* Centered card */}
+      <div className="flex-1 flex items-center justify-center px-4 py-12">
+        <div className="bg-white rounded-lg shadow-md p-8 w-full max-w-sm">
+          <div className="mb-6">
+            <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+              Welcome back
+            </span>
+            <h1 className="text-3xl font-bold text-gray-800 mt-3">Sign in</h1>
+            <p className="text-sm text-gray-500 mt-1">Enter your credentials to continue.</p>
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Global error */}
             {error && (
-              <p className="font-body text-sm text-red-400 bg-red-400/10 border border-red-400/20 px-4 py-3">
+              <div className="text-sm text-red-700 bg-red-50 border border-red-200 px-3 py-2 rounded-lg">
                 {error}
-              </p>
+              </div>
             )}
 
             <div>
-              <label className="font-mono text-xs text-stone-500 uppercase tracking-widest block mb-2">
-                Email
-              </label>
+              <label className="block text-sm font-medium text-gray-600 mb-1">Email</label>
               <input
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 required
                 autoFocus
-                className="w-full bg-stone-900 border border-stone-700 text-stone-100 font-body text-sm px-4 py-3 focus:outline-none focus:border-amber-400 transition-colors placeholder-stone-600"
                 placeholder="you@example.com"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
               />
               {fieldErrors.email && (
-                <p className="font-body text-xs text-red-400 mt-1">{fieldErrors.email[0]}</p>
+                <p className="text-xs text-red-500 mt-1">{fieldErrors.email[0]}</p>
               )}
             </div>
 
             <div>
-              <label className="font-mono text-xs text-stone-500 uppercase tracking-widest block mb-2">
-                Password
-              </label>
+              <label className="block text-sm font-medium text-gray-600 mb-1">Password</label>
               <input
                 type="password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 required
-                className="w-full bg-stone-900 border border-stone-700 text-stone-100 font-body text-sm px-4 py-3 focus:outline-none focus:border-amber-400 transition-colors placeholder-stone-600"
                 placeholder="••••••••"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
               />
               {fieldErrors.password && (
-                <p className="font-body text-xs text-red-400 mt-1">{fieldErrors.password[0]}</p>
+                <p className="text-xs text-red-500 mt-1">{fieldErrors.password[0]}</p>
               )}
             </div>
 
             <button
               type="submit"
               disabled={submitting}
-              className="w-full bg-amber-400 text-stone-950 font-body font-medium text-sm py-3 hover:bg-amber-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+              className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {submitting ? 'Signing in…' : 'Sign in'}
             </button>
           </form>
 
-          <p className="font-body text-sm text-stone-500 mt-6 text-center">
+          <p className="text-sm text-gray-500 mt-6 text-center">
             No account?{' '}
-            <Link
-              to="/register"
-              state={{ from }}
-              className="text-amber-400 hover:text-amber-300 transition-colors"
-            >
-              Register
+            <Link to="/register" state={{ from }} className="text-blue-600 hover:text-blue-700 font-medium transition">
+              Register free
             </Link>
           </p>
         </div>

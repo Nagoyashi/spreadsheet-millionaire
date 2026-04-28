@@ -1,0 +1,301 @@
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        import { useState, useEffect } from 'react'
+import {
+  AreaChart, Area, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer, ReferenceLine,
+} from 'recharts'
+import { Flame, TrendingUp, PiggyBank, Percent } from 'lucide-react'
+
+const DEFAULTS = {
+  annual_expenses: 40000,
+  savings_rate: 50,
+  current_savings: 0,
+  annual_income: 80000,
+  expected_return: 7,
+  withdrawal_rate: 4,
+}
+
+function fmt(n) {
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`
+  if (n >= 1_000)     return `$${(n / 1_000).toFixed(1)}K`
+  return `$${Math.round(n)}`
+}
+
+function calculate(inputs) {
+  const annualExpenses = parseFloat(inputs.annual_expenses) || 0
+  const savingsRate    = parseFloat(inputs.savings_rate) / 100 || 0
+  const currentSavings = parseFloat(inputs.current_savings) || 0
+  const annualIncome   = parseFloat(inputs.annual_income) || 0
+  const expectedReturn = parseFloat(inputs.expected_return) / 100 || 0.07
+  const withdrawalRate = parseFloat(inputs.withdrawal_rate) / 100 || 0.04
+
+  const fireNumber    = withdrawalRate > 0 ? annualExpenses / withdrawalRate : 0
+  const annualSavings = annualIncome * savingsRate
+
+  let years = 0
+  let balance = currentSavings
+  if (annualSavings > 0 && fireNumber > 0) {
+    if (expectedReturn === 0) {
+      years = fireNumber > currentSavings ? Math.ceil((fireNumber - currentSavings) / annualSavings) : 0
+    } else {
+      while (balance < fireNumber && years < 100) {
+        balance = balance * (1 + expectedReturn) + annualSavings
+        years++
+      }
+      if (years >= 100) years = null
+    }
+  }
+
+  const chartData = []
+  const totalYears = years != null ? Math.min(years + 5, 50) : 40
+  let bal = currentSavings
+  let contribTotal = currentSavings
+  for (let y = 0; y <= totalYears; y++) {
+    chartData.push({
+      year: y,
+      portfolio: Math.round(bal),
+      contributions: Math.round(contribTotal),
+      target: Math.round(fireNumber),
+    })
+    bal = bal * (1 + expectedReturn) + annualSavings
+    contribTotal += annualSavings
+  }
+
+  return { fireNumber, annualSavings, yearsToFire: years, retirementYear: years != null ? new Date().getFullYear() + Math.ceil(years) : null, chartData, fireYear: years }
+}
+
+// ─── Shared components ────────────────────────────────────────────────────────
+
+function StatCard({ label, value, sub, Icon, iconClass, gradientClass }) {
+  return (
+    <div className="bg-white rounded-lg shadow-md p-5 hover:shadow-lg hover:-translate-y-1 transition">
+      <div className="flex items-start justify-between mb-3">
+        <p className="text-sm font-medium text-gray-600">{label}</p>
+        <div className={`p-2 rounded-lg bg-gray-50`}>
+          <Icon className={`w-4 h-4 ${iconClass}`} />
+        </div>
+      </div>
+      <p className="text-4xl font-bold text-gray-800">{value}</p>
+      {sub && <p className="text-sm text-gray-400 mt-1">{sub}</p>}
+      <div className={`h-1 rounded-full bg-gradient-to-r ${gradientClass} mt-4`} />
+    </div>
+  )
+}
+
+function NumInput({ label, prefix, suffix, value, onChange, hint, min, max, step = 'any' }) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-600 mb-1">
+        {label}
+        {hint && <span className="ml-1 text-gray-400 font-normal">{hint}</span>}
+      </label>
+      <div className="flex rounded-lg border border-gray-300 focus-within:ring-2 focus-within:ring-blue-500 overflow-hidden">
+        {prefix && (
+          <span className="px-3 py-2 bg-gray-50 text-gray-500 text-sm border-r border-gray-300 flex items-center">
+            {prefix}
+          </span>
+        )}
+        <input
+          type="number"
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          min={min}
+          max={max}
+          step={step}
+          className="flex-1 px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none"
+        />
+        {suffix && (
+          <span className="px-3 py-2 bg-gray-50 text-gray-500 text-sm border-l border-gray-300 flex items-center">
+            {suffix}
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ChartTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-lg text-xs min-w-36">
+      <p className="font-semibold text-gray-700 mb-2">Year {label}</p>
+      {payload.map(p => (
+        <div key={p.dataKey} className="flex justify-between gap-4 mb-1">
+          <span className="text-gray-500 flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full inline-block" style={{ background: p.color }} />
+            {p.name}
+          </span>
+          <span className="font-semibold text-gray-800">{fmt(p.value)}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
+export default function FIRECalculator({ initialData, onDataChange }) {
+  const [inputs, setInputs] = useState({ ...DEFAULTS, ...initialData })
+
+  useEffect(() => {
+    if (initialData) setInputs({ ...DEFAULTS, ...initialData })
+  }, [initialData])
+
+  useEffect(() => {
+    onDataChange?.(inputs)
+  }, [inputs, onDataChange])
+
+  const set = key => val => setInputs(prev => ({ ...prev, [key]: val }))
+  const results = calculate(inputs)
+
+  const progressPct = results.fireNumber > 0
+    ? Math.min(100, ((parseFloat(inputs.current_savings) || 0) / results.fireNumber) * 100)
+    : 0
+
+  return (
+    <div className="space-y-6">
+
+      {/* Stat cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          label="FIRE Number"
+          value={fmt(results.fireNumber)}
+          sub="Target portfolio"
+          Icon={Flame}
+          iconClass="text-emerald-500"
+          gradientClass="from-emerald-500 to-teal-600"
+        />
+        <StatCard
+          label="Years to FIRE"
+          value={results.yearsToFire != null ? `${Math.ceil(results.yearsToFire)} yrs` : '100+'}
+          sub={results.retirementYear ? `Retiring ${results.retirementYear}` : 'Adjust inputs'}
+          Icon={TrendingUp}
+          iconClass="text-blue-500"
+          gradientClass="from-blue-500 to-indigo-600"
+        />
+        <StatCard
+          label="Annual Savings"
+          value={fmt(results.annualSavings)}
+          sub="Invested per year"
+          Icon={PiggyBank}
+          iconClass="text-violet-500"
+          gradientClass="from-violet-500 to-purple-600"
+        />
+        <StatCard
+          label="Savings Rate"
+          value={`${parseFloat(inputs.savings_rate).toFixed(0)}%`}
+          sub="Of gross income"
+          Icon={Percent}
+          iconClass="text-amber-500"
+          gradientClass="from-amber-400 to-orange-500"
+        />
+      </div>
+
+      {/* Progress bar card */}
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="flex justify-between items-baseline mb-3">
+          <h3 className="text-xl font-bold text-gray-800">Progress to FIRE</h3>
+          <span className="text-sm text-gray-400">
+            {fmt(parseFloat(inputs.current_savings) || 0)} / {fmt(results.fireNumber)}
+          </span>
+        </div>
+        <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-600 transition-all duration-500"
+            style={{ width: `${progressPct}%`, minWidth: progressPct > 0 ? '6px' : '0' }}
+          />
+        </div>
+        <p className="text-sm text-gray-400 mt-2">{progressPct.toFixed(1)}% of your FIRE number saved</p>
+      </div>
+
+      {/* Chart */}
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+          <h3 className="text-xl font-bold text-gray-800">Wealth Projection</h3>
+          <div className="flex gap-4 text-xs text-gray-400">
+            {[
+              { color: '#3b82f6', label: 'Portfolio',     dashed: false },
+              { color: '#10b981', label: 'Contributions', dashed: true  },
+              { color: '#ef4444', label: 'FIRE target',   dashed: true  },
+            ].map(l => (
+              <div key={l.label} className="flex items-center gap-1.5">
+                <svg width="16" height="8">
+                  {l.dashed
+                    ? <line x1="0" y1="4" x2="16" y2="4" stroke={l.color} strokeWidth="1.5" strokeDasharray="4 2" />
+                    : <line x1="0" y1="4" x2="16" y2="4" stroke={l.color} strokeWidth="2" />
+                  }
+                </svg>
+                {l.label}
+              </div>
+            ))}
+          </div>
+        </div>
+        <ResponsiveContainer width="100%" height={250}>
+          <AreaChart data={results.chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+            <defs>
+              <linearGradient id="gBlue" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.15} />
+                <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id="gGreen" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#10b981" stopOpacity={0.12} />
+                <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+            <XAxis dataKey="year" tick={{ fontSize: 12, fill: '#6b7280' }} tickLine={false} axisLine={false} tickFormatter={v => `Yr ${v}`} />
+            <YAxis tickFormatter={fmt} tick={{ fontSize: 12, fill: '#6b7280' }} tickLine={false} axisLine={false} width={54} />
+            <Tooltip content={<ChartTooltip />} />
+            {results.fireYear != null && (
+              <ReferenceLine x={results.fireYear} stroke="#ef4444" strokeDasharray="4 3" strokeWidth={1.5}
+                label={{ value: 'FIRE', position: 'insideTopRight', fontSize: 10, fill: '#ef4444' }} />
+            )}
+            <Area type="monotone" dataKey="contributions" name="Contributions" stroke="#10b981" strokeWidth={1.5} fill="url(#gGreen)" strokeDasharray="5 3" dot={false} />
+            <Area type="monotone" dataKey="portfolio"     name="Portfolio"     stroke="#3b82f6" strokeWidth={2}   fill="url(#gBlue)"  dot={false} />
+            <Area type="monotone" dataKey="target"        name="FIRE target"   stroke="#ef4444" strokeWidth={1.5} fill="none"         strokeDasharray="6 3" dot={false} />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Inputs */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        {/* Finances */}
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <h3 className="text-xl font-bold text-gray-800 mb-4">Your finances</h3>
+          <div className="space-y-4">
+            <NumInput label="Annual Income"   prefix="$" value={inputs.annual_income}   onChange={set('annual_income')}   min={0} />
+            <NumInput label="Annual Expenses" prefix="$" value={inputs.annual_expenses} onChange={set('annual_expenses')} min={0} />
+            <NumInput label="Savings Rate"    suffix="%" value={inputs.savings_rate}    onChange={set('savings_rate')}    min={0} max={100} />
+            <NumInput label="Current Savings" prefix="$" value={inputs.current_savings} onChange={set('current_savings')} min={0} />
+          </div>
+        </div>
+
+        {/* Assumptions */}
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <h3 className="text-xl font-bold text-gray-800 mb-4">Assumptions</h3>
+          <div className="space-y-4">
+            <NumInput label="Expected Return" hint="per year" suffix="%" value={inputs.expected_return} onChange={set('expected_return')} min={0} max={30} step={0.1} />
+            <NumInput label="Withdrawal Rate" hint="safe withdrawal" suffix="%" value={inputs.withdrawal_rate} onChange={set('withdrawal_rate')} min={0.1} max={20} step={0.1} />
+          </div>
+
+          {/* Insight */}
+          <div className="mt-5 bg-gradient-to-r from-blue-50 to-emerald-50 border border-blue-100 rounded-lg p-4">
+            <p className="text-xs font-semibold text-blue-600 uppercase tracking-wider mb-1">Insight</p>
+            <p className="text-sm text-gray-600 leading-relaxed">
+              {results.yearsToFire != null ? (
+                <>
+                  Saving <strong className="text-gray-800">{fmt(results.annualSavings)}/yr</strong> puts you
+                  on track to retire in <strong className="text-gray-800">{Math.ceil(results.yearsToFire)} years</strong>
+                  {results.retirementYear && <> ({results.retirementYear})</>}.
+                </>
+              ) : (
+                <>At your current rate you won't reach FIRE in 100 years. Increase savings or reduce expenses.</>
+              )}
+            </p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  )
+}
