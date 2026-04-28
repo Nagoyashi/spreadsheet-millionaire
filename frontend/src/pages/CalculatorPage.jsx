@@ -1,20 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useParams, useNavigate, Link, Navigate } from 'react-router-dom'
+import { useParams, useNavigate, Navigate } from 'react-router-dom'
+import { Save, Check, AlertCircle, Menu } from 'lucide-react'
 import { useCalculatorData } from '../hooks/useCalculatorData'
-import FIRECalculator from '../components/calculators/FIRECalculator'
-import CompoundInterestCalculator from '../components/calculators/CompoundInterestCalculator'
-import SankeyDiagram from '../components/calculators/SankeyDiagram'
-import SavedCalculationsSidebar from '../components/SavedCalculationsSidebar'
+import { CALC_MAP, VALID_TYPES } from '../calculators/registry'
+import CalculatorSidebar from '../components/CalculatorSidebar'
 
-const VALID_TYPES = ['fire', 'compound', 'sankey']
-
-const CALC_LABELS = {
-  fire: 'FIRE Calculator',
-  compound: 'Compound Interest',
-  sankey: 'Cash Flow Sankey',
-}
-
-// sessionStorage key pattern for persisting inputs across auth redirect
 const storageKey = (type) => `fintrackr_calc_${type}`
 
 // ─── Save Name Modal ──────────────────────────────────────────────────────────
@@ -27,12 +17,10 @@ function SaveNameModal({ onConfirm, onCancel }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-stone-950/80 flex items-center justify-center z-50 px-4">
-      <div className="bg-stone-900 border border-stone-700 p-6 w-full max-w-sm">
-        <h3 className="font-display text-xl text-stone-100 mb-1">Name this calculation</h3>
-        <p className="font-body text-sm text-stone-500 mb-4">
-          Give it a name so you can find it later.
-        </p>
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+      <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm">
+        <h3 className="text-xl font-bold text-gray-800 mb-1">Name this calculation</h3>
+        <p className="text-sm text-gray-500 mb-4">Give it a name so you can find it later.</p>
         <form onSubmit={handleSubmit} className="space-y-4">
           <input
             type="text"
@@ -40,20 +28,20 @@ function SaveNameModal({ onConfirm, onCancel }) {
             onChange={e => setName(e.target.value)}
             autoFocus
             placeholder="e.g. My FIRE plan"
-            className="w-full bg-stone-800 border border-stone-700 text-stone-100 font-body text-sm px-4 py-3 focus:outline-none focus:border-amber-400 transition-colors placeholder-stone-600"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
           />
           <div className="flex gap-2">
             <button
               type="submit"
               disabled={!name.trim()}
-              className="flex-1 bg-amber-400 text-stone-950 font-body font-medium text-sm py-2.5 hover:bg-amber-300 transition-colors disabled:opacity-40"
+              className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm font-medium disabled:opacity-40"
             >
               Save
             </button>
             <button
               type="button"
               onClick={onCancel}
-              className="flex-1 border border-stone-700 text-stone-400 font-body text-sm py-2.5 hover:text-stone-100 hover:border-stone-500 transition-colors"
+              className="flex-1 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition text-sm"
             >
               Cancel
             </button>
@@ -69,68 +57,74 @@ export default function CalculatorPage({ auth }) {
   const { type } = useParams()
   const navigate = useNavigate()
 
-  const { savedCalcs, loading: calcsLoading, saveCalc, updateCalc, deleteCalc } =
-    useCalculatorData(auth.isAuthenticated, type)
+  // Guard early — invalid type redirects before hooks run into bad state
+  if (!VALID_TYPES.includes(type)) return <Navigate to="/" replace />
 
-  // The currently-loaded saved calc id (null = unsaved / new)
+  const { component: CalcComponent, label, Icon, color } = CALC_MAP[type]
+
+  const {
+    savedCalcs,
+    loading: calcsLoading,
+    error: calcsError,
+    saveCalc,
+    updateCalc,
+    deleteCalc,
+  } = useCalculatorData(auth.isAuthenticated, type)
+
   const [activeSavedCalcId, setActiveSavedCalcId] = useState(null)
+  const [initialData, setInitialData]             = useState(null)
+  const currentDataRef                            = useRef({})
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+  const [showNameModal, setShowNameModal]         = useState(false)
+  // saveStatus: null | 'saving' | 'saved' | 'error'
+  const [saveStatus, setSaveStatus]               = useState(null)
+  const [saveError, setSaveError]                 = useState(null)
+  const [isSaving, setIsSaving]                   = useState(false)
 
-  // Data to inject into the calculator (from a saved calc load or sessionStorage restore)
-  const [initialData, setInitialData] = useState(null)
-
-  // Latest data emitted by the calculator via onDataChange
-  const currentDataRef = useRef({})
-
-  // Sidebar open on desktop, togglable on mobile
-  const [sidebarOpen, setSidebarOpen] = useState(true)
-
-  // Save name modal
-  const [showNameModal, setShowNameModal] = useState(false)
-
-  // Feedback: 'saving' | 'saved' | 'error' | null
-  const [saveStatus, setSaveStatus] = useState(null)
-
-  // ── Restore from sessionStorage on mount (after auth redirect) ──────────────
+  // Restore inputs saved to sessionStorage before an auth redirect
   useEffect(() => {
     const stored = sessionStorage.getItem(storageKey(type))
     if (stored) {
-      try {
-        setInitialData(JSON.parse(stored))
-      } catch {
-        // ignore malformed data
-      }
+      try { setInitialData(JSON.parse(stored)) } catch {}
       sessionStorage.removeItem(storageKey(type))
     }
   }, [type])
 
-  // ── Redirect unauthenticated users to login when they hit Save ───────────────
-  function handleSaveClick(currentData) {
+  // ─── Save logic ────────────────────────────────────────────────────────────
+
+  function handleSaveClick() {
+    if (isSaving) return
+
     if (!auth.isAuthenticated) {
-      // Persist current inputs before navigating away
-      sessionStorage.setItem(storageKey(type), JSON.stringify(currentData))
+      sessionStorage.setItem(storageKey(type), JSON.stringify(currentDataRef.current))
       navigate('/login', { state: { from: `/calculator/${type}` } })
       return
     }
 
     if (activeSavedCalcId) {
-      // Option B: already have an active saved calc → PUT directly, no name needed
-      doSave(null, currentData)
+      doSave(null, currentDataRef.current)
     } else {
-      // New save → ask for a name first
       setShowNameModal(true)
     }
   }
 
   async function doSave(name, data) {
+    setIsSaving(true)
     setSaveStatus('saving')
+    setSaveError(null)
+
     const result = await saveCalc(name, type, data, activeSavedCalcId)
+
+    setIsSaving(false)
+
     if (result.success) {
       setActiveSavedCalcId(result.calculator.id)
       setSaveStatus('saved')
       setTimeout(() => setSaveStatus(null), 2000)
     } else {
       setSaveStatus('error')
-      setTimeout(() => setSaveStatus(null), 3000)
+      setSaveError(result.error || 'Something went wrong. Please try again.')
+      setTimeout(() => { setSaveStatus(null); setSaveError(null) }, 4000)
     }
   }
 
@@ -139,122 +133,134 @@ export default function CalculatorPage({ auth }) {
     doSave(name, currentDataRef.current)
   }
 
-  // ── Load a saved calculation into the calculator ─────────────────────────────
+  // ─── Sidebar handlers ───────────────────────────────────────────────────────
+
   function handleLoad(calc) {
     setInitialData(calc.data)
     setActiveSavedCalcId(calc.id)
+    setMobileSidebarOpen(false)
   }
 
-  // ── Calculator emits its current data on every change ────────────────────────
+  async function handleDelete(id) {
+    await deleteCalc(id)
+    if (activeSavedCalcId === id) {
+      setActiveSavedCalcId(null)
+      setInitialData(null)
+    }
+  }
+
   const handleDataChange = useCallback((data) => {
     currentDataRef.current = data
   }, [])
 
-  // ── Render the right calculator component ────────────────────────────────────
-  function renderCalculator() {
-    const props = { initialData, onDataChange: handleDataChange }
-    switch (type) {
-      case 'fire':     return <FIRECalculator {...props} />
-      case 'compound': return <CompoundInterestCalculator {...props} />
-      case 'sankey':   return <SankeyDiagram {...props} />
-      default:         return null
-    }
-  }
-
-  // Guard invalid type params
-  if (!VALID_TYPES.includes(type)) return <Navigate to="/" replace />
+  // ─── Derived UI state ───────────────────────────────────────────────────────
 
   const activeCalc = savedCalcs.find(c => c.id === activeSavedCalcId)
 
+  const saveButtonClass =
+    saveStatus === 'saved'  ? 'bg-emerald-600 hover:bg-emerald-700 text-white' :
+    saveStatus === 'error'  ? 'bg-red-600 text-white' :
+    saveStatus === 'saving' ? 'bg-blue-400 text-white cursor-wait' :
+                              'bg-blue-600 hover:bg-blue-700 text-white'
+
+  const saveLabel = auth.isAuthenticated
+    ? (activeSavedCalcId ? 'Update' : 'Save')
+    : 'Save (sign in)'
+
+  // ─── Shared sidebar props ───────────────────────────────────────────────────
+
+  const sidebarProps = {
+    activeType: type,
+    auth,
+    savedCalcs,
+    calcsLoading,
+    calcsError,
+    activeSavedCalcId,
+    onLoad: handleLoad,
+    onRename: (id, name) => updateCalc(id, { name }),
+    onDelete: handleDelete,
+    onClose: () => setMobileSidebarOpen(false),
+    onNavigateLogin: () => navigate('/login', { state: { from: `/calculator/${type}` } }),
+  }
+
+  // ─── Render ─────────────────────────────────────────────────────────────────
+
   return (
-    <div className="min-h-screen bg-stone-950 flex flex-col">
-      {/* Nav */}
-      <nav className="border-b border-stone-800 px-6 py-4 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-4">
-          <Link to="/" className="font-display text-xl text-stone-100 tracking-tight">
-            FIN<span className="text-amber-400">trackr</span>
-          </Link>
-          <span className="text-stone-700">·</span>
-          <span className="font-mono text-xs text-stone-500 uppercase tracking-widest">
-            {CALC_LABELS[type]}
-          </span>
+    <div className="min-h-screen flex">
+
+      {/* Desktop sidebar */}
+      <div className="hidden md:block">
+        <CalculatorSidebar {...sidebarProps} />
+      </div>
+
+      {/* Mobile overlay */}
+      {mobileSidebarOpen && (
+        <div className="fixed inset-0 z-50 flex md:hidden">
+          <CalculatorSidebar {...sidebarProps} />
+          <div
+            className="flex-1 bg-black/50"
+            onClick={() => setMobileSidebarOpen(false)}
+          />
         </div>
+      )}
 
-        <div className="flex items-center gap-3">
-          {/* Save / Update button */}
-          <button
-            onClick={() => handleSaveClick(currentDataRef.current)}
-            className={`font-body text-sm px-4 py-1.5 transition-colors font-medium ${
-              saveStatus === 'saved'
-                ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                : saveStatus === 'error'
-                ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-                : saveStatus === 'saving'
-                ? 'bg-stone-800 text-stone-500 border border-stone-700 cursor-wait'
-                : activeSavedCalcId
-                ? 'bg-stone-800 text-stone-300 border border-stone-700 hover:border-amber-400/50 hover:text-stone-100'
-                : 'bg-amber-400 text-stone-950 hover:bg-amber-300'
-            }`}
-          >
-            {saveStatus === 'saving' ? 'Saving…'
-              : saveStatus === 'saved' ? '✓ Saved'
-              : saveStatus === 'error' ? 'Error'
-              : activeSavedCalcId ? `Update "${activeCalc?.name ?? '…'}"`
-              : auth.isAuthenticated ? 'Save'
-              : 'Save (sign in)'}
-          </button>
+      {/* ── Content area ─────────────────────────────────────────────────── */}
+      <div className="flex-1 flex flex-col bg-gray-100 min-h-screen">
 
-          {/* Sidebar toggle */}
-          {auth.isAuthenticated && (
-            <button
-              onClick={() => setSidebarOpen(o => !o)}
-              className="font-mono text-xs text-stone-500 hover:text-stone-300 tracking-widest uppercase transition-colors"
-            >
-              {sidebarOpen ? 'Hide saved' : 'Saved'}
-            </button>
-          )}
+        {/* Top bar */}
+        <header className="bg-white border-b border-gray-200 px-6 py-4 shrink-0">
+          <div className="flex items-center justify-between">
 
-          {/* Auth */}
-          {auth.isAuthenticated ? (
-            <button
-              onClick={auth.logout}
-              className="font-body text-sm text-stone-500 hover:text-stone-300 transition-colors"
-            >
-              Sign out
-            </button>
-          ) : (
-            <button
-              onClick={() => navigate('/login', { state: { from: `/calculator/${type}` } })}
-              className="font-body text-sm text-stone-400 hover:text-stone-100 transition-colors"
-            >
-              Sign in
-            </button>
-          )}
-        </div>
-      </nav>
+            {/* Left: mobile menu + calculator title */}
+            <div className="flex items-center gap-3">
+              <button
+                className="md:hidden text-gray-500 hover:text-gray-800 mr-1"
+                onClick={() => setMobileSidebarOpen(true)}
+                aria-label="Open sidebar"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+              <div className="p-1.5 rounded-lg bg-gray-50">
+                <Icon className={`w-5 h-5 ${color}`} />
+              </div>
+              <h1 className="text-3xl font-bold text-gray-800">{label}</h1>
+              {activeSavedCalcId && activeCalc && (
+                <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                  {activeCalc.name}
+                </span>
+              )}
+            </div>
 
-      {/* Body: calculator + sidebar */}
-      <div className="flex-1 flex overflow-hidden">
-        <main className="flex-1 overflow-y-auto">
-          {renderCalculator()}
+            {/* Right: save button + inline error */}
+            <div className="flex flex-col items-end gap-1">
+              <button
+                onClick={handleSaveClick}
+                disabled={isSaving}
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg transition text-sm font-medium disabled:cursor-not-allowed ${saveButtonClass}`}
+              >
+                {saveStatus === 'saving' && <><Save className="w-4 h-4" /> Saving…</>}
+                {saveStatus === 'saved'  && <><Check className="w-4 h-4" /> Saved</>}
+                {saveStatus === 'error'  && <><AlertCircle className="w-4 h-4" /> Error</>}
+                {!saveStatus             && <><Save className="w-4 h-4" /> {saveLabel}</>}
+              </button>
+              {saveError && (
+                <p className="text-xs text-red-500 text-right">{saveError}</p>
+              )}
+            </div>
+
+          </div>
+        </header>
+
+        {/* Calculator — component resolved from registry, no switch needed */}
+        <main className="flex-1 overflow-y-auto p-6">
+          <div className="max-w-5xl mx-auto">
+            <CalcComponent
+              initialData={initialData}
+              onDataChange={handleDataChange}
+            />
+          </div>
         </main>
 
-        {auth.isAuthenticated && sidebarOpen && (
-          <SavedCalculationsSidebar
-            savedCalcs={savedCalcs}
-            loading={calcsLoading}
-            activeSavedCalcId={activeSavedCalcId}
-            onLoad={handleLoad}
-            onRename={(id, name) => updateCalc(id, { name })}
-            onDelete={async (id) => {
-              await deleteCalc(id)
-              if (activeSavedCalcId === id) {
-                setActiveSavedCalcId(null)
-                setInitialData(null)
-              }
-            }}
-          />
-        )}
       </div>
 
       {/* Save name modal */}
@@ -264,6 +270,7 @@ export default function CalculatorPage({ auth }) {
           onCancel={() => setShowNameModal(false)}
         />
       )}
+
     </div>
   )
 }

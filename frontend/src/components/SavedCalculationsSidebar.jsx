@@ -1,6 +1,6 @@
 import { useState } from 'react'
+import { Pencil, Trash2, BookOpen, AlertCircle } from 'lucide-react'
 
-// Inline rename: click the name → editable input → blur/enter saves via onRename
 function RenameableItem({ calc, isActive, onLoad, onRename, onDelete }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(calc.name)
@@ -11,7 +11,7 @@ function RenameableItem({ calc, isActive, onLoad, onRename, onDelete }) {
     if (draft.trim() && draft.trim() !== calc.name) {
       onRename(calc.id, draft.trim())
     } else {
-      setDraft(calc.name) // reset if empty or unchanged
+      setDraft(calc.name)
     }
   }
 
@@ -19,16 +19,17 @@ function RenameableItem({ calc, isActive, onLoad, onRename, onDelete }) {
     e.stopPropagation()
     setDeleting(true)
     await onDelete(calc.id)
-    // Component unmounts on success; setDeleting(false) only needed on error
+    // No need to setDeleting(false) — component unmounts on successful delete.
+    // If it fails, the parent surfaces the error and this item stays mounted.
     setDeleting(false)
   }
 
   return (
     <div
-      className={`group px-4 py-3 border-b border-stone-800 cursor-pointer transition-colors ${
+      className={`group px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${
         isActive
-          ? 'bg-amber-400/10 border-l-2 border-l-amber-400'
-          : 'hover:bg-stone-800/50 border-l-2 border-l-transparent'
+          ? 'bg-white/15 text-white'
+          : 'text-gray-400 hover:bg-white/10 hover:text-white'
       }`}
       onClick={() => !editing && onLoad(calc)}
     >
@@ -44,36 +45,33 @@ function RenameableItem({ calc, isActive, onLoad, onRename, onDelete }) {
           }}
           autoFocus
           onClick={e => e.stopPropagation()}
-          className="w-full bg-stone-800 border border-amber-400/50 text-stone-100 font-body text-sm px-2 py-0.5 focus:outline-none"
+          className="w-full bg-white/10 border border-amber-400/50 text-white text-xs px-2 py-0.5 rounded focus:outline-none"
         />
       ) : (
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <p className={`font-body text-sm truncate ${isActive ? 'text-amber-400' : 'text-stone-200'}`}>
-              {calc.name}
-            </p>
-            <p className="font-mono text-xs text-stone-600 mt-0.5">
+        <div className="flex items-center justify-between gap-1 min-w-0">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm truncate font-medium">{calc.name}</p>
+            <p className="text-xs text-gray-500 mt-0.5">
               {new Date(calc.updated_at).toLocaleDateString(undefined, {
-                month: 'short', day: 'numeric', year: 'numeric'
+                month: 'short', day: 'numeric',
               })}
             </p>
           </div>
-          {/* Actions — visible on hover */}
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
             <button
               onClick={e => { e.stopPropagation(); setEditing(true) }}
-              className="font-mono text-xs text-stone-500 hover:text-stone-300 px-1 py-0.5 transition-colors"
+              className="p-1 rounded hover:bg-white/10 text-gray-500 hover:text-gray-300 transition-colors"
               title="Rename"
             >
-              ✎
+              <Pencil className="w-3 h-3" />
             </button>
             <button
               onClick={handleDelete}
               disabled={deleting}
-              className="font-mono text-xs text-stone-500 hover:text-red-400 px-1 py-0.5 transition-colors disabled:opacity-40"
+              className="p-1 rounded hover:bg-white/10 text-gray-500 hover:text-red-400 transition-colors disabled:opacity-40"
               title="Delete"
             >
-              ✕
+              <Trash2 className="w-3 h-3" />
             </button>
           </div>
         </div>
@@ -85,30 +83,37 @@ function RenameableItem({ calc, isActive, onLoad, onRename, onDelete }) {
 export default function SavedCalculationsSidebar({
   savedCalcs,
   loading,
+  error,
   activeSavedCalcId,
   onLoad,
   onRename,
   onDelete,
 }) {
   return (
-    <aside className="w-64 shrink-0 border-l border-stone-800 bg-stone-900/50 flex flex-col overflow-hidden">
-      <div className="px-4 py-3 border-b border-stone-800">
-        <p className="font-mono text-xs text-stone-500 uppercase tracking-widest">
-          Saved
-        </p>
+    <div className="flex flex-col flex-1 min-h-0">
+      {/* Section header */}
+      <div className="px-3 py-2 mt-2">
+        <div className="flex items-center gap-2 px-2 mb-1">
+          <BookOpen className="w-3.5 h-3.5 text-gray-500" />
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Saved</span>
+        </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      {/* List */}
+      <div className="flex-1 overflow-y-auto px-3 space-y-0.5">
         {loading ? (
-          <div className="px-4 py-6 text-center">
-            <p className="font-mono text-xs text-stone-600 animate-pulse tracking-widest">
-              LOADING…
-            </p>
+          <div className="px-2 py-3">
+            <p className="text-xs text-gray-600 animate-pulse">Loading…</p>
+          </div>
+        ) : error ? (
+          <div className="px-2 py-3 flex items-start gap-2">
+            <AlertCircle className="w-3.5 h-3.5 text-red-400 shrink-0 mt-0.5" />
+            <p className="text-xs text-red-400 leading-relaxed">{error}</p>
           </div>
         ) : savedCalcs.length === 0 ? (
-          <div className="px-4 py-6">
-            <p className="font-body text-xs text-stone-600 leading-relaxed">
-              No saved calculations yet. Hit <span className="text-amber-400">Save</span> to keep your work.
+          <div className="px-2 py-3">
+            <p className="text-xs text-gray-600 leading-relaxed">
+              No saved calculations yet.
             </p>
           </div>
         ) : (
@@ -124,6 +129,6 @@ export default function SavedCalculationsSidebar({
           ))
         )}
       </div>
-    </aside>
+    </div>
   )
 }
