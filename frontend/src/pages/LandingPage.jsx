@@ -1,20 +1,31 @@
-import { useState, useEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BarChart2, ArrowRight, LogOut, User, Star } from 'lucide-react'
 import { CALCULATORS, CATEGORIES } from '../calculators/registry'
 
-const FAVOURITES_KEY = 'fintrackr_favourites'
+const FAVOURITES_KEY = (userId) => `fintrackr_favourites_${userId}`
 
-function useFavourites() {
+function useFavourites(auth) {
+  const key = auth.isAuthenticated ? FAVOURITES_KEY(auth.user.id) : null
+
   const [favourites, setFavourites] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(FAVOURITES_KEY)) || [] }
+    if (!key) return []
+    try { return JSON.parse(localStorage.getItem(key)) || [] }
     catch { return [] }
   })
 
+  // Re-load when auth state changes (login/logout)
+  useEffect(() => {
+    if (!key) { setFavourites([]); return }
+    try { setFavourites(JSON.parse(localStorage.getItem(key)) || []) }
+    catch { setFavourites([]) }
+  }, [key])
+
   function toggle(type) {
+    if (!key) return
     setFavourites(prev => {
       const next = prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
-      localStorage.setItem(FAVOURITES_KEY, JSON.stringify(next))
+      localStorage.setItem(key, JSON.stringify(next))
       return next
     })
   }
@@ -22,14 +33,38 @@ function useFavourites() {
   return { favourites, toggle }
 }
 
+// ─── Small toast for unauthenticated star attempt ─────────────────────────────
+function AuthToast({ visible }) {
+  if (!visible) return null
+  return (
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white text-sm px-4 py-2.5 rounded-lg shadow-lg flex items-center gap-2 pointer-events-none">
+      <Star className="w-4 h-4 text-amber-400" />
+      Sign in to save favourites
+    </div>
+  )
+}
+
 export default function LandingPage({ auth }) {
   const navigate = useNavigate()
   const [activeCategory, setActiveCategory] = useState('All')
-  const { favourites, toggle } = useFavourites()
+  const { favourites, toggle } = useFavourites(auth)
+  const [showAuthToast, setShowAuthToast] = useState(false)
+  const toastTimerRef = useRef(null)
 
-  // Build the displayed list:
-  //   - Favourites tab: only starred calcs
-  //   - Any other tab: filter by category, starred calcs sorted to front
+  function handleStarClick(e, type) {
+    e.stopPropagation()
+    if (!auth.isAuthenticated) {
+      clearTimeout(toastTimerRef.current)
+      setShowAuthToast(true)
+      toastTimerRef.current = setTimeout(() => setShowAuthToast(false), 2500)
+      return
+    }
+    toggle(type)
+  }
+
+  useEffect(() => () => clearTimeout(toastTimerRef.current), [])
+
+  // Build displayed list — starred calcs float to top within any tab
   const displayed = (() => {
     if (activeCategory === 'Favourites') {
       return CALCULATORS.filter(c => favourites.includes(c.type))
@@ -42,9 +77,9 @@ export default function LandingPage({ auth }) {
     return [...starred, ...unstarred]
   })()
 
-  // All tabs: Favourites (if any starred) + All + categories
+  // Tabs: Favourites always first, then All, then categories
   const tabs = [
-    ...(favourites.length > 0 ? ['Favourites'] : []),
+    'Favourites',
     'All',
     ...CATEGORIES.filter(c => c !== 'All'),
   ]
@@ -54,23 +89,17 @@ export default function LandingPage({ auth }) {
 
       {/* ── Dark Sidebar ─────────────────────────────────────────────────── */}
       <aside className="w-64 shrink-0 bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 flex flex-col min-h-screen">
-
-        {/* Brand */}
         <div className="px-6 py-5 border-b border-white/10">
           <span className="text-xl font-bold text-white tracking-tight">
             FIN<span className="text-amber-400">trackr</span>
           </span>
         </div>
-
-        {/* Nav */}
         <nav className="flex-1 px-3 py-4 space-y-1">
           <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-white/10 text-white font-medium text-sm">
             <BarChart2 className="w-5 h-5 text-amber-400" />
             Calculators
           </div>
         </nav>
-
-        {/* User footer */}
         <div className="px-4 py-4 border-t border-white/10">
           {auth.isAuthenticated ? (
             <div className="space-y-2">
@@ -108,21 +137,14 @@ export default function LandingPage({ auth }) {
       {/* ── Light Content Area ────────────────────────────────────────────── */}
       <div className="flex-1 bg-gray-100 overflow-y-auto">
 
-        {/* Top bar */}
         <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
           <h1 className="text-3xl font-bold text-gray-800">Financial Calculators</h1>
           {!auth.isAuthenticated && (
             <div className="flex items-center gap-3">
-              <button
-                onClick={() => navigate('/login')}
-                className="text-sm text-gray-600 hover:text-gray-900 transition"
-              >
+              <button onClick={() => navigate('/login')} className="text-sm text-gray-600 hover:text-gray-900 transition">
                 Sign in
               </button>
-              <button
-                onClick={() => navigate('/register')}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm font-medium"
-              >
+              <button onClick={() => navigate('/register')} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm font-medium">
                 Register free
               </button>
             </div>
@@ -155,13 +177,13 @@ export default function LandingPage({ auth }) {
           {/* ── Filter bar ──────────────────────────────────────────────────── */}
           <div className="flex items-center gap-2 flex-wrap mb-5">
             {tabs.map(tab => {
-              const isFavTab = tab === 'Favourites'
-              const count = isFavTab
+              const isFavTab  = tab === 'Favourites'
+              const count     = isFavTab
                 ? favourites.length
                 : tab === 'All'
                   ? CALCULATORS.length
                   : CALCULATORS.filter(c => c.category === tab).length
-              const isActive = activeCategory === tab
+              const isActive  = activeCategory === tab
 
               return (
                 <button
@@ -174,7 +196,9 @@ export default function LandingPage({ auth }) {
                   }`}
                 >
                   {isFavTab && (
-                    <Star className={`w-3.5 h-3.5 ${isActive ? 'text-amber-400 fill-amber-400' : 'text-amber-400 fill-amber-400'}`} />
+                    <Star className={`w-3.5 h-3.5 shrink-0 ${
+                      isActive ? 'text-amber-400 fill-amber-400' : 'text-amber-400 fill-amber-400'
+                    }`} />
                   )}
                   {tab}
                   <span className={`text-xs px-1.5 py-0.5 rounded-full ${
@@ -196,56 +220,77 @@ export default function LandingPage({ auth }) {
                   <div
                     key={type}
                     onClick={() => navigate(`/calculator/${type}`)}
-                    className="relative bg-white rounded-lg shadow-sm border border-gray-100 p-5 hover:shadow-md hover:-translate-y-1 transition cursor-pointer group"
+                    className="bg-white rounded-lg shadow-sm border border-gray-100 p-5 hover:shadow-md hover:-translate-y-1 transition cursor-pointer group flex flex-col"
                   >
-                    {/* Star button */}
-                    <button
-                      onClick={e => { e.stopPropagation(); toggle(type) }}
-                      className={`absolute top-3 right-3 p-1 rounded-full transition-colors ${
-                        isStarred
-                          ? 'text-amber-400'
-                          : 'text-gray-200 hover:text-amber-300'
-                      }`}
-                      title={isStarred ? 'Remove from favourites' : 'Add to favourites'}
-                    >
-                      <Star className={`w-4 h-4 ${isStarred ? 'fill-amber-400' : ''}`} />
-                    </button>
-
                     {/* Gradient accent bar */}
                     <div className={`h-1 rounded-full bg-gradient-to-r ${gradient} mb-4`} />
 
-                    <div className="flex items-start justify-between mb-3 pr-4">
+                    {/* Icon + badge row */}
+                    <div className="flex items-start justify-between mb-3">
                       <div className="p-2 rounded-lg bg-gray-50">
                         <Icon className={`w-5 h-5 ${color}`} />
                       </div>
-                      {/* Badge now uses category — matches filter tabs exactly */}
                       <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${badge}`}>
                         {category}
                       </span>
                     </div>
 
+                    {/* Text content */}
                     <p className="text-xs font-medium text-gray-400 mb-0.5">{subtitle}</p>
                     <h3 className="text-base font-bold text-gray-800 mb-2">{label}</h3>
-                    <p className="text-xs text-gray-500 leading-relaxed mb-4">{description}</p>
+                    <p className="text-xs text-gray-500 leading-relaxed mb-4 flex-1">{description}</p>
 
-                    <div className="flex items-center gap-1 text-blue-600 group-hover:gap-2 transition-all text-xs font-medium">
-                      Open <ArrowRight className="w-3.5 h-3.5" />
+                    {/* Bottom row: Open link + star button */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1 text-blue-600 group-hover:gap-2 transition-all text-xs font-medium">
+                        Open <ArrowRight className="w-3.5 h-3.5" />
+                      </div>
+                      <button
+                        onClick={(e) => handleStarClick(e, type)}
+                        className={`p-1.5 rounded-full transition-colors ${
+                          isStarred
+                            ? 'text-amber-400 hover:text-amber-500'
+                            : 'text-gray-300 hover:text-amber-300'
+                        }`}
+                        title={isStarred ? 'Remove from favourites' : 'Add to favourites'}
+                      >
+                        <Star className={`w-4 h-4 ${isStarred ? 'fill-amber-400' : ''}`} />
+                      </button>
                     </div>
                   </div>
                 )
               })}
             </div>
           ) : (
-            <div className="text-center py-16 text-gray-400 text-sm">
-              {activeCategory === 'Favourites'
-                ? 'No favourites yet. Click the ★ on any calculator to add it here.'
-                : 'No calculators in this category yet.'
-              }
+            // Empty state — differs by tab and auth state
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <Star className="w-10 h-10 text-gray-200 mb-4" />
+              {activeCategory === 'Favourites' ? (
+                auth.isAuthenticated ? (
+                  <>
+                    <p className="text-gray-600 font-medium mb-1">No favourites yet</p>
+                    <p className="text-sm text-gray-400">Click the ★ on any calculator to pin it here.</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-gray-600 font-medium mb-1">Favourites require an account</p>
+                    <p className="text-sm text-gray-400 mb-4">Sign in to save your favourite calculators and access them instantly.</p>
+                    <button
+                      onClick={() => navigate('/login')}
+                      className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm font-medium"
+                    >
+                      Sign in
+                    </button>
+                  </>
+                )
+              ) : (
+                <p className="text-sm text-gray-400">No calculators in this category yet.</p>
+              )}
             </div>
           )}
 
           {/* Auth nudge */}
-          {!auth.isAuthenticated && (
+          {!auth.isAuthenticated && activeCategory !== 'Favourites' && (
             <div className="mt-6 bg-white rounded-lg shadow-sm border border-gray-100 p-6 flex items-center justify-between">
               <div>
                 <h3 className="text-base font-bold text-gray-800">Save your calculations</h3>
@@ -262,6 +307,10 @@ export default function LandingPage({ auth }) {
 
         </main>
       </div>
+
+      {/* Toast for unauthenticated star attempt */}
+      <AuthToast visible={showAuthToast} />
+
     </div>
   )
 }
