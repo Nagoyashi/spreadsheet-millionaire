@@ -2,40 +2,62 @@ import os
 from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_session import Session
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from flask_talisman import Talisman
 
 from config import Config
 from db_init import init_db
+
+# ── Rate limiter — shared instance imported by route files ────────────────────
+# get_remote_address uses X-Forwarded-For when behind a proxy (Railway, Render etc.)
+limiter = Limiter(
+    key_func=get_remote_address,
+    storage_uri=Config.RATELIMIT_STORAGE_URI,
+    default_limits=[],          # no default limit — set per-route explicitly
+)
 
 
 def create_app() -> Flask:
     app = Flask(__name__)
     app.config.from_object(Config)
 
-    # Flask-Session — filesystem backend
+    # ── Flask-Session (filesystem-backed server-side sessions) ────────────────
     os.makedirs(Config.SESSION_FILE_DIR, exist_ok=True)
     Session(app)
 
-    # ------------------------------------------------------------------ #
-    # CORS — must allow credentials so the session cookie is sent
-    # ------------------------------------------------------------------ #
+    # ── Rate limiter ──────────────────────────────────────────────────────────
+    limiter.init_app(app)
+
+    # ── Security headers via Flask-Talisman ───────────────────────────────────
+    # Disabled in development (HTTP) to avoid HTTPS redirect loops.
+    # In production, force_https=True redirects all HTTP to HTTPS.
+    is_production = Config.FLASK_ENV == "production"
+    Talisman(
+        app,
+        force_https=is_production,
+        strict_transport_security=is_production,
+        content_security_policy=False,  # CSP managed separately if needed
+        referrer_policy="strict-origin-when-cross-origin",
+        frame_options="DENY",           # X-Frame-Options: DENY (clickjacking)
+        content_type_options=True,      # X-Content-Type-Options: nosniff
+    )
+
+    # ── CORS — must allow credentials for session cookies ─────────────────────
     CORS(
         app,
         origins=Config.CORS_ORIGINS,
         supports_credentials=Config.CORS_SUPPORTS_CREDENTIALS,
     )
 
-    # ------------------------------------------------------------------ #
-    # Blueprints
-    # ------------------------------------------------------------------ #
+    # ── Blueprints ────────────────────────────────────────────────────────────
     from routes.auth        import bp as auth_bp
     from routes.calculators import bp as calculators_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(calculators_bp)
 
-    # ------------------------------------------------------------------ #
-    # Global error handlers
-    # ------------------------------------------------------------------ #
+    # ── Global error handlers ─────────────────────────────────────────────────
     @app.errorhandler(404)
     def not_found(_):
         return jsonify({"error": "Resource not found."}), 404
@@ -44,6 +66,10 @@ def create_app() -> Flask:
     def method_not_allowed(_):
         return jsonify({"error": "Method not allowed."}), 405
 
+    @app.errorhandler(429)
+    def too_many_requests(_):
+        return jsonify({"error": "Too many requests. Please slow down."}), 429
+
     @app.errorhandler(500)
     def internal_error(_):
         return jsonify({"error": "Internal server error."}), 500
@@ -51,10 +77,8 @@ def create_app() -> Flask:
     return app
 
 
-# ------------------------------------------------------------------ #
-# Bootstrap
-# ------------------------------------------------------------------ #
+# ── Bootstrap ─────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    init_db()                           # creates tables if they don't exist
+    init_db()
     app = create_app()
-    app.run(host="0.0.0.0", port=5000, debug=Config.__dict__.get("FLASK_DEBUG", False))
+    app.run(host="0.0.0.0", port=5000, debug=Config.FLASK_DEBUG)
