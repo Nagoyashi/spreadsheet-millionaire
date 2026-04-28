@@ -4,18 +4,14 @@ import { Save, Check, AlertCircle, Menu } from 'lucide-react'
 import { useCalculatorData } from '../hooks/useCalculatorData'
 import { useSave } from '../hooks/useSave'
 import { CALC_MAP, VALID_TYPES } from '../calculators/registry'
+import { CALC_STORAGE_KEY } from '../constants'
 import CalculatorSidebar from '../components/CalculatorSidebar'
 import SaveNameModal from '../components/ui/SaveNameModal'
 
-const storageKey = (type) => `fintrackr_calc_${type}`
-
 // ─── Loading skeleton shown while a lazy calculator chunk downloads ───────────
-// Mirrors the visual structure of a typical calculator so the layout doesn't
-// jump when the real component appears.
 function CalculatorSkeleton() {
   return (
     <div className="space-y-6 animate-pulse">
-      {/* Stat cards row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[...Array(4)].map((_, i) => (
           <div key={i} className="bg-white rounded-lg shadow-sm p-5 h-28">
@@ -28,12 +24,10 @@ function CalculatorSkeleton() {
           </div>
         ))}
       </div>
-      {/* Chart area */}
       <div className="bg-white rounded-lg shadow-sm p-6 h-72">
         <div className="h-4 bg-gray-100 rounded w-48 mb-6" />
         <div className="h-48 bg-gray-50 rounded-lg" />
       </div>
-      {/* Input panels */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {[...Array(2)].map((_, i) => (
           <div key={i} className="bg-white rounded-lg shadow-sm p-6 h-56">
@@ -55,7 +49,6 @@ export default function CalculatorPage({ auth }) {
   const { type } = useParams()
   const navigate = useNavigate()
 
-  // Guard early — invalid type redirects before hooks run into bad state
   if (!VALID_TYPES.includes(type)) return <Navigate to="/" replace />
 
   const { component: CalcComponent, label, Icon, color } = CALC_MAP[type]
@@ -75,14 +68,12 @@ export default function CalculatorPage({ auth }) {
 
   // Restore inputs saved to sessionStorage before an auth redirect
   useEffect(() => {
-    const stored = sessionStorage.getItem(storageKey(type))
+    const stored = sessionStorage.getItem(CALC_STORAGE_KEY(type))
     if (stored) {
       try { setInitialData(JSON.parse(stored)) } catch {}
-      sessionStorage.removeItem(storageKey(type))
+      sessionStorage.removeItem(CALC_STORAGE_KEY(type))
     }
   }, [type])
-
-  // ─── Save logic (fully encapsulated in useSave) ───────────────────────────
 
   const {
     activeSavedCalcId,
@@ -117,8 +108,6 @@ export default function CalculatorPage({ auth }) {
     currentDataRef.current = data
   }, [])
 
-  // ─── Derived UI state ───────────────────────────────────────────────────────
-
   const activeCalc = savedCalcs.find(c => c.id === activeSavedCalcId)
 
   const saveButtonClass =
@@ -131,16 +120,9 @@ export default function CalculatorPage({ auth }) {
     ? (activeSavedCalcId ? 'Update' : 'Save')
     : 'Save (sign in)'
 
-  // ─── Memoized calculator render ─────────────────────────────────────────────
-
   const calculator = useMemo(() => (
-    <CalcComponent
-      initialData={initialData}
-      onDataChange={handleDataChange}
-    />
+    <CalcComponent initialData={initialData} onDataChange={handleDataChange} />
   ), [CalcComponent, initialData, handleDataChange])
-
-  // ─── Shared sidebar props ───────────────────────────────────────────────────
 
   const sidebarProps = {
     activeType: type,
@@ -156,40 +138,26 @@ export default function CalculatorPage({ auth }) {
     onNavigateLogin: () => navigate('/login', { state: { from: `/calculator/${type}` } }),
   }
 
-  // ─── Render ─────────────────────────────────────────────────────────────────
-
   return (
     <div className="min-h-screen flex">
 
-      {/* Desktop sidebar */}
       <div className="hidden md:block">
         <CalculatorSidebar {...sidebarProps} />
       </div>
 
-      {/* Mobile overlay */}
       {mobileSidebarOpen && (
         <div className="fixed inset-0 z-50 flex md:hidden">
           <CalculatorSidebar {...sidebarProps} />
-          <div
-            className="flex-1 bg-black/50"
-            onClick={() => setMobileSidebarOpen(false)}
-          />
+          <div className="flex-1 bg-black/50" onClick={() => setMobileSidebarOpen(false)} />
         </div>
       )}
 
-      {/* ── Content area ─────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col bg-gray-100 min-h-screen">
 
-        {/* Top bar */}
         <header className="bg-white border-b border-gray-200 px-6 py-4 shrink-0">
           <div className="flex items-center justify-between">
-
             <div className="flex items-center gap-3">
-              <button
-                className="md:hidden text-gray-500 hover:text-gray-800 mr-1"
-                onClick={() => setMobileSidebarOpen(true)}
-                aria-label="Open sidebar"
-              >
+              <button className="md:hidden text-gray-500 hover:text-gray-800 mr-1" onClick={() => setMobileSidebarOpen(true)} aria-label="Open sidebar">
                 <Menu className="w-5 h-5" />
               </button>
               <div className="p-1.5 rounded-lg bg-gray-50">
@@ -202,7 +170,6 @@ export default function CalculatorPage({ auth }) {
                 </span>
               )}
             </div>
-
             <div className="flex flex-col items-end gap-1">
               <button
                 onClick={handleSaveClick}
@@ -214,15 +181,11 @@ export default function CalculatorPage({ auth }) {
                 {saveStatus === 'error'  && <><AlertCircle className="w-4 h-4" /> Error</>}
                 {!saveStatus             && <><Save className="w-4 h-4" /> {saveLabel}</>}
               </button>
-              {saveError && (
-                <p className="text-xs text-red-500 text-right">{saveError}</p>
-              )}
+              {saveError && <p className="text-xs text-red-500 text-right">{saveError}</p>}
             </div>
-
           </div>
         </header>
 
-        {/* Calculator — lazy loaded, skeleton shown while chunk downloads */}
         <main className="flex-1 overflow-y-auto p-6">
           <div className="max-w-5xl mx-auto">
             <Suspense fallback={<CalculatorSkeleton />}>
@@ -233,12 +196,8 @@ export default function CalculatorPage({ auth }) {
 
       </div>
 
-      {/* Save name modal */}
       {showNameModal && (
-        <SaveNameModal
-          onConfirm={handleNameConfirm}
-          onCancel={handleNameCancel}
-        />
+        <SaveNameModal onConfirm={handleNameConfirm} onCancel={handleNameCancel} />
       )}
 
     </div>
