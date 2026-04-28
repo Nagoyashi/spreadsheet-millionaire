@@ -1,9 +1,12 @@
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, ReferenceLine,
 } from 'recharts'
 import { Flame, TrendingUp, PiggyBank, Percent } from 'lucide-react'
+import StatCard from '../components/ui/StatCard'
+import NumInput from '../components/ui/NumInput'
+import ChartTooltip from '../components/ui/ChartTooltip'
 
 const DEFAULTS = {
   annual_expenses: 40000,
@@ -21,12 +24,12 @@ function fmt(n) {
 }
 
 function calculate(inputs) {
-  const annualExpenses = parseFloat(inputs.annual_expenses) || 0
-  const savingsRate    = parseFloat(inputs.savings_rate) / 100 || 0
-  const currentSavings = parseFloat(inputs.current_savings) || 0
-  const annualIncome   = parseFloat(inputs.annual_income) || 0
-  const expectedReturn = parseFloat(inputs.expected_return) / 100 || 0.07
-  const withdrawalRate = parseFloat(inputs.withdrawal_rate) / 100 || 0.04
+  const annualExpenses  = parseFloat(inputs.annual_expenses) || 0
+  const savingsRate     = parseFloat(inputs.savings_rate) / 100 || 0
+  const currentSavings  = parseFloat(inputs.current_savings) || 0
+  const annualIncome    = parseFloat(inputs.annual_income) || 0
+  const expectedReturn  = parseFloat(inputs.expected_return) / 100 || 0.07
+  const withdrawalRate  = parseFloat(inputs.withdrawal_rate) / 100 || 0.04
 
   const fireNumber    = withdrawalRate > 0 ? annualExpenses / withdrawalRate : 0
   const annualSavings = annualIncome * savingsRate
@@ -60,78 +63,15 @@ function calculate(inputs) {
     contribTotal += annualSavings
   }
 
-  return { fireNumber, annualSavings, yearsToFire: years, retirementYear: years != null ? new Date().getFullYear() + Math.ceil(years) : null, chartData, fireYear: years }
+  return {
+    fireNumber,
+    annualSavings,
+    yearsToFire: years,
+    retirementYear: years != null ? new Date().getFullYear() + Math.ceil(years) : null,
+    chartData,
+    fireYear: years,
+  }
 }
-
-// ─── Shared components ────────────────────────────────────────────────────────
-
-function StatCard({ label, value, sub, Icon, iconClass, gradientClass }) {
-  return (
-    <div className="bg-white rounded-lg shadow-md p-5 hover:shadow-lg hover:-translate-y-1 transition">
-      <div className="flex items-start justify-between mb-3">
-        <p className="text-sm font-medium text-gray-600">{label}</p>
-        <div className={`p-2 rounded-lg bg-gray-50`}>
-          <Icon className={`w-4 h-4 ${iconClass}`} />
-        </div>
-      </div>
-      <p className="text-4xl font-bold text-gray-800">{value}</p>
-      {sub && <p className="text-sm text-gray-400 mt-1">{sub}</p>}
-      <div className={`h-1 rounded-full bg-gradient-to-r ${gradientClass} mt-4`} />
-    </div>
-  )
-}
-
-function NumInput({ label, prefix, suffix, value, onChange, hint, min, max, step = 'any' }) {
-  return (
-    <div>
-      <label className="block text-sm font-medium text-gray-600 mb-1">
-        {label}
-        {hint && <span className="ml-1 text-gray-400 font-normal">{hint}</span>}
-      </label>
-      <div className="flex rounded-lg border border-gray-300 focus-within:ring-2 focus-within:ring-blue-500 overflow-hidden">
-        {prefix && (
-          <span className="px-3 py-2 bg-gray-50 text-gray-500 text-sm border-r border-gray-300 flex items-center">
-            {prefix}
-          </span>
-        )}
-        <input
-          type="number"
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          min={min}
-          max={max}
-          step={step}
-          className="flex-1 px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none"
-        />
-        {suffix && (
-          <span className="px-3 py-2 bg-gray-50 text-gray-500 text-sm border-l border-gray-300 flex items-center">
-            {suffix}
-          </span>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function ChartTooltip({ active, payload, label }) {
-  if (!active || !payload?.length) return null
-  return (
-    <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-lg text-xs min-w-36">
-      <p className="font-semibold text-gray-700 mb-2">Year {label}</p>
-      {payload.map(p => (
-        <div key={p.dataKey} className="flex justify-between gap-4 mb-1">
-          <span className="text-gray-500 flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full inline-block" style={{ background: p.color }} />
-            {p.name}
-          </span>
-          <span className="font-semibold text-gray-800">{fmt(p.value)}</span>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// ─── Main component ───────────────────────────────────────────────────────────
 
 export default function FIRECalculator({ initialData, onDataChange }) {
   const [inputs, setInputs] = useState({ ...DEFAULTS, ...initialData })
@@ -190,7 +130,7 @@ export default function FIRECalculator({ initialData, onDataChange }) {
         />
       </div>
 
-      {/* Progress bar card */}
+      {/* Progress bar */}
       <div className="bg-white rounded-lg shadow-md p-6">
         <div className="flex justify-between items-baseline mb-3">
           <h3 className="text-xl font-bold text-gray-800">Progress to FIRE</h3>
@@ -244,7 +184,7 @@ export default function FIRECalculator({ initialData, onDataChange }) {
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
             <XAxis dataKey="year" tick={{ fontSize: 12, fill: '#6b7280' }} tickLine={false} axisLine={false} tickFormatter={v => `Yr ${v}`} />
             <YAxis tickFormatter={fmt} tick={{ fontSize: 12, fill: '#6b7280' }} tickLine={false} axisLine={false} width={54} />
-            <Tooltip content={<ChartTooltip />} />
+            <Tooltip content={<ChartTooltip fmt={fmt} />} />
             {results.fireYear != null && (
               <ReferenceLine x={results.fireYear} stroke="#ef4444" strokeDasharray="4 3" strokeWidth={1.5}
                 label={{ value: 'FIRE', position: 'insideTopRight', fontSize: 10, fill: '#ef4444' }} />
@@ -258,8 +198,6 @@ export default function FIRECalculator({ initialData, onDataChange }) {
 
       {/* Inputs */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-        {/* Finances */}
         <div className="bg-white rounded-lg shadow-md p-6">
           <h3 className="text-xl font-bold text-gray-800 mb-4">Your finances</h3>
           <div className="space-y-4">
@@ -270,7 +208,6 @@ export default function FIRECalculator({ initialData, onDataChange }) {
           </div>
         </div>
 
-        {/* Assumptions */}
         <div className="bg-white rounded-lg shadow-md p-6">
           <h3 className="text-xl font-bold text-gray-800 mb-4">Assumptions</h3>
           <div className="space-y-4">
@@ -278,7 +215,6 @@ export default function FIRECalculator({ initialData, onDataChange }) {
             <NumInput label="Withdrawal Rate" hint="safe withdrawal" suffix="%" value={inputs.withdrawal_rate} onChange={set('withdrawal_rate')} min={0.1} max={20} step={0.1} />
           </div>
 
-          {/* Insight */}
           <div className="mt-5 bg-gradient-to-r from-blue-50 to-emerald-50 border border-blue-100 rounded-lg p-4">
             <p className="text-xs font-semibold text-blue-600 uppercase tracking-wider mb-1">Insight</p>
             <p className="text-sm text-gray-600 leading-relaxed">

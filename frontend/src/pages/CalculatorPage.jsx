@@ -1,58 +1,15 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useParams, useNavigate, Navigate } from 'react-router-dom'
 import { Save, Check, AlertCircle, Menu } from 'lucide-react'
 import { useCalculatorData } from '../hooks/useCalculatorData'
+import { useSave } from '../hooks/useSave'
 import { CALC_MAP, VALID_TYPES } from '../calculators/registry'
 import CalculatorSidebar from '../components/CalculatorSidebar'
+import SaveNameModal from '../components/ui/SaveNameModal'
+import { Suspense } from 'react'
 
 const storageKey = (type) => `fintrackr_calc_${type}`
 
-// ─── Save Name Modal ──────────────────────────────────────────────────────────
-function SaveNameModal({ onConfirm, onCancel }) {
-  const [name, setName] = useState('')
-
-  function handleSubmit(e) {
-    e.preventDefault()
-    if (name.trim()) onConfirm(name.trim())
-  }
-
-  return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-      <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm">
-        <h3 className="text-xl font-bold text-gray-800 mb-1">Name this calculation</h3>
-        <p className="text-sm text-gray-500 mb-4">Give it a name so you can find it later.</p>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <input
-            type="text"
-            value={name}
-            onChange={e => setName(e.target.value)}
-            autoFocus
-            placeholder="e.g. My FIRE plan"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-          />
-          <div className="flex gap-2">
-            <button
-              type="submit"
-              disabled={!name.trim()}
-              className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm font-medium disabled:opacity-40"
-            >
-              Save
-            </button>
-            <button
-              type="button"
-              onClick={onCancel}
-              className="flex-1 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition text-sm"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  )
-}
-
-// ─── Main Page ────────────────────────────────────────────────────────────────
 export default function CalculatorPage({ auth }) {
   const { type } = useParams()
   const navigate = useNavigate()
@@ -71,15 +28,9 @@ export default function CalculatorPage({ auth }) {
     deleteCalc,
   } = useCalculatorData(auth.isAuthenticated, type)
 
-  const [activeSavedCalcId, setActiveSavedCalcId] = useState(null)
   const [initialData, setInitialData]             = useState(null)
-  const currentDataRef                            = useRef({})
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
-  const [showNameModal, setShowNameModal]         = useState(false)
-  // saveStatus: null | 'saving' | 'saved' | 'error'
-  const [saveStatus, setSaveStatus]               = useState(null)
-  const [saveError, setSaveError]                 = useState(null)
-  const [isSaving, setIsSaving]                   = useState(false)
+  const currentDataRef                            = useRef({})
 
   // Restore inputs saved to sessionStorage before an auth redirect
   useEffect(() => {
@@ -90,64 +41,37 @@ export default function CalculatorPage({ auth }) {
     }
   }, [type])
 
-  // ─── Save logic ────────────────────────────────────────────────────────────
+  // ─── Save logic (fully encapsulated in useSave) ───────────────────────────
 
-  function handleSaveClick() {
-    if (isSaving) return
+  const {
+    activeSavedCalcId,
+    saveStatus,
+    saveError,
+    isSaving,
+    showNameModal,
+    handleSaveClick,
+    handleNameConfirm,
+    handleNameCancel,
+    handleLoad,
+    handleDelete,
+  } = useSave({
+    type,
+    auth,
+    saveCalc,
+    navigate,
+    currentDataRef,
+    onLoad: (calc) => {
+      setInitialData(calc.data)
+      setMobileSidebarOpen(false)
+    },
+  })
 
-    if (!auth.isAuthenticated) {
-      sessionStorage.setItem(storageKey(type), JSON.stringify(currentDataRef.current))
-      navigate('/login', { state: { from: `/calculator/${type}` } })
-      return
-    }
-
-    if (activeSavedCalcId) {
-      doSave(null, currentDataRef.current)
-    } else {
-      setShowNameModal(true)
-    }
-  }
-
-  async function doSave(name, data) {
-    setIsSaving(true)
-    setSaveStatus('saving')
-    setSaveError(null)
-
-    const result = await saveCalc(name, type, data, activeSavedCalcId)
-
-    setIsSaving(false)
-
-    if (result.success) {
-      setActiveSavedCalcId(result.calculator.id)
-      setSaveStatus('saved')
-      setTimeout(() => setSaveStatus(null), 2000)
-    } else {
-      setSaveStatus('error')
-      setSaveError(result.error || 'Something went wrong. Please try again.')
-      setTimeout(() => { setSaveStatus(null); setSaveError(null) }, 4000)
-    }
-  }
-
-  function handleNameConfirm(name) {
-    setShowNameModal(false)
-    doSave(name, currentDataRef.current)
-  }
-
-  // ─── Sidebar handlers ───────────────────────────────────────────────────────
-
-  function handleLoad(calc) {
-    setInitialData(calc.data)
-    setActiveSavedCalcId(calc.id)
-    setMobileSidebarOpen(false)
-  }
-
-  async function handleDelete(id) {
+  // Wrap deleteCalc to also clear initialData if the active calc is deleted
+  const handleDeleteCalc = useCallback(async (id) => {
     await deleteCalc(id)
-    if (activeSavedCalcId === id) {
-      setActiveSavedCalcId(null)
-      setInitialData(null)
-    }
-  }
+    handleDelete(id)
+    if (activeSavedCalcId === id) setInitialData(null)
+  }, [deleteCalc, handleDelete, activeSavedCalcId])
 
   const handleDataChange = useCallback((data) => {
     currentDataRef.current = data
@@ -167,6 +91,20 @@ export default function CalculatorPage({ auth }) {
     ? (activeSavedCalcId ? 'Update' : 'Save')
     : 'Save (sign in)'
 
+  // ─── Memoized calculator render ─────────────────────────────────────────────
+  // CalcComponent, initialData, and handleDataChange are the only things that
+  // should trigger a re-render of the calculator itself. Input keystrokes inside
+  // the calculator don't change any of these, so the calculator manages its own
+  // re-renders internally. This prevents sidebar interactions, save button state
+  // changes, and modal open/close from re-rendering the calculator.
+
+  const calculator = useMemo(() => (
+    <CalcComponent
+      initialData={initialData}
+      onDataChange={handleDataChange}
+    />
+  ), [CalcComponent, initialData, handleDataChange])
+
   // ─── Shared sidebar props ───────────────────────────────────────────────────
 
   const sidebarProps = {
@@ -178,7 +116,7 @@ export default function CalculatorPage({ auth }) {
     activeSavedCalcId,
     onLoad: handleLoad,
     onRename: (id, name) => updateCalc(id, { name }),
-    onDelete: handleDelete,
+    onDelete: handleDeleteCalc,
     onClose: () => setMobileSidebarOpen(false),
     onNavigateLogin: () => navigate('/login', { state: { from: `/calculator/${type}` } }),
   }
@@ -225,7 +163,7 @@ export default function CalculatorPage({ auth }) {
               </div>
               <h1 className="text-3xl font-bold text-gray-800">{label}</h1>
               {activeSavedCalcId && activeCalc && (
-                <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                <span className="px-2 py-0.5 text-xs font-semibond rounded-full bg-blue-100 text-blue-800">
                   {activeCalc.name}
                 </span>
               )}
@@ -251,13 +189,16 @@ export default function CalculatorPage({ auth }) {
           </div>
         </header>
 
-        {/* Calculator — component resolved from registry, no switch needed */}
+        {/* Calculator — memoized, only re-renders when initialData changes */}
         <main className="flex-1 overflow-y-auto p-6">
           <div className="max-w-5xl mx-auto">
-            <CalcComponent
-              initialData={initialData}
-              onDataChange={handleDataChange}
-            />
+            <Suspense fallback={
+              <div className="flex items-center justify-center py-24">
+                <span className="text-sm text-gray-400 animate-pulse">Loading…</span>
+              </div>
+            }>
+              {calculator}
+            </Suspense>
           </div>
         </main>
 
@@ -267,7 +208,7 @@ export default function CalculatorPage({ auth }) {
       {showNameModal && (
         <SaveNameModal
           onConfirm={handleNameConfirm}
-          onCancel={() => setShowNameModal(false)}
+          onCancel={handleNameCancel}
         />
       )}
 
