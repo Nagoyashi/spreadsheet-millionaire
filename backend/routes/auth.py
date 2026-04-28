@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify, session
 from marshmallow import ValidationError
 
+from app import limiter
 from models.user import User
 from schemas.user_schema import RegisterSchema, LoginSchema
 from utils.auth_helpers import set_session, clear_session, get_current_user
@@ -12,6 +13,7 @@ login_schema    = LoginSchema()
 
 
 @bp.route("/register", methods=["POST"])
+@limiter.limit("10 per hour")   # prevent mass account creation from one IP
 def register():
     """
     Create a new account.
@@ -29,13 +31,14 @@ def register():
     try:
         user = User.create(email=data["email"], plain_password=data["password"])
     except ValueError as err:
-        return jsonify({"error": str(err)}), 409   # 409 Conflict — email taken
+        return jsonify({"error": str(err)}), 409
 
     set_session(user)
     return jsonify({"user": user.to_dict()}), 201
 
 
 @bp.route("/login", methods=["POST"])
+@limiter.limit("20 per hour; 5 per minute")   # brute-force protection
 def login():
     """
     Authenticate an existing user.
@@ -80,7 +83,6 @@ def status():
 
     user = get_current_user()
     if not user:
-        # Session references a deleted user — clean up
         clear_session()
         return jsonify({"logged_in": False, "user": None}), 200
 
