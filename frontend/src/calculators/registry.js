@@ -1,20 +1,24 @@
+import { lazy } from 'react'
 import { TrendingUp, DollarSign, BarChart2 } from 'lucide-react'
-import FIRECalculator from './FIRECalculator'
-import CompoundInterestCalculator from './CompoundInterestCalculator'
-import SankeyDiagram from './SankeyDiagram'
 
 // ─── THE ONLY FILE YOU TOUCH TO ADD A NEW CALCULATOR ─────────────────────────
 //
 // 1. Create your component in src/calculators/YourCalculator.jsx
 //    It must accept:  { initialData, onDataChange }
 //
-// 2. Import it above and add one entry to CALCULATORS below.
+// 2. Add one entry to CALCULATORS below using lazy() for the component.
 //
 // 3. Add the new type string to the backend calc_type constraint
 //    in backend/schemas/calculator_schema.py
 //
 // That's it. CalculatorPage, LandingPage, routing, and the sidebar
 // all derive everything they need from this registry automatically.
+//
+// ─── Why lazy()? ─────────────────────────────────────────────────────────────
+// Each calculator (especially SankeyDiagram with d3 + d3-sankey) is a chunky
+// bundle. lazy() means each calculator is only downloaded when the user actually
+// navigates to it — not on first page load. CalculatorPage wraps the render in
+// <Suspense> to handle the loading state.
 
 export const CALCULATORS = [
   {
@@ -27,7 +31,7 @@ export const CALCULATORS = [
     gradient: 'from-emerald-500 to-teal-600',
     badge: 'bg-emerald-100 text-emerald-800',
     badgeLabel: 'Retirement',
-    component: FIRECalculator,
+    component: lazy(() => import('./FIRECalculator')),
   },
   {
     type: 'compound',
@@ -39,7 +43,7 @@ export const CALCULATORS = [
     gradient: 'from-blue-500 to-indigo-600',
     badge: 'bg-blue-100 text-blue-800',
     badgeLabel: 'Investing',
-    component: CompoundInterestCalculator,
+    component: lazy(() => import('./CompoundInterestCalculator')),
   },
   {
     type: 'sankey',
@@ -51,7 +55,7 @@ export const CALCULATORS = [
     gradient: 'from-violet-500 to-purple-600',
     badge: 'bg-violet-100 text-violet-800',
     badgeLabel: 'Budgeting',
-    component: SankeyDiagram,
+    component: lazy(() => import('./SankeyDiagram')),
   },
 ]
 
