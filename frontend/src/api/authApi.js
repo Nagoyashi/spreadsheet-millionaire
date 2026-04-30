@@ -1,28 +1,32 @@
 // All auth API calls. No logic here — just HTTP.
 //
 // CSRF protection:
-//   Call authApi.fetchCsrfToken() once on app load.
-//   After that, every mutating request (POST/PUT/DELETE) automatically
-//   includes the X-CSRF-Token header via the shared request() helper.
+//   The backend issues a token via GET /api/auth/csrf-token.
+//   We store it in memory (module-level variable) and attach it as
+//   X-CSRF-Token on every mutating request.
+//
+//   Memory storage is intentional — it survives the session but not a
+//   full page reload, which is fine because fetchCsrfToken() is called
+//   on every app mount. It also means an attacker's page can never read
+//   it (no cookie, no localStorage — just a JS variable in our module).
 
 const BASE = '/api/auth'
 
-// ─── CSRF cookie reader ───────────────────────────────────────────────────────
-// The backend sets a non-HttpOnly 'csrf_token' cookie that JS can read.
-// We attach its value as X-CSRF-Token on every mutating request.
-function getCsrfToken() {
-  const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/)
-  return match ? decodeURIComponent(match[1]) : null
+// Module-level token store — only accessible within this module
+let _csrfToken = null
+
+export function getCsrfToken() {
+  return _csrfToken
 }
 
 // ─── Shared fetch wrapper ─────────────────────────────────────────────────────
 async function request(path, options = {}) {
-  const method  = (options.method || 'GET').toUpperCase()
+  const method   = (options.method || 'GET').toUpperCase()
   const mutating = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)
 
   const headers = {
     'Content-Type': 'application/json',
-    ...(mutating && getCsrfToken() ? { 'X-CSRF-Token': getCsrfToken() } : {}),
+    ...(mutating && _csrfToken ? { 'X-CSRF-Token': _csrfToken } : {}),
     ...options.headers,
   }
 
@@ -36,9 +40,14 @@ async function request(path, options = {}) {
 }
 
 export const authApi = {
-  // Fetch a fresh CSRF token from the server and store it in a cookie.
-  // Call this once on app load before any mutating request.
-  fetchCsrfToken: () => request('/csrf-token'),
+  // Fetch a CSRF token and store it in memory.
+  // Awaited in App.jsx before rendering so the token is always ready.
+  fetchCsrfToken: async () => {
+    const { ok, data } = await request('/csrf-token')
+    if (ok && data?.csrf_token) {
+      _csrfToken = data.csrf_token
+    }
+  },
 
   register: (email, password) =>
     request('/register', {

@@ -1,27 +1,21 @@
 // All calculator API calls. No logic here — just HTTP.
 //
 // CSRF protection:
-//   The shared request() helper reads the csrf_token cookie (set by the backend
-//   via /api/auth/csrf-token) and attaches it as X-CSRF-Token on all mutating
-//   requests. No extra setup needed here — just ensure authApi.fetchCsrfToken()
-//   has been called on app load.
+//   getCsrfToken() reads from the in-memory token stored by authApi.
+//   Attached as X-CSRF-Token on all mutating requests automatically.
+
+import { getCsrfToken } from './authApi'
 
 const BASE = '/api/calculators'
 
-// ─── CSRF cookie reader ───────────────────────────────────────────────────────
-function getCsrfToken() {
-  const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/)
-  return match ? decodeURIComponent(match[1]) : null
-}
-
-// ─── Shared fetch wrapper ─────────────────────────────────────────────────────
 async function request(path, options = {}) {
   const method   = (options.method || 'GET').toUpperCase()
   const mutating = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)
+  const token    = getCsrfToken()
 
   const headers = {
     'Content-Type': 'application/json',
-    ...(mutating && getCsrfToken() ? { 'X-CSRF-Token': getCsrfToken() } : {}),
+    ...(mutating && token ? { 'X-CSRF-Token': token } : {}),
     ...options.headers,
   }
 

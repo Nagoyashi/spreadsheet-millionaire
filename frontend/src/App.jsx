@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth'
 import { authApi } from './api/authApi'
@@ -7,9 +7,6 @@ import CalculatorPage from './pages/CalculatorPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 
-// App.jsx owns auth state and passes it down as props.
-// No Context — the component tree is shallow enough that props are clean.
-
 function RequireGuest({ isAuthenticated, children }) {
   if (isAuthenticated) return <Navigate to="/" replace />
   return children
@@ -17,17 +14,18 @@ function RequireGuest({ isAuthenticated, children }) {
 
 export default function App() {
   const auth = useAuth()
+  const [csrfReady, setCsrfReady] = useState(false)
 
-  // Fetch a CSRF token once on app load.
-  // This sets the csrf_token cookie which all mutating API calls read from.
-  // Runs before any user interaction so the token is always ready.
+  // Fetch CSRF token on mount and wait for it before rendering.
+  // This guarantees the token is in memory before any form submission.
+  // Runs in parallel with useAuth's getStatus() call — both resolve
+  // before anything renders, keeping startup time minimal.
   useEffect(() => {
-    authApi.fetchCsrfToken()
+    authApi.fetchCsrfToken().finally(() => setCsrfReady(true))
   }, [])
 
-  // Don't render routes until the initial /api/auth/status check resolves.
-  // Prevents a flash of the login page for authenticated users.
-  if (auth.loading) {
+  // Block rendering until both auth status and CSRF token are ready
+  if (auth.loading || !csrfReady) {
     return (
       <div className="min-h-screen bg-stone-950 flex items-center justify-center">
         <span className="font-mono text-stone-500 text-sm tracking-widest animate-pulse">
@@ -65,7 +63,6 @@ export default function App() {
           }
         />
 
-        {/* Catch-all */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
