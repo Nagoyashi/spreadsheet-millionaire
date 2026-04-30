@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, session, make_response
+from flask import Blueprint, request, jsonify, session
 from marshmallow import ValidationError
 
 from app import limiter
@@ -20,26 +20,18 @@ def csrf_token():
     """
     Issues a CSRF token for the current session.
 
-    Called once on app load before any mutating request.
-    The token is stored in the server-side session and returned as:
-      - JSON body (for immediate use)
-      - Non-HttpOnly cookie (so JS can read and re-attach it as a header)
+    Called once on app load. The token is:
+      - Stored in the server-side session
+      - Returned in the JSON body for the frontend to store in memory
 
-    A malicious cross-origin page can trigger credentialed requests (the browser
-    sends the session cookie automatically) but cannot read our csrf_token cookie
-    due to SameSite=Strict + CORS, so it cannot forge the X-CSRF-Token header.
+    The frontend stores it as a module-level JS variable (not a cookie,
+    not localStorage) and sends it as X-CSRF-Token on every mutating request.
+    An attacker's page on another origin cannot read this value because:
+      - It's not in a cookie they can trigger
+      - CORS blocks them from reading our API response
     """
     token = generate_csrf_token()
-    response = make_response(jsonify({"csrf_token": token}))
-    response.set_cookie(
-        "csrf_token",
-        token,
-        httponly=False,       # JS must be able to read this
-        samesite="Strict",    # never sent on cross-site requests
-        secure=False,         # set True in prod via Talisman / config
-        max_age=60 * 60 * 24, # 24 hours
-    )
-    return response
+    return jsonify({"csrf_token": token}), 200
 
 
 @bp.route("/register", methods=["POST"])
