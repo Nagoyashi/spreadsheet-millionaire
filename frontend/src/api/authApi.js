@@ -64,6 +64,13 @@ export const authApi = {
   logout: () =>
     request('/logout', { method: 'POST' }),
 
+  // Permanently deletes the account. Requires password confirmation.
+  deleteAccount: (password) =>
+    request('/account', {
+      method: 'DELETE',
+      body: JSON.stringify({ password }),
+    }),
+
   getStatus: () =>
     request('/status'),
 }

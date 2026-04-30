@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BarChart2, ArrowRight, LogOut, User, Star } from 'lucide-react'
+import { BarChart2, ArrowRight, LogOut, User, Star, Trash2 } from 'lucide-react'
 import { CALCULATORS, CATEGORIES } from '../calculators/registry'
 import { useFavourites } from '../hooks/useFavourites'
+import DeleteAccountModal from '../components/ui/DeleteAccountModal'
 
 // ─── Small toast for unauthenticated star attempt ─────────────────────────────
 function AuthToast({ visible }) {
@@ -19,8 +20,23 @@ export default function LandingPage({ auth }) {
   const navigate = useNavigate()
   const [activeCategory, setActiveCategory] = useState('All')
   const { favourites, toggle } = useFavourites(auth)
-  const [showAuthToast, setShowAuthToast] = useState(false)
-  const toastTimerRef = useRef(null)
+  const [showAuthToast, setShowAuthToast]   = useState(false)
+  const toastTimerRef                       = useRef(null)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleteError, setDeleteError]         = useState(null)
+  const [deleteLoading, setDeleteLoading]     = useState(false)
+
+  async function handleDeleteConfirm(password) {
+    setDeleteLoading(true)
+    setDeleteError(null)
+    const result = await auth.deleteAccount(password)
+    setDeleteLoading(false)
+    if (result.success) {
+      setShowDeleteModal(false)
+    } else {
+      setDeleteError(result.error)
+    }
+  }
 
   function handleStarClick(e, type) {
     e.stopPropagation()
@@ -80,6 +96,13 @@ export default function LandingPage({ auth }) {
               >
                 <LogOut className="w-4 h-4" />
                 Sign out
+              </button>
+              <button
+                onClick={() => { setDeleteError(null); setShowDeleteModal(true) }}
+                className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-gray-600 hover:text-red-400 hover:bg-white/10 transition text-sm"
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete account
               </button>
             </div>
           ) : (
@@ -232,6 +255,15 @@ export default function LandingPage({ auth }) {
       </div>
 
       <AuthToast visible={showAuthToast} />
+
+      {showDeleteModal && (
+        <DeleteAccountModal
+          onConfirm={handleDeleteConfirm}
+          onCancel={() => setShowDeleteModal(false)}
+          error={deleteError}
+          loading={deleteLoading}
+        />
+      )}
     </div>
   )
 }
