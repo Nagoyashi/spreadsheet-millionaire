@@ -1,6 +1,6 @@
 # FINtrackr
 
-A lightweight financial calculator web app. Use any calculator without an account. Sign in to save, rename, and reload your calculations.
+A lightweight financial calculator web app. Use any calculator without an account. Sign in to save, rename, reload, and manage your calculations.
 
 **Live calculators:** FIRE, Compound Interest, Cash Flow Sankey, Investment Fee Impact, Inflation, Dividend, Withdrawal Plan, Debt Payoff, Mortgage, Coast FIRE, Emergency Fund, Barista FIRE.
 
@@ -16,7 +16,7 @@ A lightweight financial calculator web app. Use any calculator without an accoun
 | Database | SQLite (raw SQL, no ORM) |
 | Auth | Flask-Session (server-side, filesystem-backed) |
 | Validation | Marshmallow |
-| Security | Flask-Limiter + Flask-Talisman + bcrypt |
+| Security | Flask-Limiter + Flask-Talisman + bcrypt + CSRF tokens |
 
 ---
 
@@ -83,14 +83,14 @@ money-calculators/
 │   ├── models/          # User, SavedCalculator
 │   ├── routes/          # auth.py, calculators.py
 │   ├── schemas/         # Marshmallow validation
-│   ├── utils/           # login_required decorator
+│   ├── utils/           # auth_helpers (login_required, csrf_protect, session helpers)
 │   ├── app.py           # Flask factory
 │   ├── config.py        # All config from .env
 │   └── db_init.py       # Schema creation + migrations
 └── frontend/
     └── src/
         ├── calculators/ # One file per calculator + registry.js
-        ├── components/  # CalculatorSidebar, ui/ primitives
+        ├── components/  # CalculatorSidebar, ui/ primitives (StatCard, NumInput, etc.)
         ├── hooks/       # useAuth, useCalculatorData, useSave, useFavourites
         ├── pages/       # LandingPage, CalculatorPage, LoginPage, RegisterPage
         ├── api/         # authApi, calculatorApi
@@ -112,12 +112,14 @@ Full structure and architectural conventions: see `PROJECT_STRUCTURE.md`.
 
 ## Security
 
-- Passwords: bcrypt hashed, 8+ chars with letter + number required
-- Sessions: server-side filesystem sessions, signed cookie, 30-day expiry
-- Rate limiting: 5/min + 20/hr on login, 10/hr on register
-- IDOR: every DB query on saved calculations includes `AND user_id = ?`
-- Headers: `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, HTTPS redirect in production
-- Config: app exits at startup if secret key is invalid
+- **Passwords** — bcrypt hashed, 8+ chars with letter + number required
+- **Sessions** — server-side filesystem sessions, signed cookie, 30-day expiry
+- **CSRF** — token issued on app load, stored in JS memory, verified as `X-CSRF-Token` header on every mutating request
+- **Rate limiting** — 5/min + 20/hr on login, 10/hr on register, 5/hr on account deletion
+- **IDOR** — every DB query on saved calculations includes `AND user_id = ?`
+- **Headers** — `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, HTTPS redirect in production
+- **Account deletion** — password re-confirmation required, cascades to all user data
+- **Config** — app exits at startup if secret key is invalid
 
 ---
 
