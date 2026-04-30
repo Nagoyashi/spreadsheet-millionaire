@@ -2,14 +2,14 @@ import { useState, useEffect, useCallback } from 'react'
 import { authApi } from '../api/authApi'
 
 // Shared auth state across the app.
-// Usage: const { user, loading, isAuthenticated, login, logout, register } = useAuth()
+// Usage: const { user, loading, isAuthenticated, login, logout, register, deleteAccount } = useAuth()
 //
 // App.jsx calls this once and passes the returned object down as props.
 // No Context needed at this scale.
 
 export function useAuth() {
-  const [user, setUser] = useState(null)
-  const [loading, setLoading] = useState(true) // true until first status check resolves
+  const [user, setUser]       = useState(null)
+  const [loading, setLoading] = useState(true)
 
   // On mount: check if there's an existing session (page refresh, returning user)
   useEffect(() => {
@@ -24,7 +24,6 @@ export function useAuth() {
       setUser(data.user)
       return { success: true }
     }
-    // 401 → single error string, 422 → structured errors object
     return { success: false, error: data.error, errors: data.errors }
   }, [])
 
@@ -42,6 +41,15 @@ export function useAuth() {
     setUser(null)
   }, [])
 
+  const deleteAccount = useCallback(async (password) => {
+    const { ok, data } = await authApi.deleteAccount(password)
+    if (ok) {
+      setUser(null)
+      return { success: true }
+    }
+    return { success: false, error: data?.error || 'Something went wrong.' }
+  }, [])
+
   return {
     user,
     loading,
@@ -49,5 +57,6 @@ export function useAuth() {
     login,
     register,
     logout,
+    deleteAccount,
   }
 }

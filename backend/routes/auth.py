@@ -6,7 +6,7 @@ from models.user import User
 from schemas.user_schema import RegisterSchema, LoginSchema
 from utils.auth_helpers import (
     set_session, clear_session, get_current_user,
-    csrf_protect, generate_csrf_token,
+    csrf_protect, generate_csrf_token, login_required,
 )
 
 bp = Blueprint("auth", __name__, url_prefix="/api/auth")
@@ -19,16 +19,8 @@ login_schema    = LoginSchema()
 def csrf_token():
     """
     Issues a CSRF token for the current session.
-
-    Called once on app load. The token is:
-      - Stored in the server-side session
-      - Returned in the JSON body for the frontend to store in memory
-
-    The frontend stores it as a module-level JS variable (not a cookie,
-    not localStorage) and sends it as X-CSRF-Token on every mutating request.
-    An attacker's page on another origin cannot read this value because:
-      - It's not in a cookie they can trigger
-      - CORS blocks them from reading our API response
+    Stored server-side in the session, returned in JSON body.
+    Frontend stores in memory and sends as X-CSRF-Token header.
     """
     token = generate_csrf_token()
     return jsonify({"csrf_token": token}), 200
@@ -93,6 +85,41 @@ def logout():
     """Clear the session. Always returns 200."""
     clear_session()
     return jsonify({"message": "Logged out."}), 200
+
+
+@bp.route("/account", methods=["DELETE"])
+@login_required
+@csrf_protect
+@limiter.limit("5 per hour")
+def delete_account():
+    """
+    Permanently delete the authenticated user's account and all their data.
+    Body: { password } — required to confirm intent.
+
+    Password re-verification prevents accidental deletion if a session is
+    left open on a shared machine, and satisfies GDPR Article 17 (right
+    to erasure) by ensuring the deletion is intentional.
+
+    ON DELETE CASCADE on saved_calculators handles data cleanup automatically.
+    """
+    user_id  = session["user_id"]
+    body     = request.get_json(silent=True) or {}
+    password = body.get("password", "")
+
+    if not password:
+        return jsonify({"error": "Password is required to delete your account."}), 422
+
+    user = get_current_user()
+    if not user:
+        return jsonify({"error": "User not found."}), 404
+
+    if not user.check_password(password):
+        return jsonify({"error": "Incorrect password."}), 401
+
+    User.delete(user_id)
+    clear_session()
+
+    return jsonify({"message": "Account deleted."}), 200
 
 
 @bp.route("/status", methods=["GET"])

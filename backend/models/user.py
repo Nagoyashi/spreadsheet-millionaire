@@ -41,9 +41,7 @@ class User:
     # ------------------------------------------------------------------ #
     @classmethod
     def create(cls, email: str, plain_password: str) -> "User":
-        """
-        Insert a new user. Raises ValueError if email already exists.
-        """
+        """Insert a new user. Raises ValueError if email already exists."""
         password_hash = cls.hash_password(plain_password)
         try:
             with get_connection() as conn:
@@ -71,3 +69,17 @@ class User:
                 "SELECT * FROM users WHERE email = ?", (email.lower().strip(),)
             ).fetchone()
         return cls(**dict(row)) if row else None
+
+    @classmethod
+    def delete(cls, user_id: int) -> bool:
+        """
+        Permanently deletes a user and all their saved calculations.
+        The ON DELETE CASCADE on saved_calculators handles the cascade.
+        Returns True if a row was deleted, False if user not found.
+        """
+        with get_connection() as conn:
+            cursor = conn.execute(
+                "DELETE FROM users WHERE id = ?", (user_id,)
+            )
+            conn.commit()
+        return cursor.rowcount > 0
