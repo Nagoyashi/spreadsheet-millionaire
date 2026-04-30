@@ -1,12 +1,34 @@
 // All calculator API calls. No logic here — just HTTP.
+//
+// CSRF protection:
+//   The shared request() helper reads the csrf_token cookie (set by the backend
+//   via /api/auth/csrf-token) and attaches it as X-CSRF-Token on all mutating
+//   requests. No extra setup needed here — just ensure authApi.fetchCsrfToken()
+//   has been called on app load.
 
 const BASE = '/api/calculators'
 
+// ─── CSRF cookie reader ───────────────────────────────────────────────────────
+function getCsrfToken() {
+  const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/)
+  return match ? decodeURIComponent(match[1]) : null
+}
+
+// ─── Shared fetch wrapper ─────────────────────────────────────────────────────
 async function request(path, options = {}) {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
+  const method   = (options.method || 'GET').toUpperCase()
+  const mutating = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)
+
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(mutating && getCsrfToken() ? { 'X-CSRF-Token': getCsrfToken() } : {}),
+    ...options.headers,
+  }
+
+  const res  = await fetch(`${BASE}${path}`, {
     credentials: 'include',
     ...options,
+    headers,
   })
   const data = res.status === 204 ? null : await res.json()
   return { ok: res.ok, status: res.status, data }
@@ -15,7 +37,7 @@ async function request(path, options = {}) {
 export const calculatorApi = {
   // GET /api/calculators?type=fire  (type is optional)
   getAll: (type = null) => {
-    const query = type ? `?type=${type}` : ''
+    const query = type ? `?type=${encodeURIComponent(type)}` : ''
     return request(query)
   },
 
@@ -30,7 +52,7 @@ export const calculatorApi = {
   update: (id, fields) =>
     request(`/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(fields),  // { name?, data? } — both optional
+      body: JSON.stringify(fields),
     }),
 
   // DELETE /api/calculators/<id>

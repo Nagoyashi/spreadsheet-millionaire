@@ -40,7 +40,7 @@ def create_app() -> Flask:
         content_security_policy=False,  # CSP managed separately if needed
         referrer_policy="strict-origin-when-cross-origin",
         frame_options="DENY",           # X-Frame-Options: DENY (clickjacking)
-        content_type_options=True,      # X-Content-Type-Options: nosniff
+        x_content_type_options=True,    # X-Content-Type-Options: nosniff
     )
 
     # ── CORS — must allow credentials for session cookies ─────────────────────
