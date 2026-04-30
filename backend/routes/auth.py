@@ -1,10 +1,13 @@
-from flask import Blueprint, request, jsonify, session
+from flask import Blueprint, request, jsonify, session, make_response
 from marshmallow import ValidationError
 
 from app import limiter
 from models.user import User
 from schemas.user_schema import RegisterSchema, LoginSchema
-from utils.auth_helpers import set_session, clear_session, get_current_user
+from utils.auth_helpers import (
+    set_session, clear_session, get_current_user,
+    csrf_protect, generate_csrf_token,
+)
 
 bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 
@@ -12,8 +15,36 @@ register_schema = RegisterSchema()
 login_schema    = LoginSchema()
 
 
+@bp.route("/csrf-token", methods=["GET"])
+def csrf_token():
+    """
+    Issues a CSRF token for the current session.
+
+    Called once on app load before any mutating request.
+    The token is stored in the server-side session and returned as:
+      - JSON body (for immediate use)
+      - Non-HttpOnly cookie (so JS can read and re-attach it as a header)
+
+    A malicious cross-origin page can trigger credentialed requests (the browser
+    sends the session cookie automatically) but cannot read our csrf_token cookie
+    due to SameSite=Strict + CORS, so it cannot forge the X-CSRF-Token header.
+    """
+    token = generate_csrf_token()
+    response = make_response(jsonify({"csrf_token": token}))
+    response.set_cookie(
+        "csrf_token",
+        token,
+        httponly=False,       # JS must be able to read this
+        samesite="Strict",    # never sent on cross-site requests
+        secure=False,         # set True in prod via Talisman / config
+        max_age=60 * 60 * 24, # 24 hours
+    )
+    return response
+
+
 @bp.route("/register", methods=["POST"])
-@limiter.limit("10 per hour")   # prevent mass account creation from one IP
+@limiter.limit("10 per hour")
+@csrf_protect
 def register():
     """
     Create a new account.
@@ -38,7 +69,8 @@ def register():
 
 
 @bp.route("/login", methods=["POST"])
-@limiter.limit("20 per hour; 5 per minute")   # brute-force protection
+@limiter.limit("20 per hour; 5 per minute")
+@csrf_protect
 def login():
     """
     Authenticate an existing user.
@@ -55,7 +87,7 @@ def login():
 
     user = User.get_by_email(data["email"])
 
-    # Deliberate vague message — don't reveal whether the email exists
+    # Deliberate vague message — don't reveal whether email exists
     if not user or not user.check_password(data["password"]):
         return jsonify({"error": "Invalid email or password."}), 401
 
@@ -64,6 +96,7 @@ def login():
 
 
 @bp.route("/logout", methods=["POST"])
+@csrf_protect
 def logout():
     """Clear the session. Always returns 200."""
     clear_session()
@@ -73,8 +106,8 @@ def logout():
 @bp.route("/status", methods=["GET"])
 def status():
     """
-    Lightweight session check called on every app load.
-    Returns auth state without touching the DB if not logged in.
+    Lightweight session check on every app load.
+    GET — no CSRF protection needed (read-only).
     """
     user_id = session.get("user_id")
 

@@ -2,8 +2,6 @@ import json
 import sqlite3
 from db_init import get_connection
 
-VALID_TYPES = ("fire", "compound", "sankey")
-
 
 class SavedCalculator:
     """

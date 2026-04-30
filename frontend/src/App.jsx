@@ -1,21 +1,29 @@
+import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth'
+import { authApi } from './api/authApi'
 import LandingPage from './pages/LandingPage'
 import CalculatorPage from './pages/CalculatorPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 
-// App.jsx owns auth state and passes it down.
+// App.jsx owns auth state and passes it down as props.
 // No Context — the component tree is shallow enough that props are clean.
 
 function RequireGuest({ isAuthenticated, children }) {
-  // Redirect logged-in users away from /login and /register
   if (isAuthenticated) return <Navigate to="/" replace />
   return children
 }
 
 export default function App() {
   const auth = useAuth()
+
+  // Fetch a CSRF token once on app load.
+  // This sets the csrf_token cookie which all mutating API calls read from.
+  // Runs before any user interaction so the token is always ready.
+  useEffect(() => {
+    authApi.fetchCsrfToken()
+  }, [])
 
   // Don't render routes until the initial /api/auth/status check resolves.
   // Prevents a flash of the login page for authenticated users.
