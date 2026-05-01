@@ -82,18 +82,20 @@ money-calculators/
 ├── backend/
 │   ├── models/          # User, SavedCalculator
 │   ├── routes/          # auth.py, calculators.py
-│   ├── schemas/         # Marshmallow validation
+│   ├── schemas/         # Marshmallow validation (imports calc_types)
 │   ├── utils/           # auth_helpers (login_required, csrf_protect, session helpers)
 │   ├── app.py           # Flask factory
+│   ├── calc_types.py    # Single source of truth for VALID_CALC_TYPES
 │   ├── config.py        # All config from .env
-│   └── db_init.py       # Schema creation + migrations
+│   └── db_init.py       # Schema creation + migrations (imports calc_types)
 └── frontend/
     └── src/
         ├── calculators/ # One file per calculator + registry.js
-        ├── components/  # CalculatorSidebar, ui/ primitives (StatCard, NumInput, etc.)
-        ├── hooks/       # useAuth, useCalculatorData, useSave, useFavourites
+        ├── components/  # CalculatorSidebar, CalculatorHeader, ui/ primitives (StatCard, NumInput, CalculatorSkeleton, etc.)
+        ├── hooks/       # useAuth, useCalculatorData, useCalculatorInputs, useSave, useFavourites
         ├── pages/       # LandingPage, CalculatorPage, LoginPage, RegisterPage
         ├── api/         # authApi, calculatorApi
+        ├── utils/       # format (shared fmt), migrateCalcData (saved-data versioning)
         └── constants.js # Shared storage key generators
 ```
 
@@ -103,10 +105,58 @@ Full structure and architectural conventions: see `PROJECT_STRUCTURE.md`.
 
 ## Adding a New Calculator
 
-1. Create `frontend/src/calculators/YourCalculator.jsx` — must accept `{ initialData, onDataChange }` props
-2. Add one entry to `frontend/src/calculators/registry.js`
-3. Add the type string to `VALID_CALC_TYPES` in `backend/schemas/calculator_schema.py` and `backend/db_init.py`
-4. Run `python db_init.py` to migrate the database constraint
+1. Create `frontend/src/calculators/YourCalculator.jsx` — must accept `{ initialData, onDataChange }` props. Use the `useCalculatorInputs` hook for input state.
+2. Add `version: 1` as the first field in your `DEFAULTS` object.
+3. Add one entry to `frontend/src/calculators/registry.js`.
+4. Add the type string to `VALID_CALC_TYPES` in `backend/calc_types.py` (single source — the schema and `db_init.py` both import from here).
+5. Run `python db_init.py` to migrate the database constraint.
+
+### Calculator component pattern
+
+```jsx
+import { useCalculatorInputs } from '../hooks/useCalculatorInputs'
+import { fmt } from '../utils/format'
+
+const DEFAULTS = {
+  version: 1,                   // required — used by the migration system
+  some_input: 1000,
+  // ...
+}
+
+export default function YourCalculator({ initialData, onDataChange }) {
+  const { inputs, set } = useCalculatorInputs({
+    defaults: DEFAULTS,
+    initialData,
+    onDataChange,
+    calcType: 'your_calc_type',
+  })
+
+  // use `set('some_input')` for scalar inputs
+  // use `setInputs(prev => ...)` (also returned) for nested array operations
+  // use `fmt(value)` for currency formatting — never write a local fmt()
+}
+```
+
+---
+
+## Saved Data Versioning
+
+Saved calculator data is stored as opaque JSON. When you change an input shape (rename a field, change units, add a required field), bump the version and add a migration so existing saved records continue to load.
+
+1. Bump `DEFAULTS.version` in the calculator (e.g. `1` → `2`).
+2. Add a migration step in `frontend/src/utils/migrateCalcData.js`:
+   ```js
+   const MIGRATIONS = {
+     fire: {
+       2: (data) => ({
+         ...data,
+         savings_pct: data.savings_rate,        // rename
+         savings_rate: undefined,
+       }),
+     },
+   }
+   ```
+3. Old records load through the migration automatically. The internal `__v` key is stripped before the data is sent to the backend, so stored JSON stays clean.
 
 ---
 
