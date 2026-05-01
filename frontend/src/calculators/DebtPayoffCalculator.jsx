@@ -1,22 +1,18 @@
-import { useState, useEffect } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { CreditCard, TrendingDown, Calendar, DollarSign, Plus, Trash2 } from 'lucide-react'
 import StatCard from '../components/ui/StatCard'
 import NumInput from '../components/ui/NumInput'
+import { useCalculatorInputs } from '../hooks/useCalculatorInputs'
+import { fmt } from '../utils/format'
 
 const DEFAULTS = {
+  version: 1,
   extra_payment: 200,
   debts: [
     { id: 1, name: 'Credit Card', balance: 5000, rate: 19.99, minimum: 100 },
     { id: 2, name: 'Car Loan',    balance: 12000, rate: 6.5,  minimum: 250 },
     { id: 3, name: 'Student Loan', balance: 20000, rate: 4.5, minimum: 200 },
   ],
-}
-
-function fmt(n) {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`
-  if (n >= 1_000)     return `$${(n / 1_000).toFixed(1)}K`
-  return `$${Math.round(n)}`
 }
 
 function simulate(debts, extraPayment, strategy) {
@@ -87,17 +83,14 @@ function calculate(inputs) {
 }
 
 export default function DebtPayoffCalculator({ initialData, onDataChange }) {
-  const [inputs, setInputs] = useState({
-    extra_payment: DEFAULTS.extra_payment,
-    debts: DEFAULTS.debts,
-    ...initialData,
+  // setInputs is exposed alongside set() for the array operations below
+  // (add/remove/update debt) which need to mutate a nested array.
+  const { inputs, setInputs } = useCalculatorInputs({
+    defaults: DEFAULTS,
+    initialData,
+    onDataChange,
+    calcType: 'debt_payoff',
   })
-
-  useEffect(() => {
-    if (initialData) setInputs({ extra_payment: DEFAULTS.extra_payment, debts: DEFAULTS.debts, ...initialData })
-  }, [initialData])
-
-  useEffect(() => { onDataChange?.(inputs) }, [inputs, onDataChange])
 
   const results = calculate(inputs)
 

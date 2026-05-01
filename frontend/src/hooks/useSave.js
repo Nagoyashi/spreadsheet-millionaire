@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { CALC_STORAGE_KEY } from '../constants'
+import { stripVersion } from '../utils/migrateCalcData'
 
 // Encapsulates all save-related state and logic for CalculatorPage.
 //
@@ -18,6 +19,12 @@ import { CALC_STORAGE_KEY } from '../constants'
 //   handleNameCancel   — call when modal is dismissed
 //   handleLoad         — (calc) => void
 //   handleDelete       — (id) => void
+//
+// Versioning note:
+//   currentDataRef may contain an internal __v key from useCalculatorInputs.
+//   stripVersion() removes it before sending to the backend so the stored
+//   JSON stays clean. The version is re-injected on load via injectVersion()
+//   in useCalculatorInputs / migrateCalcData.
 
 export function useSave({ type, auth, saveCalc, navigate, currentDataRef, onLoad }) {
   const [activeSavedCalcId, setActiveSavedCalcId] = useState(null)
@@ -40,7 +47,8 @@ export function useSave({ type, auth, saveCalc, navigate, currentDataRef, onLoad
     if (isSaving) return
 
     if (!auth.isAuthenticated) {
-      sessionStorage.setItem(CALC_STORAGE_KEY(type), JSON.stringify(currentDataRef.current))
+      const cleanData = stripVersion(currentDataRef.current)
+      sessionStorage.setItem(CALC_STORAGE_KEY(type), JSON.stringify(cleanData))
       navigate('/login', { state: { from: `/calculator/${type}` } })
       return
     }
@@ -57,7 +65,8 @@ export function useSave({ type, auth, saveCalc, navigate, currentDataRef, onLoad
     setSaveStatus('saving')
     setSaveError(null)
 
-    const result = await saveCalc(name, type, data, activeSavedCalcId)
+    const cleanData = stripVersion(data)
+    const result = await saveCalc(name, type, cleanData, activeSavedCalcId)
 
     setIsSaving(false)
 

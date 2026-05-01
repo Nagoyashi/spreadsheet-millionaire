@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer,
@@ -7,20 +6,17 @@ import { DollarSign, TrendingDown, Percent, AlertTriangle } from 'lucide-react'
 import StatCard from '../components/ui/StatCard'
 import NumInput from '../components/ui/NumInput'
 import ChartTooltip from '../components/ui/ChartTooltip'
+import { useCalculatorInputs } from '../hooks/useCalculatorInputs'
+import { fmt } from '../utils/format'
 
 const DEFAULTS = {
+  version: 1,
   initial_investment: 10000,
   monthly_contribution: 500,
   annual_return: 7,
   years: 30,
   low_fee: 0.1,
   high_fee: 1.0,
-}
-
-function fmt(n) {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`
-  if (n >= 1_000)     return `$${(n / 1_000).toFixed(1)}K`
-  return `$${Math.round(n)}`
 }
 
 function calculateGrowth(principal, monthly, annualReturn, years) {
@@ -59,15 +55,12 @@ function calculate(inputs) {
 }
 
 export default function InvestmentFeeCalculator({ initialData, onDataChange }) {
-  const [inputs, setInputs] = useState({ ...DEFAULTS, ...initialData })
-
-  useEffect(() => {
-    if (initialData) setInputs({ ...DEFAULTS, ...initialData })
-  }, [initialData])
-
-  useEffect(() => { onDataChange?.(inputs) }, [inputs, onDataChange])
-
-  const set = key => val => setInputs(prev => ({ ...prev, [key]: val }))
+  const { inputs, set } = useCalculatorInputs({
+    defaults: DEFAULTS,
+    initialData,
+    onDataChange,
+    calcType: 'investment_fee',
+  })
   const results = calculate(inputs)
 
   return (

@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, ReferenceLine,
@@ -7,19 +6,16 @@ import { Wallet, Calendar, TrendingDown, Percent } from 'lucide-react'
 import StatCard from '../components/ui/StatCard'
 import NumInput from '../components/ui/NumInput'
 import ChartTooltip from '../components/ui/ChartTooltip'
+import { useCalculatorInputs } from '../hooks/useCalculatorInputs'
+import { fmt } from '../utils/format'
 
 const DEFAULTS = {
+  version: 1,
   portfolio_value: 1000000,
   annual_withdrawal: 40000,
   expected_return: 5,
   inflation_rate: 2.5,
   years: 30,
-}
-
-function fmt(n) {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`
-  if (n >= 1_000)     return `$${(n / 1_000).toFixed(1)}K`
-  return `$${Math.round(n)}`
 }
 
 function calculate(inputs) {
@@ -54,15 +50,12 @@ function calculate(inputs) {
 }
 
 export default function WithdrawalPlanCalculator({ initialData, onDataChange }) {
-  const [inputs, setInputs] = useState({ ...DEFAULTS, ...initialData })
-
-  useEffect(() => {
-    if (initialData) setInputs({ ...DEFAULTS, ...initialData })
-  }, [initialData])
-
-  useEffect(() => { onDataChange?.(inputs) }, [inputs, onDataChange])
-
-  const set = key => val => setInputs(prev => ({ ...prev, [key]: val }))
+  const { inputs, set } = useCalculatorInputs({
+    defaults: DEFAULTS,
+    initialData,
+    onDataChange,
+    calcType: 'withdrawal',
+  })
   const results = calculate(inputs)
 
   const statusColor  = results.sustainable ? 'from-emerald-50 to-teal-50 border-emerald-100' : 'from-red-50 to-rose-50 border-red-100'

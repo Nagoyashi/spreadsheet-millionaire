@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, ReferenceLine,
@@ -7,8 +6,11 @@ import { Anchor, TrendingUp, Calendar, DollarSign } from 'lucide-react'
 import StatCard from '../components/ui/StatCard'
 import NumInput from '../components/ui/NumInput'
 import ChartTooltip from '../components/ui/ChartTooltip'
+import { useCalculatorInputs } from '../hooks/useCalculatorInputs'
+import { fmt } from '../utils/format'
 
 const DEFAULTS = {
+  version: 1,
   current_savings: 50000,
   annual_contribution: 15000,
   expected_return: 7,
@@ -16,12 +18,6 @@ const DEFAULTS = {
   annual_expenses: 40000,
   current_age: 30,
   retirement_age: 65,
-}
-
-function fmt(n) {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`
-  if (n >= 1_000)     return `$${(n / 1_000).toFixed(1)}K`
-  return `$${Math.round(n)}`
 }
 
 function calculate(inputs) {
@@ -73,15 +69,12 @@ function calculate(inputs) {
 }
 
 export default function CoastFIRECalculator({ initialData, onDataChange }) {
-  const [inputs, setInputs] = useState({ ...DEFAULTS, ...initialData })
-
-  useEffect(() => {
-    if (initialData) setInputs({ ...DEFAULTS, ...initialData })
-  }, [initialData])
-
-  useEffect(() => { onDataChange?.(inputs) }, [inputs, onDataChange])
-
-  const set = key => val => setInputs(prev => ({ ...prev, [key]: val }))
+  const { inputs, set } = useCalculatorInputs({
+    defaults: DEFAULTS,
+    initialData,
+    onDataChange,
+    calcType: 'coast_fire',
+  })
   const results = calculate(inputs)
 
   return (

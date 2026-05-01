@@ -1,20 +1,16 @@
-import { useState, useEffect } from 'react'
 import { Shield, Calendar, DollarSign, TrendingUp } from 'lucide-react'
 import StatCard from '../components/ui/StatCard'
 import NumInput from '../components/ui/NumInput'
+import { useCalculatorInputs } from '../hooks/useCalculatorInputs'
+import { fmt } from '../utils/format'
 
 const DEFAULTS = {
+  version: 1,
   monthly_expenses: 3500,
   target_months: 6,
   current_savings: 5000,
   monthly_contribution: 500,
   interest_rate: 4.5,
-}
-
-function fmt(n) {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`
-  if (n >= 1_000)     return `$${(n / 1_000).toFixed(1)}K`
-  return `$${Math.round(n)}`
 }
 
 function calculate(inputs) {
@@ -43,15 +39,12 @@ function calculate(inputs) {
 }
 
 export default function EmergencyFundCalculator({ initialData, onDataChange }) {
-  const [inputs, setInputs] = useState({ ...DEFAULTS, ...initialData })
-
-  useEffect(() => {
-    if (initialData) setInputs({ ...DEFAULTS, ...initialData })
-  }, [initialData])
-
-  useEffect(() => { onDataChange?.(inputs) }, [inputs, onDataChange])
-
-  const set = key => val => setInputs(prev => ({ ...prev, [key]: val }))
+  const { inputs, set } = useCalculatorInputs({
+    defaults: DEFAULTS,
+    initialData,
+    onDataChange,
+    calcType: 'emergency_fund',
+  })
   const results = calculate(inputs)
 
   const MONTH_PRESETS = [3, 6, 9, 12]

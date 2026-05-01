@@ -15,16 +15,9 @@ Migration strategy:
 """
 
 import sqlite3
-import os
 from config import Config
+from calc_types import VALID_CALC_TYPES
 
-# Keep this list in sync with VALID_CALC_TYPES in schemas/calculator_schema.py
-VALID_CALC_TYPES = (
-    'fire', 'compound', 'sankey',
-    'investment_fee', 'inflation', 'dividend',
-    'withdrawal', 'debt_payoff', 'mortgage',
-    'coast_fire', 'emergency_fund', 'barista_fire',
-)
 
 # The CHECK expression as it will appear in CREATE TABLE
 _CALC_TYPE_CHECK = "calc_type IN ({})".format(
