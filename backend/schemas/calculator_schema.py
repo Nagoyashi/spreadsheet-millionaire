@@ -1,19 +1,7 @@
-from marshmallow import Schema, fields, validate, ValidationError
+from marshmallow import Schema, fields, validate
 
-VALID_CALC_TYPES = [
-    'fire',
-    'compound',
-    'sankey',
-    'investment_fee',
-    'inflation',
-    'dividend',
-    'withdrawal',
-    'debt_payoff',
-    'mortgage',
-    'coast_fire',
-    'emergency_fund',
-    'barista_fire',
-]
+from calc_types import VALID_CALC_TYPES
+
 
 class SaveCalculatorSchema(Schema):
     name = fields.Str(required=True, validate=validate.Length(min=1, max=100))
@@ -22,6 +10,7 @@ class SaveCalculatorSchema(Schema):
         validate=validate.OneOf(VALID_CALC_TYPES)
     )
     data = fields.Dict(required=True)
+
 
 class UpdateCalculatorSchema(Schema):
     name = fields.Str(validate=validate.Length(min=1, max=100))

@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer,
@@ -7,18 +6,15 @@ import { TrendingDown, DollarSign, Calendar, Percent } from 'lucide-react'
 import StatCard from '../components/ui/StatCard'
 import NumInput from '../components/ui/NumInput'
 import ChartTooltip from '../components/ui/ChartTooltip'
+import { useCalculatorInputs } from '../hooks/useCalculatorInputs'
+import { fmt } from '../utils/format'
 
 const DEFAULTS = {
+  version: 1,
   current_amount: 100000,
   inflation_rate: 2.5,
   years: 20,
   desired_future_amount: 200000,
-}
-
-function fmt(n) {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`
-  if (n >= 1_000)     return `$${(n / 1_000).toFixed(1)}K`
-  return `$${Math.round(n)}`
 }
 
 function calculate(inputs) {
@@ -48,15 +44,12 @@ function calculate(inputs) {
 }
 
 export default function InflationCalculator({ initialData, onDataChange }) {
-  const [inputs, setInputs] = useState({ ...DEFAULTS, ...initialData })
-
-  useEffect(() => {
-    if (initialData) setInputs({ ...DEFAULTS, ...initialData })
-  }, [initialData])
-
-  useEffect(() => { onDataChange?.(inputs) }, [inputs, onDataChange])
-
-  const set = key => val => setInputs(prev => ({ ...prev, [key]: val }))
+  const { inputs, set } = useCalculatorInputs({
+    defaults: DEFAULTS,
+    initialData,
+    onDataChange,
+    calcType: 'inflation',
+  })
   const results = calculate(inputs)
 
   return (

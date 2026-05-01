@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, ReferenceLine,
@@ -7,20 +6,17 @@ import { Flame, TrendingUp, PiggyBank, Percent } from 'lucide-react'
 import StatCard from '../components/ui/StatCard'
 import NumInput from '../components/ui/NumInput'
 import ChartTooltip from '../components/ui/ChartTooltip'
+import { useCalculatorInputs } from '../hooks/useCalculatorInputs'
+import { fmt } from '../utils/format'
 
 const DEFAULTS = {
+  version: 1,
   annual_expenses: 40000,
   savings_rate: 50,
   current_savings: 0,
   annual_income: 80000,
   expected_return: 7,
   withdrawal_rate: 4,
-}
-
-function fmt(n) {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`
-  if (n >= 1_000)     return `$${(n / 1_000).toFixed(1)}K`
-  return `$${Math.round(n)}`
 }
 
 function calculate(inputs) {
@@ -74,17 +70,13 @@ function calculate(inputs) {
 }
 
 export default function FIRECalculator({ initialData, onDataChange }) {
-  const [inputs, setInputs] = useState({ ...DEFAULTS, ...initialData })
+  const { inputs, set } = useCalculatorInputs({
+    defaults: DEFAULTS,
+    initialData,
+    onDataChange,
+    calcType: 'fire',
+  })
 
-  useEffect(() => {
-    if (initialData) setInputs({ ...DEFAULTS, ...initialData })
-  }, [initialData])
-
-  useEffect(() => {
-    onDataChange?.(inputs)
-  }, [inputs, onDataChange])
-
-  const set = key => val => setInputs(prev => ({ ...prev, [key]: val }))
   const results = calculate(inputs)
 
   const progressPct = results.fireNumber > 0

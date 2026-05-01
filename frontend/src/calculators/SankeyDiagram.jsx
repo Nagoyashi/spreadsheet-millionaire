@@ -2,8 +2,11 @@ import { useState, useEffect, useRef } from 'react'
 import * as d3 from 'd3'
 import { sankey, sankeyLinkHorizontal, sankeyLeft } from 'd3-sankey'
 import { TrendingUp, TrendingDown, PiggyBank, Percent } from 'lucide-react'
+import { fmt } from '../utils/format'
+import { migrate, stripVersion } from '../utils/migrateCalcData'
 
 const DEFAULTS = {
+  version: 1,
   income_sources: [
     { id: 'salary',    label: 'Salary',    value: 75000 },
     { id: 'freelance', label: 'Freelance', value: 12000 },
@@ -24,13 +27,8 @@ const EXPENSE_COLOURS = ['#6366f1', '#8b5cf6', '#a78bfa', '#7c3aed', '#4f46e5', 
 
 function uid() { return Math.random().toString(36).slice(2, 8) }
 
-function fmt(n) {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`
-  if (n >= 1_000)     return `$${(n / 1_000).toFixed(0)}K`
-  return `$${n.toFixed(0)}`
-}
-
-// ─── Stat card ─────────────────────────────────────────────────────────────────
+// Sankey uses a local StatCard with a `highlight` variant — the shared
+// ui/StatCard doesn't support this, so we keep this one local.
 function StatCard({ label, value, Icon, iconClass, gradientClass, highlight }) {
   return (
     <div className={`rounded-lg shadow-md p-5 hover:shadow-lg hover:-translate-y-1 transition ${highlight ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white' : 'bg-white'}`}>
@@ -170,7 +168,7 @@ function SankeyChart({ incomeSources, expenseCategories }) {
       labelG.append('text').attr('x', x).attr('y', midY + yOff).attr('dy', '0.35em')
         .attr('text-anchor', anchor).attr('fill', node.colour).attr('font-weight', 600).text(node.label)
       labelG.append('text').attr('x', x).attr('y', midY + yOff + 15).attr('dy', '0.35em')
-        .attr('text-anchor', anchor).attr('fill', '#6b7280').text(fmt(node.value))
+        .attr('text-anchor', anchor).attr('fill', '#6b7280').text(fmt(node.value, { thousandDecimals: 0 }))
     })
   }, [incomeSources, expenseCategories, dims])
 
@@ -214,20 +212,53 @@ function InputSection({ title, accentColor, items, colours, onAdd, onLabelChange
 }
 
 // ─── Main component ────────────────────────────────────────────────────────────
-export default function SankeyDiagram({ initialData, onDataChange }) {
-  const [incomeSources, setIncomeSources]         = useState(initialData?.income_sources      ?? DEFAULTS.income_sources)
-  const [expenseCategories, setExpenseCategories] = useState(initialData?.expense_categories  ?? DEFAULTS.expense_categories)
+//
+// Sankey keeps its own two-slice state shape (income_sources +
+// expense_categories) rather than using useCalculatorInputs, because its
+// data isn't a flat input map. We still apply migrate/strip from the same
+// versioning module so saved records upgrade cleanly on load.
 
+const CURRENT_VERSION = DEFAULTS.version
+
+function buildInitialSlices(initialData) {
+  if (!initialData) {
+    return {
+      income_sources: DEFAULTS.income_sources,
+      expense_categories: DEFAULTS.expense_categories,
+    }
+  }
+  const migrated = migrate('sankey', initialData, CURRENT_VERSION)
+  return {
+    income_sources:     migrated.income_sources     ?? DEFAULTS.income_sources,
+    expense_categories: migrated.expense_categories ?? DEFAULTS.expense_categories,
+  }
+}
+
+export default function SankeyDiagram({ initialData, onDataChange }) {
+  const initial = buildInitialSlices(initialData)
+  const [incomeSources, setIncomeSources]         = useState(initial.income_sources)
+  const [expenseCategories, setExpenseCategories] = useState(initial.expense_categories)
+
+  // Reload state when a saved record is loaded
   useEffect(() => {
     if (initialData) {
-      setIncomeSources(initialData.income_sources      ?? DEFAULTS.income_sources)
-      setExpenseCategories(initialData.expense_categories ?? DEFAULTS.expense_categories)
+      const next = buildInitialSlices(initialData)
+      setIncomeSources(next.income_sources)
+      setExpenseCategories(next.expense_categories)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialData])
 
+  // Notify parent — strip the internal version key (added by migrate())
+  // so currentDataRef stays a clean { income_sources, expense_categories }.
+  const onDataChangeRef = useRef(onDataChange)
+  useEffect(() => { onDataChangeRef.current = onDataChange }, [onDataChange])
   useEffect(() => {
-    onDataChange?.({ income_sources: incomeSources, expense_categories: expenseCategories })
-  }, [incomeSources, expenseCategories, onDataChange])
+    onDataChangeRef.current?.(stripVersion({
+      income_sources: incomeSources,
+      expense_categories: expenseCategories,
+    }))
+  }, [incomeSources, expenseCategories])
 
   const addIncome = () => setIncomeSources(p => [...p, { id: uid(), label: 'New source',   value: 0 }])
   const addExpense = () => setExpenseCategories(p => [...p, { id: uid(), label: 'New category', value: 0 }])
@@ -252,21 +283,21 @@ export default function SankeyDiagram({ initialData, onDataChange }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           label="Total Income"
-          value={fmt(totalIncome)}
+          value={fmt(totalIncome, { thousandDecimals: 0 })}
           Icon={TrendingUp}
           iconClass="text-emerald-500"
           gradientClass="from-emerald-500 to-teal-600"
         />
         <StatCard
           label="Total Expenses"
-          value={fmt(totalExpenses)}
+          value={fmt(totalExpenses, { thousandDecimals: 0 })}
           Icon={TrendingDown}
           iconClass="text-red-500"
           gradientClass="from-red-500 to-rose-600"
         />
         <StatCard
           label={surplus >= 0 ? 'Surplus' : 'Deficit'}
-          value={fmt(Math.abs(surplus))}
+          value={fmt(Math.abs(surplus), { thousandDecimals: 0 })}
           Icon={PiggyBank}
           iconClass="text-emerald-500"
           gradientClass="from-emerald-500 to-teal-600"
