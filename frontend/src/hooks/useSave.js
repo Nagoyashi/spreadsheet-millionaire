@@ -19,6 +19,8 @@ import { stripVersion } from '../utils/migrateCalcData'
 //   handleNameCancel   — call when modal is dismissed
 //   handleLoad         — (calc) => void
 //   handleDelete       — (id) => void
+//   handleNew          — () => void  — detach from active record so the next save
+//                        creates a new record. Inputs are NOT reset (caller decides).
 //
 // Versioning note:
 //   currentDataRef may contain an internal __v key from useCalculatorInputs.
@@ -42,6 +44,17 @@ export function useSave({ type, auth, saveCalc, navigate, currentDataRef, onLoad
       clearTimeout(errorTimerRef.current)
     }
   }, [])
+
+  // Reset the active record whenever the calculator type changes.
+  // CalculatorPage doesn't unmount on route param changes — it stays mounted
+  // and just receives a new `type`. Without this reset, an active record from
+  // (say) FIRE would leak into Mortgage and the save button would mis-render
+  // as "Update" on a different calculator.
+  useEffect(() => {
+    setActiveSavedCalcId(null)
+    setSaveStatus(null)
+    setSaveError(null)
+  }, [type])
 
   const handleSaveClick = useCallback(() => {
     if (isSaving) return
@@ -100,6 +113,15 @@ export function useSave({ type, auth, saveCalc, navigate, currentDataRef, onLoad
     if (activeSavedCalcId === id) setActiveSavedCalcId(null)
   }, [activeSavedCalcId])
 
+  // Detach from the active saved record. The next save will create a new
+  // record (modal will appear for a name). Inputs are intentionally left
+  // untouched so the user can fork an existing scenario into a new save.
+  const handleNew = useCallback(() => {
+    setActiveSavedCalcId(null)
+    setSaveStatus(null)
+    setSaveError(null)
+  }, [])
+
   return {
     activeSavedCalcId,
     setActiveSavedCalcId,
@@ -112,5 +134,6 @@ export function useSave({ type, auth, saveCalc, navigate, currentDataRef, onLoad
     handleNameCancel,
     handleLoad,
     handleDelete,
+    handleNew,
   }
 }

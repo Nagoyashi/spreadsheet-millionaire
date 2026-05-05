@@ -13,6 +13,7 @@ export default function CalculatorSidebar({
   calcsError,
   activeSavedCalcId,
   onLoad,
+  onDeselect,
   onRename,
   onDelete,
   onClose,
@@ -121,6 +122,7 @@ export default function CalculatorSidebar({
               error={calcsError}
               activeSavedCalcId={activeSavedCalcId}
               onLoad={onLoad}
+              onDeselect={onDeselect}
               onRename={onRename}
               onDelete={onDelete}
             />
