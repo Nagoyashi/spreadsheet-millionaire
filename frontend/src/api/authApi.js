@@ -10,7 +10,9 @@
 //   on every app mount. It also means an attacker's page can never read
 //   it (no cookie, no localStorage — just a JS variable in our module).
 
-const BASE = '/api/auth'
+import { createApi, registerCsrfTokenGetter } from './httpClient'
+
+const api = createApi('/api/auth')
 
 // Module-level token store — only accessible within this module
 let _csrfToken = null
@@ -19,58 +21,27 @@ export function getCsrfToken() {
   return _csrfToken
 }
 
-// ─── Shared fetch wrapper ─────────────────────────────────────────────────────
-async function request(path, options = {}) {
-  const method   = (options.method || 'GET').toUpperCase()
-  const mutating = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)
-
-  const headers = {
-    'Content-Type': 'application/json',
-    ...(mutating && _csrfToken ? { 'X-CSRF-Token': _csrfToken } : {}),
-    ...options.headers,
-  }
-
-  const res  = await fetch(`${BASE}${path}`, {
-    credentials: 'include',
-    ...options,
-    headers,
-  })
-  const data = res.status === 204 ? null : await res.json()
-  return { ok: res.ok, status: res.status, data }
-}
+// Hand httpClient our getter so it can attach X-CSRF-Token automatically
+// on every mutating request from any API module (auth, calculators, future
+// modules). One-way dependency — httpClient never pulls auth state itself.
+registerCsrfTokenGetter(getCsrfToken)
 
 export const authApi = {
   // Fetch a CSRF token and store it in memory.
   // Awaited in App.jsx before rendering so the token is always ready.
   fetchCsrfToken: async () => {
-    const { ok, data } = await request('/csrf-token')
+    const { ok, data } = await api.get('/csrf-token')
     if (ok && data?.csrf_token) {
       _csrfToken = data.csrf_token
     }
   },
 
-  register: (email, password) =>
-    request('/register', {
-      method: 'POST',
-      body: JSON.stringify({ email, password }),
-    }),
-
-  login: (email, password) =>
-    request('/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password }),
-    }),
-
-  logout: () =>
-    request('/logout', { method: 'POST' }),
+  register: (email, password) => api.post('/register', { email, password }),
+  login:    (email, password) => api.post('/login',    { email, password }),
+  logout:   ()                => api.post('/logout'),
 
   // Permanently deletes the account. Requires password confirmation.
-  deleteAccount: (password) =>
-    request('/account', {
-      method: 'DELETE',
-      body: JSON.stringify({ password }),
-    }),
+  deleteAccount: (password) => api.delete('/account', { password }),
 
-  getStatus: () =>
-    request('/status'),
+  getStatus: () => api.get('/status'),
 }

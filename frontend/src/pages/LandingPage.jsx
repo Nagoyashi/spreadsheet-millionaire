@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BarChart2, ArrowRight, LogOut, User, Star, Trash2 } from 'lucide-react'
+import { BarChart2, ArrowRight, Star } from 'lucide-react'
 import { CALCULATORS, CATEGORIES } from '../calculators/registry'
 import { useFavourites } from '../hooks/useFavourites'
-import DeleteAccountModal from '../components/ui/DeleteAccountModal'
+import UserFooter from '../components/UserFooter'
 
 // ─── Small toast for unauthenticated star attempt ─────────────────────────────
 function AuthToast({ visible }) {
@@ -22,21 +22,6 @@ export default function LandingPage({ auth }) {
   const { favourites, toggle } = useFavourites(auth)
   const [showAuthToast, setShowAuthToast]   = useState(false)
   const toastTimerRef                       = useRef(null)
-  const [showDeleteModal, setShowDeleteModal] = useState(false)
-  const [deleteError, setDeleteError]         = useState(null)
-  const [deleteLoading, setDeleteLoading]     = useState(false)
-
-  async function handleDeleteConfirm(password) {
-    setDeleteLoading(true)
-    setDeleteError(null)
-    const result = await auth.deleteAccount(password)
-    setDeleteLoading(false)
-    if (result.success) {
-      setShowDeleteModal(false)
-    } else {
-      setDeleteError(result.error)
-    }
-  }
 
   function handleStarClick(e, type) {
     e.stopPropagation()
@@ -85,26 +70,7 @@ export default function LandingPage({ auth }) {
         </nav>
         <div className="px-4 py-4 border-t border-white/10">
           {auth.isAuthenticated ? (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 px-2">
-                <User className="w-4 h-4 text-gray-400 shrink-0" />
-                <span className="text-xs text-gray-400 truncate">{auth.user.email}</span>
-              </div>
-              <button
-                onClick={auth.logout}
-                className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition text-sm"
-              >
-                <LogOut className="w-4 h-4" />
-                Sign out
-              </button>
-              <button
-                onClick={() => { setDeleteError(null); setShowDeleteModal(true) }}
-                className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-gray-600 hover:text-red-400 hover:bg-white/10 transition text-sm"
-              >
-                <Trash2 className="w-4 h-4" />
-                Delete account
-              </button>
-            </div>
+            <UserFooter auth={auth} variant="roomy" />
           ) : (
             <div className="space-y-2">
               <button onClick={() => navigate('/login')} className="w-full px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition text-sm text-left">
@@ -255,15 +221,6 @@ export default function LandingPage({ auth }) {
       </div>
 
       <AuthToast visible={showAuthToast} />
-
-      {showDeleteModal && (
-        <DeleteAccountModal
-          onConfirm={handleDeleteConfirm}
-          onCancel={() => setShowDeleteModal(false)}
-          error={deleteError}
-          loading={deleteLoading}
-        />
-      )}
     </div>
   )
 }
