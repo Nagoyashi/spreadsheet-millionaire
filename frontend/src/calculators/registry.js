@@ -9,13 +9,17 @@ import {
 //
 // 1. Create your component in src/calculators/YourCalculator.jsx
 //    It must accept:  { initialData, onDataChange }
+//    Use the useCalculatorInputs hook for input state, fmt() from utils/format
+//    for currency, and include `version: 1` as the first field in DEFAULTS.
 //
 // 2. Add one entry to CALCULATORS below using lazy() for the component.
 //    Pick a category from: 'Retirement' | 'Investing' | 'Budgeting' | 'Debt & Property'
 //    New categories are picked up automatically by the LandingPage filter bar.
 //
-// 3. Add the new type string to the backend calc_type constraint
-//    in backend/schemas/calculator_schema.py
+// 3. Add the new type string to VALID_CALC_TYPES in backend/calc_types.py.
+//    This is the single backend source — both schemas/calculator_schema.py
+//    and db_init.py import from it. Then run `python db_init.py` once to
+//    migrate the CHECK constraint on saved_calculators.
 //
 // Note: badge on each card uses `category` automatically — no separate badgeLabel needed.
 
