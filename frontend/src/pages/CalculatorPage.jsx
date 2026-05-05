@@ -53,6 +53,7 @@ export default function CalculatorPage({ auth }) {
     handleNameCancel,
     handleLoad,
     handleDelete,
+    handleNew,
   } = useSave({
     type,
     auth,
@@ -93,6 +94,7 @@ export default function CalculatorPage({ auth }) {
     calcsError,
     activeSavedCalcId,
     onLoad: handleLoad,
+    onDeselect: handleNew,                  // click active record in sidebar = detach
     onRename: (id, name) => updateCalc(id, { name }),
     onDelete: handleDeleteCalc,
     onClose: () => setMobileSidebarOpen(false),
@@ -125,6 +127,7 @@ export default function CalculatorPage({ auth }) {
           saveLabel={saveLabel}
           isSaving={isSaving}
           onSaveClick={handleSaveClick}
+          onNewClick={handleNew}
           onMobileMenuClick={() => setMobileSidebarOpen(true)}
         />
 

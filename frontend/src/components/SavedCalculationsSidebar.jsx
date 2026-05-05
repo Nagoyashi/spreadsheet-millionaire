@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Pencil, Trash2, BookOpen, AlertCircle } from 'lucide-react'
 
-function RenameableItem({ calc, isActive, onLoad, onRename, onDelete }) {
+function RenameableItem({ calc, isActive, onLoad, onDeselect, onRename, onDelete }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(calc.name)
   const [deleting, setDeleting] = useState(false)
@@ -24,6 +24,13 @@ function RenameableItem({ calc, isActive, onLoad, onRename, onDelete }) {
     setDeleting(false)
   }
 
+  // Clicking the active record toggles deselect; clicking any other record loads it.
+  function handleClick() {
+    if (editing) return
+    if (isActive && onDeselect) onDeselect()
+    else onLoad(calc)
+  }
+
   return (
     <div
       className={`group px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${
@@ -31,7 +38,8 @@ function RenameableItem({ calc, isActive, onLoad, onRename, onDelete }) {
           ? 'bg-white/15 text-white'
           : 'text-gray-400 hover:bg-white/10 hover:text-white'
       }`}
-      onClick={() => !editing && onLoad(calc)}
+      onClick={handleClick}
+      title={isActive ? 'Click to deselect — start a fresh save' : undefined}
     >
       {editing ? (
         <input
@@ -86,6 +94,7 @@ export default function SavedCalculationsSidebar({
   error,
   activeSavedCalcId,
   onLoad,
+  onDeselect,
   onRename,
   onDelete,
 }) {
@@ -123,6 +132,7 @@ export default function SavedCalculationsSidebar({
               calc={calc}
               isActive={calc.id === activeSavedCalcId}
               onLoad={onLoad}
+              onDeselect={onDeselect}
               onRename={onRename}
               onDelete={onDelete}
             />
