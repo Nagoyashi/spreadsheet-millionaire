@@ -6,11 +6,15 @@ import { CALC_MAP, VALID_TYPES } from '../calculators/registry'
 import { CALC_STORAGE_KEY } from '../constants'
 import CalculatorSidebar from '../components/CalculatorSidebar'
 import CalculatorHeader from '../components/CalculatorHeader'
+import CalculatorExplainer from '../components/CalculatorExplainer'
 import CalculatorSkeleton from '../components/ui/CalculatorSkeleton'
 import SaveNameModal from '../components/ui/SaveNameModal'
 
 // Orchestrates the calculator experience: routing guard, data fetch,
 // save coordination, sidebar state. Header + skeleton are extracted.
+// The pedagogical "What is X?" explainer is rendered above the Suspense
+// boundary so it's visible immediately on first load (before the lazy
+// calculator chunk arrives).
 
 export default function CalculatorPage({ auth }) {
   const { type } = useParams()
@@ -18,7 +22,7 @@ export default function CalculatorPage({ auth }) {
 
   if (!VALID_TYPES.includes(type)) return <Navigate to="/" replace />
 
-  const { component: CalcComponent, label, Icon, color } = CALC_MAP[type]
+  const { component: CalcComponent, label, Icon, color, gradient, explainer } = CALC_MAP[type]
 
   const {
     savedCalcs,
@@ -132,7 +136,8 @@ export default function CalculatorPage({ auth }) {
         />
 
         <main className="flex-1 overflow-y-auto p-6">
-          <div className="max-w-5xl mx-auto">
+          <div className="max-w-5xl mx-auto space-y-6">
+            <CalculatorExplainer Icon={Icon} gradient={gradient} explainer={explainer} />
             <Suspense fallback={<CalculatorSkeleton />}>
               {calculator}
             </Suspense>
