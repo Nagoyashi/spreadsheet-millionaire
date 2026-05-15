@@ -78,18 +78,6 @@ export default function BaristaFIRECalculator({ initialData, onDataChange }) {
   return (
     <div className="space-y-6">
 
-      {/* Explainer */}
-      <div className="bg-gradient-to-r from-amber-500 to-orange-500 rounded-lg p-5 text-white">
-        <div className="flex items-center gap-2 mb-2">
-          <Coffee className="w-5 h-5" />
-          <h3 className="font-bold">What is Barista FIRE?</h3>
-        </div>
-        <p className="text-sm text-amber-50 leading-relaxed">
-          Semi-retire early with a smaller portfolio by working part-time to cover some expenses.
-          Your investments cover the rest — and you keep growing until full FIRE if you choose.
-        </p>
-      </div>
-
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           label="Barista FIRE Number"
