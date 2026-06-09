@@ -13,7 +13,10 @@ env/
 # ── Flask / Backend ───────────────────────────────────────
 backend/.env
 backend/fintrackr.db
+backend/fintrackr.db-shm
+backend/fintrackr.db-wal
 backend/flask_session/
+__MACOSX/
 
 # ── Node / Frontend ───────────────────────────────────────
 frontend/node_modules/

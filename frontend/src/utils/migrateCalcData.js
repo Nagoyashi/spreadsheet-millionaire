@@ -21,9 +21,36 @@
 //   Then bump FIRECalculator's DEFAULTS.version to 2.
 
 // Per-type migration registry: { [calcType]: { [targetVersion]: (data) => data } }
-// Empty for now — every calculator is at v1. Add entries here as schemas evolve.
 const MIGRATIONS = {
-  // fire: { 2: (data) => ({ ...data, /* changes */ }) },
+  // Sankey v1 -> v2: flat expense_categories[] becomes nested expense_groups[].
+  // Existing flat expenses are wrapped into a single "Expenses" group so old
+  // saved records load without data loss. The user can reorganise into more
+  // groups afterwards. Non-destructive: every category survives as a subitem.
+  sankey: {
+    2: (data) => {
+      // Already migrated or constructed in v2 shape — leave as-is.
+      if (Array.isArray(data.expense_groups)) {
+        const { expense_categories, ...rest } = data
+        return rest
+      }
+      const flat = Array.isArray(data.expense_categories) ? data.expense_categories : []
+      const { expense_categories, ...rest } = data
+      return {
+        ...rest,
+        expense_groups: [
+          {
+            id: 'group_expenses',
+            label: 'Expenses',
+            items: flat.map(c => ({
+              id: c.id,
+              label: c.label,
+              value: c.value,
+            })),
+          },
+        ],
+      }
+    },
+  },
 }
 
 const VERSION_KEY = '__v'   // internal key used to track version on loaded data
@@ -32,7 +59,7 @@ const VERSION_KEY = '__v'   // internal key used to track version on loaded data
  * Run all migrations needed to bring `data` from its stored version up to
  * `currentVersion`. Pure function — does not mutate input.
  *
- * @param {string} calcType   — e.g. 'fire', 'compound'
+ * @param {string} calcType   — e.g. 'fire', 'sankey'
  * @param {object} data       — raw saved data (may or may not include __v)
  * @param {number} currentVersion — target version (from calculator DEFAULTS)
  * @returns {object}          — migrated data, with __v set to currentVersion
