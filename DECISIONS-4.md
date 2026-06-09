@@ -98,7 +98,7 @@
 
 **Decision:** A hook that owns `useState`, the `initialData` sync effect, the `onDataChange` notification effect, and a `set(field)` curry. Returns `{ inputs, set, setInputs }`.
 **Why:** All twelve calculators had the same 4-line boilerplate. Now they have one hook call. Adding a 13th calculator means writing inputs + render — no plumbing.
-**Exception:** `SankeyDiagram` has two state slices (income sources, expense categories), so it calls `migrate()` and `stripVersion()` directly instead. The exception is documented in code.
+**Exception:** `SankeyDiagram` has two state slices (income sources, expense groups), so it calls `migrate()` and `stripVersion()` directly instead. The exception is documented in code. See § "Sankey v2 — nested groups, restyle, permalink" for the full shape.
 
 ## Saved-data versioning
 
@@ -107,6 +107,7 @@
 **Decision:** Every calculator's `DEFAULTS` includes `version: 1` as the first field. `migrateCalcData.js` holds a per-type migration registry. The internal `__v` key is stripped before save and re-injected on load.
 **Why:** Saved data is opaque JSON in SQLite. Without a versioning system, renaming a field or changing units would silently break every existing saved record. Now we have a controlled upgrade path: bump the version, register a migration, old records upgrade on load.
 **Why strip the key before save:** Stored JSON stays clean — `__v` is metadata, not user input. Re-injection happens on load via `injectVersion()` (defaults to 1 for legacy records that pre-date versioning).
+**First real migration:** Sankey is the first calculator to advance past `version: 1` — its v1→v2 migration (flat `expense_categories[]` → nested `expense_groups[]`) is the proof that the versioning system works end-to-end on real saved data. See § "Sankey v2".
 **Next phase rule:** The tracker features will store their own user data. Same versioning rule applies — no shape without a `version: 1` field and a stub migration entry.
 
 ## Calculator explainers driven by registry
@@ -115,6 +116,26 @@
 
 **Decision:** Each registry entry has `explainer: { heading, body }`. A single `<CalculatorExplainer>` component renders the gradient banner above the Suspense boundary in `CalculatorPage`. Calculator components do not render their own explainer.
 **Why:** Originally only BaristaFIRE had an inline explainer. Extending the pattern would have meant 11 copies of nearly-identical JSX, plus a maintenance burden on the structure. Now adding an explainer to a new calculator means writing two strings in the registry — and the banner appears for free, including during the lazy-load skeleton (a nice side effect).
+
+## Sankey v2 — nested groups, restyle, permalink
+
+**TL;DR:** Sankey is a 4-column diagram (income → Budget hub → group → subcategory) with its own nested data shape, a soft pastel restyle, currency picker, %/amount toggle, and a client-side permalink.
+
+**Decision:** Sankey diverges from the other 11 calculators in four ways:
+1. **Nested data shape (v2).** `{ income_sources[], expense_groups[] }` where each group has `items[]`. This is the only calculator whose saved shape isn't a flat input map.
+2. **Four-column diagram.** income source → `Budget` hub → expense group → subcategory. Mirrors the structure of a real budget (group totals roll up from their items).
+3. **Toolbar controls.** A currency picker (`$ / € / £`), an amount/% toggle (% = share of total income), and a "Copy permalink" button.
+4. **Permalink via URL state.** Full diagram state is encoded as `?data=<base64>` — no backend, no DB column. On mount, a `?data=` param takes precedence over `initialData`. The button writes the URL to the clipboard and the address bar via `history.replaceState`.
+
+**Why nested groups:** The original flat `expense_categories[]` couldn't express "Housing = Rent + Electricity". A real budget groups spending, and the diagram is far more legible with a middle layer. Cost: a breaking data-shape change, handled by a v1→v2 migration (flat list wrapped into a single "Expenses" group — non-destructive, idempotent).
+
+**Why permalink is client-side, not backed by the DB:** A shareable budget snapshot doesn't need to be a persisted record — it's a point-in-time view someone pastes into a chat or bookmark. URL state is zero-infra and the link works for logged-out users. If we later want named, editable shared budgets, that becomes a backend feature (`?id=` + a public-share endpoint) — but that's a different product decision, not a prerequisite.
+
+**Why the restyle is Sankey-only:** The pastel palette, inline band labels, and dark hub bar were tuned for flow legibility — they're not the app's global design language (that refresh is still pending; see § "Design system extraction"). Sankey got the treatment first because it was the calculator whose old styling read as most broken (saturated colours, colliding labels, 1px stub bands from the old `Math.max(1, value)` hack).
+
+**Layout-bug fixes that shipped with the rebuild:** label truncation with ellipsis (names no longer overflow the box); sub-threshold entries (`< 1`) filtered from the diagram but kept editable in inputs (no more 1px stub bands); thin middle bands skip their label to avoid collisions; endpoints always labelled.
+
+**When to revisit:** If a second tracker/calculator needs nested groups, consider whether the group/item editor UI is worth extracting into a shared primitive. For now it lives in `SankeyDiagram.jsx` — one consumer, no extraction.
 
 ## Lazy-loaded calculators with skeleton fallback
 

@@ -84,7 +84,7 @@ frontend/
     │   ├── registry.js                     # ← ONLY file to touch when adding a calculator
     │   ├── FIRECalculator.jsx
     │   ├── CompoundInterestCalculator.jsx
-    │   ├── SankeyDiagram.jsx              # Two-slice state, calls migrate/stripVersion directly
+    │   ├── SankeyDiagram.jsx              # v2: nested income/expense_groups, 4-col diagram, currency+%/permalink. Two-slice state, calls migrate/stripVersion directly
     │   ├── InvestmentFeeCalculator.jsx
     │   ├── InflationCalculator.jsx
     │   ├── DividendCalculator.jsx
@@ -232,6 +232,8 @@ When you change a saved-data shape (rename a field, change units, restructure):
 4. The `__v` key is stripped on save so the backend stores only user-input fields.
 
 **Forward-compat note:** if a client sees a saved record with a higher version than its `DEFAULTS.version`, it logs a warning and uses the data as-is rather than downgrading.
+
+**Live example — Sankey v1→v2:** Sankey is the first calculator to use this in production. Its migration wraps the old flat `expense_categories[]` into a single nested `expense_groups[]` entry labelled "Expenses". See the `sankey` block in `migrateCalcData.js` for a real, non-trivial migration (it's also idempotent — re-running on a v2 record is a no-op).
 
 **This rule extends to the upcoming trackers.** Net worth entries, transactions, settings, anything user-scoped that's stored — same versioning pattern from day one.
 
