@@ -1,4 +1,4 @@
-# FINtrackr — Project Structure
+# SpreadsheetMillionaire — Project Structure
 
 > Keep this file updated whenever files are added, moved, or deleted.
 > Claude reads this first to resolve import paths and file locations.
@@ -130,6 +130,7 @@ Every entry in `frontend/src/calculators/registry.js` has this shape. All fields
 ```js
 {
   type:        'fire',                              // unique slug, matches backend calc_types.py
+  published:   true,                                // REQUIRED — true = visible in the public app
   label:       'FIRE Calculator',                   // shown in nav + page header
   subtitle:    'Financial Independence',            // shown on landing-page card
   description: 'Calculate your path to ...',        // landing-page card copy
@@ -145,6 +146,20 @@ Every entry in `frontend/src/calculators/registry.js` has this shape. All fields
   component:   lazy(() => import('./FIRECalculator')),
 }
 ```
+
+**`published`** gates whether a calculator appears in the public app. The MVP
+ships with four published calculators — `fire`, `compound`, `emergency_fund`,
+`debt_payoff` — and eight unpublished ones that re-enable by flipping the flag.
+The user-facing surface derives from this flag, never from a hand-kept list:
+
+| Export | Derives from | Consumed by |
+|--------|-------------|-------------|
+| `CALCULATORS` | source of truth (all 12) | `CALC_MAP`, `VALID_TYPES`, the published exports |
+| `CALC_MAP` / `VALID_TYPES` | all 12 | `CalculatorPage` lookup; `VALID_TYPES` mirrors backend `calc_types.py` |
+| `PUBLISHED_CALCULATORS` / `PUBLISHED_TYPES` | `published: true` | sidebar nav, landing grid + tabs, favourites filter, routing guard |
+| `CATEGORIES` | `PUBLISHED_CALCULATORS` | sidebar + landing tabs (empty categories never render) |
+
+See `DECISIONS.md` § "MVP narrowing via `published` flag".
 
 ---
 
@@ -164,7 +179,7 @@ Every entry in `frontend/src/calculators/registry.js` has this shape. All fields
 | User footer | The authenticated-user block (email + sign out + delete account modal) is `<UserFooter>` — used on both LandingPage (`variant="roomy"`) and CalculatorSidebar (`variant="compact"`). Owns the delete-modal state internally. |
 | Save logic | Fully encapsulated in `src/hooks/useSave.js`. Uses `stripVersion()` so the internal `__v` key never reaches the backend. Resets `activeSavedCalcId` on calculator type change |
 | New / deselect | "New" button on header (visible only when a record is loaded) and click-on-active in saved sidebar both detach from `activeSavedCalcId` without resetting inputs |
-| Favourites | Stored in `localStorage` keyed by `fintrackr_favourites_${user.id}` — per-user, no backend needed. Logic in `useFavourites.js` |
+| Favourites | Stored in `localStorage` keyed by `sm_favourites_${user.id}` — per-user, no backend needed. Logic in `useFavourites.js` |
 | Storage keys | Never hardcode — always import from `src/constants.js` |
 | Calculator imports | Each calculator imports `StatCard`, `NumInput`, `ChartTooltip` from `'../components/ui/'` |
 | Lazy loading | All calculator components use `lazy()` in `registry.js` — `CalculatorPage` wraps render in `<Suspense>` with `CalculatorSkeleton` fallback |

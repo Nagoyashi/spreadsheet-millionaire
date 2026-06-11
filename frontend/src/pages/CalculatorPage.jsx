@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'rea
 import { useParams, useNavigate, Navigate } from 'react-router-dom'
 import { useCalculatorData } from '../hooks/useCalculatorData'
 import { useSave } from '../hooks/useSave'
-import { CALC_MAP, VALID_TYPES } from '../calculators/registry'
+import { CALC_MAP, PUBLISHED_TYPES } from '../calculators/registry'
 import { CALC_STORAGE_KEY } from '../constants'
 import CalculatorSidebar from '../components/CalculatorSidebar'
 import CalculatorHeader from '../components/CalculatorHeader'
@@ -20,7 +20,10 @@ export default function CalculatorPage({ auth }) {
   const { type } = useParams()
   const navigate = useNavigate()
 
-  if (!VALID_TYPES.includes(type)) return <Navigate to="/" replace />
+  // A type that is unknown OR exists but is unpublished redirects to the landing
+  // page. PUBLISHED_TYPES is the public surface; CALC_MAP still holds all 12 so
+  // saved rows for unpublished types remain loadable on develop.
+  if (!PUBLISHED_TYPES.includes(type)) return <Navigate to="/" replace />
 
   const { component: CalcComponent, label, Icon, color, gradient, explainer } = CALC_MAP[type]
 

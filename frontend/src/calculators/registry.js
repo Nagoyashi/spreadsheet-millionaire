@@ -15,6 +15,12 @@ import {
 // 2. Add one entry to CALCULATORS below using lazy() for the component.
 //    Pick a category from: 'Retirement' | 'Investing' | 'Budgeting' | 'Debt & Property'
 //    New categories are picked up automatically by the LandingPage filter bar.
+//    Set `published: true` to show it in the public app, `false` to keep it in
+//    the codebase but hidden from the sidebar, landing grid, and routing guard.
+//    `published` is REQUIRED on every entry. The four-calculator public MVP is
+//    the only set with `published: true`; the rest re-enable one at a time as
+//    build-in-public patches by flipping the flag. See DECISIONS.md
+//    § "MVP narrowing via `published` flag".
 //
 // 3. Add the new type string to VALID_CALC_TYPES in backend/calc_types.py.
 //    This is the single backend source — both schemas/calculator_schema.py
@@ -26,6 +32,7 @@ import {
 export const CALCULATORS = [
   {
     type: 'fire',
+    published: true,
     label: 'FIRE Calculator',
     subtitle: 'Financial Independence',
     description: 'Calculate your path to early retirement. Know your number, know your timeline.',
@@ -42,6 +49,7 @@ export const CALCULATORS = [
   },
   {
     type: 'compound',
+    published: true,
     label: 'Compound Interest',
     subtitle: 'Wealth Growth',
     description: 'Watch your money grow. Model contributions, rates, and time across any horizon.',
@@ -58,6 +66,7 @@ export const CALCULATORS = [
   },
   {
     type: 'sankey',
+    published: false,
     label: 'Cash Flow Sankey',
     subtitle: 'Cash Flow Diagram',
     description: 'Visualise where your money comes from and where it goes. Every dollar accounted for.',
@@ -74,6 +83,7 @@ export const CALCULATORS = [
   },
   {
     type: 'investment_fee',
+    published: false,
     label: 'Investment Fee Impact',
     subtitle: 'Fee Comparison',
     description: 'See exactly how fund fees silently erode your wealth over time. Small % = big money.',
@@ -90,6 +100,7 @@ export const CALCULATORS = [
   },
   {
     type: 'inflation',
+    published: false,
     label: 'Inflation Calculator',
     subtitle: 'Purchasing Power',
     description: "Understand what today's money will be worth in the future — and how much you need to stay ahead.",
@@ -106,6 +117,7 @@ export const CALCULATORS = [
   },
   {
     type: 'dividend',
+    published: false,
     label: 'Dividend Calculator',
     subtitle: 'Passive Income',
     description: 'Model your dividend income stream. See how reinvestment compounds your passive income over time.',
@@ -122,6 +134,7 @@ export const CALCULATORS = [
   },
   {
     type: 'withdrawal',
+    published: false,
     label: 'Withdrawal Plan',
     subtitle: 'Decumulation',
     description: "The other side of FIRE. Model how long your portfolio lasts and whether your withdrawal rate is safe.",
@@ -138,6 +151,7 @@ export const CALCULATORS = [
   },
   {
     type: 'debt_payoff',
+    published: true,
     label: 'Debt Payoff',
     subtitle: 'Avalanche vs Snowball',
     description: 'Compare the two debt payoff strategies side by side. See which saves more and which motivates more.',
@@ -154,6 +168,7 @@ export const CALCULATORS = [
   },
   {
     type: 'mortgage',
+    published: false,
     label: 'Mortgage Calculator',
     subtitle: 'Home Loan',
     description: 'Calculate your monthly payments, total interest, and full amortisation schedule.',
@@ -170,6 +185,7 @@ export const CALCULATORS = [
   },
   {
     type: 'coast_fire',
+    published: false,
     label: 'Coast FIRE',
     subtitle: 'Semi-Retirement Path',
     description: 'Find out when you can stop contributing and let compounding do the rest of the work.',
@@ -186,6 +202,7 @@ export const CALCULATORS = [
   },
   {
     type: 'emergency_fund',
+    published: true,
     label: 'Emergency Fund',
     subtitle: 'Financial Safety Net',
     description: 'How much do you need? How long to get there? Build your financial foundation first.',
@@ -202,6 +219,7 @@ export const CALCULATORS = [
   },
   {
     type: 'barista_fire',
+    published: false,
     label: 'Barista FIRE',
     subtitle: 'Semi-Retirement',
     description: 'Semi-retire early with part-time work. Smaller portfolio needed, more freedom sooner.',
@@ -222,6 +240,14 @@ export const CALCULATORS = [
 export const CALC_MAP    = Object.fromEntries(CALCULATORS.map(c => [c.type, c]))
 export const VALID_TYPES = CALCULATORS.map(c => c.type)
 
-// All unique categories in the order they first appear.
-// Adding a new category string to any entry above automatically adds it here.
-export const CATEGORIES = ['All', ...new Set(CALCULATORS.map(c => c.category))]
+// The public MVP surface. Every user-facing enumeration (sidebar nav, landing
+// grid, category tabs, routing guard) derives from this — never re-filter the
+// full CALCULATORS list in a consumer, and never maintain a second list.
+export const PUBLISHED_CALCULATORS = CALCULATORS.filter(c => c.published)
+export const PUBLISHED_TYPES       = PUBLISHED_CALCULATORS.map(c => c.type)
+
+// All unique categories among PUBLISHED calculators, in first-appearance order.
+// Deriving from the published set means a category with no published calculator
+// never renders as an empty group. Publishing a calculator in a new category
+// adds that category here automatically.
+export const CATEGORIES = ['All', ...new Set(PUBLISHED_CALCULATORS.map(c => c.category))]
