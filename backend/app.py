@@ -1,4 +1,5 @@
 import os
+import sys
 from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_session import Session
@@ -6,7 +7,8 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_talisman import Talisman
 
-from config import Config
+import db
+from config import Config, STARTUP_WARNINGS
 from db_init import init_db
 
 # ── Rate limiter — shared instance imported by route files ────────────────────
@@ -22,8 +24,16 @@ def create_app() -> Flask:
     app = Flask(__name__)
     app.config.from_object(Config)
 
-    # ── Flask-Session (filesystem-backed server-side sessions) ────────────────
-    os.makedirs(Config.SESSION_FILE_DIR, exist_ok=True)
+    # ── Startup warnings (Redis fallback, email disabled, …) ──────────────────
+    for warning in STARTUP_WARNINGS:
+        print(f"[WARN] {warning}", file=sys.stderr)
+
+    # ── Per-request Postgres connection (psycopg) ─────────────────────────────
+    db.init_app(app)
+
+    # ── Server-side sessions — Redis (Upstash) or filesystem dev fallback ─────
+    if Config.SESSION_TYPE == "filesystem":
+        os.makedirs(Config.SESSION_FILE_DIR, exist_ok=True)
     Session(app)
 
     # ── Rate limiter ──────────────────────────────────────────────────────────

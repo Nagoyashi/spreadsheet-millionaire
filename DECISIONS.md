@@ -58,7 +58,7 @@
 
 **Decision:** `calc_types.py` holds `VALID_CALC_TYPES`. Both `schemas/calculator_schema.py` (Marshmallow `OneOf`) and `db_init.py` (CHECK constraint) import from it.
 **Why:** Previously these two lists had to be kept in sync manually. Adding a calculator would silently let invalid types into the DB or block valid ones from being saved. Now they can't diverge.
-**Trade-off accepted:** `db_init.py` has a small migration block that detects when the CHECK constraint needs updating and rebuilds the table — necessary because SQLite can't ALTER a CHECK in place.
+**Trade-off accepted:** `db_init.py` rebuilds the named `calc_type` CHECK constraint via `DROP CONSTRAINT IF EXISTS` + `ADD CONSTRAINT` on every run, so the allowed set always matches `VALID_CALC_TYPES`. Postgres alters constraints in place — the old SQLite full-table-rebuild hack is gone. (The allowed-values list is composed with `psycopg.sql.Literal`, not f-strings, since DDL can't take bind parameters.)
 
 ## Shared HTTP client + CSRF injection
 
@@ -83,22 +83,47 @@
 **Decision:** Backend stores the CSRF token in the server-side Flask session, not in a cookie.
 **Why:** With server-side sessions, the token is already protected from client tampering — no need for double-submit cookie patterns. The header-based scheme (`X-CSRF-Token`) is the simpler half of double-submit.
 
-## No ORM — raw SQL via sqlite3
+## No ORM — raw SQL via psycopg
 
-**TL;DR:** Raw `sqlite3` with parameterised queries. SQLAlchemy is not coming.
+**TL;DR:** Raw `psycopg` (psycopg 3) with parameterised queries. SQLAlchemy is not coming.
 
-**Decision:** All DB access uses `sqlite3` directly with parameterised queries.
+**Decision:** All DB access uses `psycopg` directly with parameterised (`%s`) queries. (This was `sqlite3` before the Postgres/Neon migration; the no-ORM stance carried over unchanged — only the driver and placeholder style changed.)
 **Why:** Two tables, ~10 queries total at MVP. SQLAlchemy would mean a week of refactor for zero correctness or performance gain. Raw SQL is also more transparent about what's actually hitting the database.
-**Safety:** Every query against `saved_calculators` includes `AND user_id = ?` — IDOR protection enforced at the query layer, not at a permission layer.
+**Safety:** Every query against `saved_calculators` includes `AND user_id = %s` — IDOR protection enforced at the query layer, not at a permission layer.
 **Stress-test for next phase:** The trackers will add at least two new user-scoped tables (entries, optionally categories). Same rule applies — no query without the user_id filter. If the table count climbs past 6–8, the no-ORM call should be revisited.
 
-## Filesystem sessions in dev
+## Postgres on Neon
 
-**TL;DR:** `flask-session` filesystem backend in dev. Redis before going multi-worker.
+**TL;DR:** SQLite is retired. The app runs on Postgres (Neon), one connection per request, no in-process pool, `data` stored as JSONB.
 
-**Decision:** `flask-session` with filesystem backend in development.
-**Why:** Zero infrastructure to run. Works out of the box on a fresh checkout.
-**When to revisit:** Before multi-worker production deployment. Filesystem sessions don't survive across worker processes — swap to Redis (`SESSION_TYPE = redis`) before going to gunicorn with `-w 2+`.
+**Decision:** The database is Postgres, hosted on Neon, accessed via `psycopg` (psycopg 3). A new `db.py` opens one connection per request on Flask `g` and closes it on teardown. `DATABASE_URL` is validated at startup — the app exits if it's missing or not a Postgres URL — with no SQLite fallback and no dual-driver support.
+
+**Why move off SQLite:**
+- Render's filesystem is ephemeral, so a SQLite file doesn't survive a deploy or restart — production needs a real, managed database.
+- SQLite under multiple gunicorn workers is a correctness/locking hazard; Postgres is built for concurrent writers.
+- Neon gives a branch-per-environment workflow: the **dev branch** backs local/staging, the **main branch** backs production. Same engine, isolated data, one env var (`DATABASE_URL`) apart.
+
+**Why no in-process pool:** `DATABASE_URL` points at Neon's **pooled (PgBouncer)** endpoint, which does the pooling. A second pool in-process would just fight it. One connection per request, closed on teardown, is the boring correct choice.
+
+**Why JSONB for `data`:** It's Postgres-native — the engine validates the JSON, can query into it later if needed, and `psycopg` round-trips it directly to/from a Python `dict` (no manual `json.dumps`/`loads`). The route sees the same dict shape it always did.
+
+**No-ORM stance carries over:** see § "No ORM — raw SQL via psycopg". Parameterised `%s` queries, `AND user_id = %s` on every user-scoped query, identity PKs, `TIMESTAMPTZ` timestamps, and an idempotent `db_init.py` (`python db_init.py` still creates/migrates the schema, now Postgres-side).
+
+**When to revisit:** If query volume or table count grows enough that hand-written SQL becomes a maintenance drag (see the no-ORM revisit trigger), or if Neon's pooling model stops fitting (e.g. needing long-lived connections / `LISTEN`/`NOTIFY`), reconsider the per-request-connection shape.
+
+## Redis sessions via Upstash
+
+**TL;DR:** Sessions and rate limiting live in Redis (Upstash) so they hold across workers. Dev can fall back to filesystem sessions + in-memory limiting with one env var unset.
+
+**Decision:** Server-side sessions use `flask-session` with the Redis backend (`SESSION_TYPE = "redis"`, `SESSION_REDIS = redis.from_url(REDIS_URL)`), and the rate limiter stores its counters in the same Redis (`RATELIMIT_STORAGE_URI = REDIS_URL`). In **production**, `REDIS_URL` is mandatory — the app exits at startup without it. In **development**, `REDIS_URL` is optional: set it for full prod parity, or leave it unset to fall back to filesystem sessions + `memory://` rate limiting, with a single clear startup warning.
+
+**Why this replaces "filesystem sessions in dev":** That decision's revisit condition has triggered. Filesystem sessions don't survive across gunicorn worker processes, and Render's filesystem is ephemeral besides — so a multi-worker production deploy needs a shared session store. Likewise, in-memory rate-limit counters are per-process: with `-w 2+` the limits wouldn't actually limit. Redis fixes both with one store.
+
+**Why keep the dev fallback:** A fresh checkout should still run with zero infrastructure. Making `REDIS_URL` optional in dev preserves that — and the gap between "works on my machine" and "works in prod" is exactly one environment variable.
+
+**Upstash specifics:** Upstash connection strings are `rediss://` (TLS). `redis.from_url` negotiates TLS automatically — no extra flags. The CSRF token still lives in the server-side session, so `clear_session()` continuing to preserve the token across logout is unchanged; only the storage backend moved.
+
+**When to revisit:** If Redis becomes a hard dependency for more than sessions + rate limiting (e.g. caching, queues), or if Upstash's per-command pricing model stops fitting the request volume, reassess the provider — not the decision to use Redis.
 
 ## Number formatting via shared `fmt()`
 
@@ -213,7 +238,19 @@
 
 **Decision:** Limiter instance lives in `app.py`. Routes import it and apply `@limiter.limit()` per endpoint. Auth routes get tighter limits than data routes.
 **Why:** Brute-force auth is the main attack vector. Login gets 5/min + 20/hr; register gets 10/hr; account deletion gets 5/hr. Data routes are looser.
-**Storage:** `memory://` in dev. Swap to Redis (`RATELIMIT_STORAGE_URI=redis://...`) before going multi-process or limits won't actually limit.
+**Storage:** Redis (Upstash) via `REDIS_URL` so counters are shared across workers — see § "Redis sessions via Upstash". In dev, leaving `REDIS_URL` unset falls back to `memory://` (per-process, resets on restart). Multi-process without Redis means the limits don't actually limit.
+
+## Transactional email via Resend
+
+**TL;DR:** Email goes through Resend, wrapped in a `services/email.py` module. It's best-effort — registration never fails because of an email error.
+
+**Decision:** Transactional email is sent via Resend, behind a small `services/email.py` wrapper (`send_email(to, subject, html)` + the concrete `send_welcome_email(to_email)`). `MAIL_FROM` and `RESEND_API_KEY` come from `.env`. If `RESEND_API_KEY` is unset, email is disabled — `send_email` becomes a logged no-op and a single startup warning fires (dev **and** prod). The registration route sends the welcome email **after** the user row is committed, inside its own `try/except` that logs and swallows any failure.
+
+**Why a service module:** Email is a side-effect with its own SDK, config, and failure modes — it doesn't belong inlined in a route. A module gives one place for the SDK wiring, the enabled/disabled gate, and future templates (password reset is the next caller). Routes just call `send_welcome_email(...)` and move on.
+
+**Why registration never fails on email errors:** Account creation and "did the welcome email send" are independent concerns. A Resend outage, a rate limit, or an unverified-domain rejection must not cost a user their signup or even noticeably slow it. So the send happens after the commit, in a guarded block, and its result is ignored. Email is not availability-critical **yet** — that calculus changes when password reset lands (a reset email that silently fails is a real problem), at which point this decision gets a second look.
+
+**Domain caveat:** Until `spreadsheetmillionaire.com` is verified in Resend (a DNS task), sends only succeed to the Resend account owner's own address. That's expected and not a code concern.
 
 ## bcrypt + 8-char password rule
 
