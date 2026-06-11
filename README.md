@@ -1,8 +1,10 @@
-# FINtrackr
+# SpreadsheetMillionaire
 
 A personal-finance web app. Use the calculators without an account; sign in to save your inputs. Net worth and income/expense trackers coming soon, with a freemium tier for advanced features.
 
-**Current calculators:** FIRE, Compound Interest, Cash Flow Sankey, Investment Fee Impact, Inflation, Dividend, Withdrawal Plan, Debt Payoff, Mortgage, Coast FIRE, Emergency Fund, Barista FIRE.
+**Public MVP calculators:** FIRE, Compound Interest, Emergency Fund, Debt Payoff.
+
+Eight more calculators (Cash Flow Sankey, Investment Fee Impact, Inflation, Dividend, Withdrawal Plan, Mortgage, Coast FIRE, Barista FIRE) live in the codebase behind a `published` flag in the calculator registry and ship one at a time as build-in-public patches.
 
 ---
 
@@ -56,6 +58,8 @@ Create `backend/.env`. The app **will not start** if `FLASK_SECRET_KEY` is missi
 | `CORS_ORIGINS` | `http://localhost:5173` | deployed frontend URL |
 | `DATABASE_PATH` | `fintrackr.db` | `fintrackr.db` |
 | `SESSION_COOKIE_SECURE` | `False` | `True` |
+
+> **Legacy filename note:** the dev SQLite file is still named `fintrackr.db` (and `DATABASE_PATH` defaults to it) from the project's former name. It's left as-is on purpose — the upcoming Postgres migration retires SQLite entirely, so renaming the file now would only churn dev environments for nothing.
 | `RATELIMIT_STORAGE_URI` | `memory://` | `redis://...` for multi-process |
 
 ---
@@ -64,7 +68,7 @@ Create `backend/.env`. The app **will not start** if `FLASK_SECRET_KEY` is missi
 
 - **`PROJECT_STRUCTURE.md`** — full file tree, conventions, and how-to recipes (adding a calculator, adding an API namespace, versioning saved data)
 - **`DECISIONS.md`** — the *why* behind every architectural choice, with conditions for when to revisit
-- **`INSTRUCTIONS.md`** — context for the AI assistant working on this codebase
+- **`CLAUDE.md`** — context and hard rules for the AI assistant working on this codebase
 
 ---
 

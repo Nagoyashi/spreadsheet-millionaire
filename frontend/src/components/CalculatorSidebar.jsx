@@ -40,7 +40,7 @@ export default function CalculatorSidebar({
       {/* Brand */}
       <div className="px-6 py-5 border-b border-white/10 flex items-center justify-between">
         <Link to="/" className="text-xl font-bold text-white tracking-tight">
-          FIN<span className="text-amber-400">trackr</span>
+          Spreadsheet<span className="text-amber-400">Millionaire</span>
         </Link>
         <button className="md:hidden text-gray-400 hover:text-white" onClick={onClose} aria-label="Close sidebar">
           <X className="w-5 h-5" />

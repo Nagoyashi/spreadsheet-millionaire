@@ -59,7 +59,7 @@ export default function LandingPage({ auth }) {
       <aside className="w-64 shrink-0 bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 flex flex-col min-h-screen">
         <div className="px-6 py-5 border-b border-white/10">
           <span className="text-xl font-bold text-white tracking-tight">
-            FIN<span className="text-amber-400">trackr</span>
+            Spreadsheet<span className="text-amber-400">Millionaire</span>
           </span>
         </div>
         <nav className="flex-1 px-3 py-4 space-y-1">
