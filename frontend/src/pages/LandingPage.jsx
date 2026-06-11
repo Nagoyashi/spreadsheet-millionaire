@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BarChart2, ArrowRight, Star } from 'lucide-react'
-import { CALCULATORS, CATEGORIES } from '../calculators/registry'
+import { PUBLISHED_CALCULATORS, CATEGORIES } from '../calculators/registry'
 import { useFavourites } from '../hooks/useFavourites'
 import UserFooter from '../components/UserFooter'
 
@@ -39,11 +39,11 @@ export default function LandingPage({ auth }) {
   // Starred calcs float to top within any tab
   const displayed = (() => {
     if (activeCategory === 'Favourites') {
-      return CALCULATORS.filter(c => favourites.includes(c.type))
+      return PUBLISHED_CALCULATORS.filter(c => favourites.includes(c.type))
     }
     const pool = activeCategory === 'All'
-      ? CALCULATORS
-      : CALCULATORS.filter(c => c.category === activeCategory)
+      ? PUBLISHED_CALCULATORS
+      : PUBLISHED_CALCULATORS.filter(c => c.category === activeCategory)
     return [
       ...pool.filter(c => favourites.includes(c.type)),
       ...pool.filter(c => !favourites.includes(c.type)),
@@ -122,8 +122,8 @@ export default function LandingPage({ auth }) {
               const count = isFavTab
                 ? favourites.length
                 : tab === 'All'
-                  ? CALCULATORS.length
-                  : CALCULATORS.filter(c => c.category === tab).length
+                  ? PUBLISHED_CALCULATORS.length
+                  : PUBLISHED_CALCULATORS.filter(c => c.category === tab).length
               const isActive = activeCategory === tab
               return (
                 <button

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Home, X, ChevronDown } from 'lucide-react'
-import { CALCULATORS, CATEGORIES } from '../calculators/registry'
+import { PUBLISHED_CALCULATORS, CATEGORIES } from '../calculators/registry'
 import SavedCalculationsSidebar from './SavedCalculationsSidebar'
 import UserFooter from './UserFooter'
 
@@ -19,7 +19,7 @@ export default function CalculatorSidebar({
   onClose,
   onNavigateLogin,
 }) {
-  const activeCategory = CALCULATORS.find(c => c.type === activeType)?.category ?? null
+  const activeCategory = PUBLISHED_CALCULATORS.find(c => c.type === activeType)?.category ?? null
   const navCategories  = CATEGORIES.filter(c => c !== 'All')
 
   const [openCategories, setOpenCategories] = useState(
@@ -58,7 +58,7 @@ export default function CalculatorSidebar({
         </Link>
 
         {navCategories.map(cat => {
-          const calcsInCategory = CALCULATORS.filter(c => c.category === cat)
+          const calcsInCategory = PUBLISHED_CALCULATORS.filter(c => c.category === cat)
           const isOpen          = openCategories.has(cat)
           const hasActive       = calcsInCategory.some(c => c.type === activeType)
 
