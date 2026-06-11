@@ -1,9 +1,15 @@
 import os
 import sys
 from datetime import timedelta
+
+import redis
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Warnings collected at import time, emitted once by app.py at startup.
+# Config must not print noise on import — it's imported by scripts and tests too.
+STARTUP_WARNINGS: list[str] = []
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
@@ -51,6 +57,34 @@ def _ensure_sslmode(url: str) -> str:
 _database_url = _ensure_sslmode(_database_url)
 
 
+# ── Redis (sessions + rate limiting) ──────────────────────────────────────────
+# Sessions and rate limiting move to Redis (Upstash) so they hold across multiple
+# gunicorn workers. In production REDIS_URL is mandatory — the app exits without
+# it. In development it's optional: if set we use it (full prod parity); if unset
+# we fall back to filesystem sessions + in-memory rate limiting, with one warning,
+# so a fresh checkout still runs with zero infrastructure.
+_flask_env     = os.getenv("FLASK_ENV", "production")
+_is_production = _flask_env == "production"
+_redis_url     = os.getenv("REDIS_URL", "").strip()
+
+if _is_production and not _redis_url:
+    print(
+        "\n[ERROR] REDIS_URL is missing but FLASK_ENV=production.\n"
+        "Production sessions and rate limiting require Redis (Upstash) so they\n"
+        "hold across multiple workers. Set REDIS_URL in backend/.env (rediss://).\n",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+_use_redis = bool(_redis_url)
+
+if not _use_redis:
+    STARTUP_WARNINGS.append(
+        "REDIS_URL not set — falling back to filesystem sessions and in-memory "
+        "rate limiting. Development only: neither survives multiple workers."
+    )
+
+
 class Config:
     # ── Security ──────────────────────────────────────────────────────────────
     SECRET_KEY = _secret_key
@@ -61,16 +95,23 @@ class Config:
     DATABASE_URL = _database_url
 
     # ── Sessions ──────────────────────────────────────────────────────────────
-    SESSION_TYPE              = "filesystem"
-    SESSION_FILE_DIR          = os.path.join(BASE_DIR, "flask_session")
-    SESSION_FILE_THRESHOLD    = 500
-    SESSION_PERMANENT         = True
+    SESSION_PERMANENT          = True
     PERMANENT_SESSION_LIFETIME = timedelta(days=30)  # sessions expire after 30 days
-    SESSION_USE_SIGNER        = True
-    SESSION_COOKIE_HTTPONLY   = True
-    SESSION_COOKIE_SAMESITE   = "Lax"
+    SESSION_USE_SIGNER         = True
+    SESSION_COOKIE_HTTPONLY    = True
+    SESSION_COOKIE_SAMESITE    = "Lax"
     # Read from env so dev uses False (HTTP) and prod uses True (HTTPS)
-    SESSION_COOKIE_SECURE     = os.getenv("SESSION_COOKIE_SECURE", "False").lower() == "true"
+    SESSION_COOKIE_SECURE      = os.getenv("SESSION_COOKIE_SECURE", "False").lower() == "true"
+
+    if _use_redis:
+        # Upstash URLs are rediss:// — redis.from_url negotiates TLS automatically,
+        # no extra flags needed. One shared client serves every worker.
+        SESSION_TYPE  = "redis"
+        SESSION_REDIS = redis.from_url(_redis_url)
+    else:
+        SESSION_TYPE           = "filesystem"
+        SESSION_FILE_DIR       = os.path.join(BASE_DIR, "flask_session")
+        SESSION_FILE_THRESHOLD = 500
 
     # ── CORS ──────────────────────────────────────────────────────────────────
     # Read from env — comma-separated list of allowed origins.
@@ -80,11 +121,14 @@ class Config:
     CORS_SUPPORTS_CREDENTIALS = True
 
     # ── Rate limiting ─────────────────────────────────────────────────────────
-    # Uses in-memory storage by default (fine for single-process dev/prod).
-    # Swap to Redis URI for multi-process deployments: "redis://localhost:6379"
-    RATELIMIT_STORAGE_URI     = os.getenv("RATELIMIT_STORAGE_URI", "memory://")
+    # Redis when available so limits actually hold across workers; in-memory
+    # otherwise (dev fallback only — limits are per-process and reset on restart).
+    RATELIMIT_STORAGE_URI = (
+        _redis_url if _use_redis
+        else os.getenv("RATELIMIT_STORAGE_URI", "memory://")
+    )
     RATELIMIT_HEADERS_ENABLED = True  # sends X-RateLimit-* headers to clients
 
     # ── Environment ───────────────────────────────────────────────────────────
-    FLASK_ENV   = os.getenv("FLASK_ENV", "production")
-    FLASK_DEBUG = FLASK_ENV == "development"
+    FLASK_ENV   = _flask_env
+    FLASK_DEBUG = _flask_env == "development"
