@@ -4,6 +4,7 @@ from marshmallow import ValidationError
 from app import limiter
 from models.user import User
 from schemas.user_schema import RegisterSchema, LoginSchema
+from services.email import send_welcome_email
 from utils.auth_helpers import (
     set_session, clear_session, get_current_user,
     csrf_protect, generate_csrf_token, login_required,
@@ -49,6 +50,16 @@ def register():
         return jsonify({"error": str(err)}), 409
 
     set_session(user)
+
+    # Best-effort welcome email — the user row is already committed, so an email
+    # failure must never fail or materially slow registration. send_welcome_email
+    # already swallows its own errors; the extra guard keeps the response path
+    # bulletproof regardless of what the SDK does.
+    try:
+        send_welcome_email(user.email)
+    except Exception:
+        pass
+
     return jsonify({"user": user.to_dict()}), 201
 
 

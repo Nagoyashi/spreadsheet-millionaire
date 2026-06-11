@@ -85,6 +85,18 @@ if not _use_redis:
     )
 
 
+# ── Transactional email (Resend) ──────────────────────────────────────────────
+# Best-effort this phase: a missing key disables sending (dev AND prod) rather
+# than failing startup — nothing depends on email for availability yet (that
+# changes when password reset lands). The send logic and key wiring live in
+# services/email.py; here we only surface the startup warning.
+if not os.getenv("RESEND_API_KEY", "").strip():
+    STARTUP_WARNINGS.append(
+        "RESEND_API_KEY not set — transactional email is disabled. Registration "
+        "still succeeds; the welcome email is skipped."
+    )
+
+
 class Config:
     # ── Security ──────────────────────────────────────────────────────────────
     SECRET_KEY = _secret_key
