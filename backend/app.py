@@ -6,6 +6,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_talisman import Talisman
 
+import db
 from config import Config
 from db_init import init_db
 
@@ -21,6 +22,9 @@ limiter = Limiter(
 def create_app() -> Flask:
     app = Flask(__name__)
     app.config.from_object(Config)
+
+    # ── Per-request Postgres connection (psycopg) ─────────────────────────────
+    db.init_app(app)
 
     # ── Flask-Session (filesystem-backed server-side sessions) ────────────────
     os.makedirs(Config.SESSION_FILE_DIR, exist_ok=True)

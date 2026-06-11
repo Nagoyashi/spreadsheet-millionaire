@@ -23,12 +23,42 @@ if not _secret_key or _secret_key == _PLACEHOLDER or len(_secret_key) < 32:
     sys.exit(1)
 
 
+# ── Database URL validation ───────────────────────────────────────────────────
+# Postgres-only (Neon). Fail loudly at startup if DATABASE_URL is missing or not
+# a Postgres URL — there is no SQLite fallback. Neon requires TLS, so sslmode is
+# forced on if the connection string doesn't already carry it.
+_database_url = os.getenv("DATABASE_URL", "").strip()
+
+if not _database_url or not _database_url.startswith("postgres"):
+    print(
+        "\n[ERROR] DATABASE_URL is missing or is not a Postgres connection string.\n"
+        "This app runs on Postgres (Neon) only — there is no SQLite fallback.\n"
+        "Set DATABASE_URL in backend/.env to your Neon pooled connection string\n"
+        "(it must start with 'postgres').\n",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+
+def _ensure_sslmode(url: str) -> str:
+    """Neon mandates TLS. Append sslmode=require if the URL lacks an sslmode."""
+    if "sslmode=" in url:
+        return url
+    separator = "&" if "?" in url else "?"
+    return f"{url}{separator}sslmode=require"
+
+
+_database_url = _ensure_sslmode(_database_url)
+
+
 class Config:
     # ── Security ──────────────────────────────────────────────────────────────
     SECRET_KEY = _secret_key
 
-    # ── Database ──────────────────────────────────────────────────────────────
-    DB_PATH = os.path.join(BASE_DIR, os.getenv("DATABASE_PATH", "fintrackr.db"))
+    # ── Database (Postgres / Neon) ────────────────────────────────────────────
+    # Validated above at import time. Points at Neon's pooled (PgBouncer)
+    # endpoint — connection pooling happens there, not in-process.
+    DATABASE_URL = _database_url
 
     # ── Sessions ──────────────────────────────────────────────────────────────
     SESSION_TYPE              = "filesystem"
