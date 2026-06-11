@@ -1,6 +1,6 @@
-# FINtrackr — Architectural Decisions
+# SpreadsheetMillionaire — Architectural Decisions
 
-> A snapshot of the *why* behind FINtrackr's structure. `PROJECT_STRUCTURE.md`
+> A snapshot of the *why* behind SpreadsheetMillionaire's structure. `PROJECT_STRUCTURE.md`
 > tells you *where* things live; this tells you *why* they live there.
 >
 > Use this when you (or a new contributor) need to understand a choice before
@@ -35,6 +35,22 @@
 **Why:** Adding a 13th calculator should be ~4 file touches max (component, registry entry, backend type, db migration). Anything more invites drift. The registry also feeds the landing-page grid, sidebar nav, the calculator page header, and the explainer banner — one source, many consumers.
 **Anti-pattern guard:** Never duplicate the calculator list in another file. If a new surface needs a derived list (e.g. "all retirement calcs"), it derives from the registry inline.
 **Note for next phase:** No more calculators are planned. The pattern may extend to the upcoming trackers if they share enough structure to benefit, but trackers are bigger and may justify their own registry instead of crowding this one.
+
+## MVP narrowing via `published` flag
+
+**TL;DR:** A required `published` boolean on each registry entry gates the public app. Four calculators are published; eight are hidden, not deleted.
+
+**Decision:** Every `registry.js` entry carries a required `published` boolean. The public MVP publishes four (`fire`, `compound`, `emergency_fund`, `debt_payoff`); the other eight stay in the codebase with `published: false`. The user-facing surface (sidebar nav, landing grid, category tabs, routing guard) derives from `PUBLISHED_CALCULATORS`; `backend/calc_types.py` keeps all twelve types valid.
+
+**Why flag instead of delete:**
+- Re-enabling a calculator as a build-in-public patch is a one-line flip (`false` → `true`), not a resurrection from git history — no dead-code rot, no re-wiring.
+- Saved user rows for hidden calculators stay loadable: the backend still accepts all twelve types, so nothing breaks for data created before the narrowing or on `develop`.
+- The hidden calculators stay testable on `develop` — their components still build and route there during development — without being exposed in production.
+- A flag keeps the diff that re-enables a calculator tiny and reviewable; deleting would mean losing the work and re-reviewing it on return.
+
+**Why a frontend-only concern:** The narrowing is about what the public *sees*, not what the server *accepts*. Gating server-side too would break saved rows and make the hidden calculators untestable. The single backend `VALID_CALC_TYPES` list stays at twelve on purpose.
+
+**When to revisit:** Once all twelve are published (or any that won't ship are genuinely retired), the flag can be removed and the derived `PUBLISHED_*` exports collapsed back into the base list. Until the set is final, the flag stays.
 
 ## Single source of truth for calc types (backend)
 
@@ -180,7 +196,7 @@
 
 **TL;DR:** Per-user favourites stored locally. Don't sync across devices. Acceptable for MVP.
 
-**Decision:** Per-user favourites stored in `localStorage` keyed by `fintrackr_favourites_${user.id}`.
+**Decision:** Per-user favourites stored in `localStorage` keyed by `sm_favourites_${user.id}`.
 **Why:** Favourites are a UX preference, not user data. They don't need to survive across devices, don't need backups, don't need ACID. Adding a `favourites` table would mean a migration, a new endpoint, a new query — all for a star button.
 **Trade-off accepted:** Favourites don't sync across devices. Acceptable for an MVP. If users complain, this becomes one of the first features to move server-side.
 
@@ -228,6 +244,22 @@
 
 **Decision:** All sensitive values in `.env`. `config.py` reads them via `python-dotenv`. App exits at startup if `FLASK_SECRET_KEY` is missing, under 32 chars, or still the placeholder.
 **Why:** Loud failure beats silent fragility. A misconfigured production server should refuse to boot rather than run with a weak key.
+
+## Git branching model
+
+**TL;DR:** `main` ← `develop` ← `feature/*`, conventional commits, squash merge, tags on releases.
+
+**Decision:** Three-tier branching: `main` is production, `develop` is staging/integration, and `feature/*` branches cut from `develop` and merge back via a squash-merged PR. Commits follow Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`, `refactor:`) — one logical change each. A release is a PR from `develop` to `main` followed by a version tag (`v0.2.0`, …). The original prototype is preserved at the `v0.1.0-prototype` tag.
+
+**Why this shape:**
+- Solo dev deliberately learning a production-grade workflow before there are users or collaborators forcing it. Practising the discipline now makes adding a second contributor a non-event rather than a process retrofit.
+- Squash merge keeps `main`'s history one-commit-per-feature and readable; the messy in-progress commits stay on the feature branch.
+- The `develop` tier is a place to integrate and verify several features together before they reach production — and a natural target for per-branch preview deploys (Vercel) once that lands.
+- Tags make every release — and the prototype — recoverable by name.
+
+**Repo-settings caveat:** Squash-only merge settings and branch protection on `main` are configured through GitHub's API/UI, not in the repo. On a private repo with a limited token (or a free plan), those server-side rules may not be enforceable. Until they are, the workflow is upheld by discipline, not by GitHub blocking a bad push — which is acceptable for a solo dev and revisited the moment that changes.
+
+**When to revisit:** If a second contributor joins, tighten enforcement (required reviews, status checks). If `develop` stops earning its keep — features shipping straight to `main` without an integration step — collapse to trunk-based development with short-lived feature branches.
 
 ---
 
