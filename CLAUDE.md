@@ -1,6 +1,6 @@
 # SpreadsheetMillionaire
 
-Personal-finance calculator web app (formerly FINtrackr). Flask API + React/Vite SPA. Anonymous users can use every calculator; authenticated users can save/load/rename/delete their inputs. Currently narrowing from 12 calculators to a 4-calculator public MVP; the remaining 8 ship later as build-in-public patches.
+Personal-finance calculator web app. Flask API + React/Vite SPA. Anonymous users can use every published calculator; authenticated users can save/load/rename/delete their inputs. The public MVP ships 4 of 12 calculators; the other 8 are hidden behind a `published` flag and re-enable one at a time as build-in-public patches.
 
 ## Read before structural work
 
@@ -19,12 +19,14 @@ Personal-finance calculator web app (formerly FINtrackr). Flask API + React/Vite
 
 1. **Backend imports:** `from calc_types import X` — NEVER `from backend.calc_types import X`. Flask runs from inside `backend/`, so `backend.` prefixes break at runtime. Applies to all intra-backend imports.
 2. **Single source of truth.** Calculator metadata → `frontend/src/calculators/registry.js`. Valid calc types (backend) → `backend/calc_types.py`. Storage keys → `frontend/src/constants.js`. Number formatting → `fmt()` in `frontend/src/utils/format.js`. Never duplicate any of these definitions; derive from the source instead.
-3. **No raw `fetch` in feature modules.** All HTTP goes through `httpClient.createApi(baseUrl)` via a module in `src/api/`. CSRF injection is handled there.
-4. **Every saved-data shape has `version: 1`** as its first field and a migration path in `frontend/src/utils/migrateCalcData.js`. No exceptions, including future trackers.
-5. **Every query against a user-scoped table includes `AND user_id = ?`.** IDOR protection lives at the query layer. No exceptions.
-6. **Paid features are gated at three layers:** UI component, API route, DB query. Gating only one or two is a security bug — flag it.
-7. **Calculator components never render their own explainer.** The registry's `explainer: { heading, body }` drives `<CalculatorExplainer>` in `CalculatorPage`.
-8. **Parameterised SQL only.** Raw `sqlite3` (Postgres later), never string-built queries.
+3. **Published surface.** Every user-facing enumeration of calculators (nav, grids, tabs, routing guards) derives from `PUBLISHED_CALCULATORS` / `PUBLISHED_TYPES` in the registry. Never re-filter the full `CALCULATORS` list in a consumer and never maintain a second list. `backend/calc_types.py` keeps ALL types valid regardless of published state — saved rows for unpublished calculators must remain loadable.
+4. **No raw `fetch` in feature modules.** All HTTP goes through `httpClient.createApi(baseUrl)` via a module in `src/api/`. CSRF injection is handled there.
+5. **Every saved-data shape has `version: 1`** as its first field and a migration path in `frontend/src/utils/migrateCalcData.js`. No exceptions, including future trackers.
+6. **Every query against a user-scoped table includes the `user_id` filter** (`AND user_id = ?` / `%s`). IDOR protection lives at the query layer. No exceptions.
+7. **Parameterised SQL only, no ORM.** Never build SQL with f-strings or concatenation.
+8. **Paid features are gated at three layers:** UI component, API route, DB query. Gating only one or two is a security bug — flag it.
+9. **Calculator components never render their own explainer.** The registry's `explainer: { heading, body }` drives `<CalculatorExplainer>` in `CalculatorPage`.
+10. **Repo hygiene.** Never commit: `node_modules/`, `venv/`, `__pycache__/`, `.env`, `*.db*`, `flask_session/`, cookie jars, or any credential/session artifact. The history was scrubbed once already; review `git status` before staging and never `git add .` blindly.
 
 ## Don't add without explicit approval
 
