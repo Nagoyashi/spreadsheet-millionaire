@@ -21,27 +21,26 @@ money-calculators/
 
 ```
 backend/
-├── .env                        # Secret key, env config — never committed
-├── fintrackr.db                # SQLite database — never committed
-├── fintrackr.db-shm            # SQLite WAL file — never committed
-├── fintrackr.db-wal            # SQLite WAL file — never committed
-├── requirements.txt            # flask, flask-cors, flask-session, flask-limiter, flask-talisman, bcrypt, marshmallow, python-dotenv
-├── app.py                      # Flask app factory — limiter + Talisman initialised here
-├── config.py                   # All config read from .env — fails loudly if SECRET_KEY invalid
+├── .env                        # Secret key + Neon/Upstash/Resend config — never committed
+├── requirements.txt            # flask, flask-cors, flask-session, flask-limiter, flask-talisman, bcrypt, marshmallow, python-dotenv, psycopg, redis, resend
+├── app.py                      # Flask app factory — db teardown, limiter + Talisman, startup warnings
+├── config.py                   # All config read from .env — exits if SECRET_KEY/DATABASE_URL invalid (and REDIS_URL in prod)
 ├── calc_types.py               # Single source of truth for VALID_CALC_TYPES (imported by schema + db_init)
-├── db_init.py                  # Database schema creation + migrations (idempotent)
+├── db.py                       # Per-request psycopg connection on Flask g, closed on teardown (no in-process pool)
+├── db_init.py                  # Postgres schema creation + idempotent CHECK-constraint rebuild
 ├── __pycache__/
-├── flask_session/              # Server-side session files — never committed
 ├── venv/                       # Python virtual environment — never committed
 ├── models/
 │   ├── user.py                 # User model — bcrypt hashing, create/get/delete
-│   └── calculator.py           # SavedCalculator model — all queries include AND user_id = ?
+│   └── calculator.py           # SavedCalculator model — all queries include AND user_id = %s
 ├── routes/
-│   ├── auth.py                 # /api/auth/* — register, login, logout, status, delete account, csrf-token
+│   ├── auth.py                 # /api/auth/* — register (+welcome email), login, logout, status, delete account, csrf-token
 │   └── calculators.py          # /api/calculators/* — CRUD for saved calculations
 ├── schemas/
 │   ├── user_schema.py          # Password: 8+ chars, 1 letter, 1 number enforced
 │   └── calculator_schema.py    # Imports VALID_CALC_TYPES from calc_types.py
+├── services/
+│   └── email.py                # Resend wrapper — send_email + send_welcome_email; disabled (no-op) without RESEND_API_KEY
 └── utils/
     └── auth_helpers.py         # login_required, csrf_protect, set/clear session, generate_csrf_token
 ```
@@ -53,9 +52,16 @@ backend/
 | `FLASK_SECRET_KEY` | generate with `secrets.token_hex(32)` | same — app exits if missing/placeholder |
 | `FLASK_ENV` | `development` | `production` |
 | `CORS_ORIGINS` | `http://localhost:5173` | your deployed frontend URL |
-| `DATABASE_PATH` | `fintrackr.db` | `fintrackr.db` |
+| `DATABASE_URL` | Neon **dev branch** pooled URL (`postgres://…`) | Neon **main branch** pooled URL — app exits if missing / not Postgres |
+| `REDIS_URL` | Upstash `rediss://…` (optional in dev — unset falls back to filesystem sessions) | Upstash `rediss://…` — app exits if missing |
+| `RESEND_API_KEY` | Resend key (optional — unset disables email) | Resend key (email disabled with a warning if unset) |
+| `MAIL_FROM` | sender address, e.g. `noreply@spreadsheetmillionaire.com` | same |
 | `SESSION_COOKIE_SECURE` | `False` | `True` |
-| `RATELIMIT_STORAGE_URI` | `memory://` | `redis://...` for multi-process |
+
+> `DATABASE_URL` must point at Neon's **pooled** (PgBouncer) endpoint — connection
+> pooling happens there, not in-process. `sslmode=require` is appended automatically
+> if absent. `RATELIMIT_STORAGE_URI` is no longer set directly: the limiter uses
+> `REDIS_URL` when present, else `memory://` (dev fallback only).
 
 ---
 
