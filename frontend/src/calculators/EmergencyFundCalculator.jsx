@@ -111,7 +111,7 @@ export default function EmergencyFundCalculator({ initialData, onDataChange }) {
               <button
                 key={m}
                 onClick={() => set('target_months')(m)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+                className={`px-3 py-2.5 sm:py-1.5 rounded-lg text-sm font-medium transition ${
                   parseInt(inputs.target_months) === m
                     ? 'bg-emerald-600 text-white'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'

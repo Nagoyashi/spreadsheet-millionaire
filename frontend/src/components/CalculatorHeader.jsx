@@ -34,7 +34,7 @@ export default function CalculatorHeader({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button
-            className="lg:hidden text-gray-500 hover:text-gray-800 mr-1"
+            className="lg:hidden flex items-center justify-center min-h-[44px] min-w-[44px] -ml-2 text-gray-500 hover:text-gray-800"
             onClick={onMobileMenuClick}
             aria-label="Open sidebar"
           >
@@ -43,7 +43,7 @@ export default function CalculatorHeader({
           <div className="p-1.5 rounded-lg bg-gray-50">
             <Icon className={`w-5 h-5 ${iconColor}`} />
           </div>
-          <h1 className="text-3xl font-bold text-gray-800">{label}</h1>
+          <h1 className="text-xl sm:text-3xl font-bold text-gray-800">{label}</h1>
           {activeCalcName && (
             <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
               {activeCalcName}
@@ -56,7 +56,7 @@ export default function CalculatorHeader({
               <button
                 onClick={onNewClick}
                 disabled={isSaving}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg transition text-sm font-medium border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-2 px-3 py-2.5 sm:py-2 rounded-lg transition text-sm font-medium border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Detach from this saved record — next save will create a new one"
               >
                 <FilePlus className="w-4 h-4" />
@@ -66,7 +66,7 @@ export default function CalculatorHeader({
             <button
               onClick={onSaveClick}
               disabled={isSaving}
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg transition text-sm font-medium disabled:cursor-not-allowed ${saveButtonClass}`}
+              className={`inline-flex items-center gap-2 px-4 py-2.5 sm:py-2 rounded-lg transition text-sm font-medium disabled:cursor-not-allowed ${saveButtonClass}`}
             >
               {saveStatus === 'saving' && <><Save className="w-4 h-4" /> Saving…</>}
               {saveStatus === 'saved'  && <><Check className="w-4 h-4" /> Saved</>}

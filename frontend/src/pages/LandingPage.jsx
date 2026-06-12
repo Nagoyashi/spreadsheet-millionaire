@@ -118,13 +118,13 @@ export default function LandingPage({ auth }) {
         <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
-              className="lg:hidden text-gray-500 hover:text-gray-800"
+              className="lg:hidden flex items-center justify-center min-h-[44px] min-w-[44px] -ml-2 text-gray-500 hover:text-gray-800"
               onClick={() => setMobileSidebarOpen(true)}
               aria-label="Open sidebar"
             >
               <Menu className="w-5 h-5" />
             </button>
-            <h1 className="text-3xl font-bold text-gray-800">Financial Calculators</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Financial Calculators</h1>
           </div>
           {!auth.isAuthenticated && (
             <div className="flex items-center gap-3">
@@ -166,7 +166,7 @@ export default function LandingPage({ auth }) {
                 <button
                   key={tab}
                   onClick={() => setActiveCategory(tab)}
-                  className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+                  className={`inline-flex items-center gap-1.5 px-4 py-2.5 sm:py-1.5 rounded-full text-sm font-medium transition-all ${
                     isActive ? 'bg-gray-900 text-white shadow-sm' : 'bg-white text-gray-600 border border-gray-200 hover:border-gray-400 hover:text-gray-900'
                   }`}
                 >
@@ -200,14 +200,14 @@ export default function LandingPage({ auth }) {
                     </div>
                     <p className="text-xs font-medium text-gray-400 mb-0.5">{subtitle}</p>
                     <h3 className="text-base font-bold text-gray-800 mb-2">{label}</h3>
-                    <p className="text-xs text-gray-500 leading-relaxed mb-4 flex-1">{description}</p>
+                    <p className="text-sm sm:text-xs text-gray-500 leading-relaxed mb-4 flex-1">{description}</p>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1 text-blue-600 group-hover:gap-2 transition-all text-xs font-medium">
                         Open <ArrowRight className="w-3.5 h-3.5" />
                       </div>
                       <button
                         onClick={(e) => handleStarClick(e, type)}
-                        className={`p-1.5 rounded-full transition-colors ${isStarred ? 'text-amber-400 hover:text-amber-500' : 'text-gray-300 hover:text-amber-300'}`}
+                        className={`flex items-center justify-center min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 p-1.5 rounded-full transition-colors ${isStarred ? 'text-amber-400 hover:text-amber-500' : 'text-gray-300 hover:text-amber-300'}`}
                         title={isStarred ? 'Remove from favourites' : 'Add to favourites'}
                       >
                         <Star className={`w-4 h-4 ${isStarred ? 'fill-amber-400' : ''}`} />

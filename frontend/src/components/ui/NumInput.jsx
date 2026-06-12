@@ -23,12 +23,13 @@ export default function NumInput({ label, prefix, suffix, value, onChange, hint,
         )}
         <input
           type="number"
+          inputMode="decimal"
           value={value}
           onChange={e => onChange(e.target.value)}
           min={min}
           max={max}
           step={step}
-          className="flex-1 px-3 py-2 text-sm text-gray-800 bg-white focus:outline-none"
+          className="flex-1 min-w-0 px-3 py-2.5 sm:py-2 text-base sm:text-sm text-gray-800 bg-white focus:outline-none"
         />
         {suffix && (
           <span className="px-3 py-2 bg-gray-50 text-gray-500 text-sm border-l border-gray-300 flex items-center">

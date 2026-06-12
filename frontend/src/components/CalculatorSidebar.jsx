@@ -51,7 +51,7 @@ export default function CalculatorSidebar({
       <nav className="px-3 py-3 border-b border-white/10 overflow-y-auto">
         <Link
           to="/"
-          className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition text-sm mb-2"
+          className="flex items-center gap-3 px-3 py-2.5 sm:py-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition text-sm mb-2"
         >
           <Home className="w-4 h-4 shrink-0" />
           All Calculators
@@ -66,7 +66,7 @@ export default function CalculatorSidebar({
             <div key={cat} className="mb-1">
               <button
                 onClick={() => toggleCategory(cat)}
-                className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition ${
+                className={`w-full flex items-center justify-between px-3 py-2.5 sm:py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition ${
                   hasActive ? 'text-gray-300' : 'text-gray-600 hover:text-gray-400'
                 }`}
               >
@@ -80,7 +80,7 @@ export default function CalculatorSidebar({
                     <Link
                       key={type}
                       to={`/calculator/${type}`}
-                      className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition ${
+                      className={`flex items-center gap-2.5 px-3 py-2.5 sm:py-2 rounded-lg text-sm transition ${
                         type === activeType
                           ? 'bg-white/10 text-white font-medium'
                           : 'text-gray-400 hover:text-white hover:bg-white/10'

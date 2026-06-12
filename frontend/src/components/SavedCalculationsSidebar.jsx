@@ -65,10 +65,10 @@ function RenameableItem({ calc, isActive, onLoad, onDeselect, onRename, onDelete
               })}
             </p>
           </div>
-          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+          <div className="flex items-center gap-0.5 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity shrink-0">
             <button
               onClick={e => { e.stopPropagation(); setEditing(true) }}
-              className="p-1 rounded hover:bg-white/10 text-gray-500 hover:text-gray-300 transition-colors"
+              className="flex items-center justify-center min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 p-1 rounded hover:bg-white/10 text-gray-500 hover:text-gray-300 transition-colors"
               title="Rename"
             >
               <Pencil className="w-3 h-3" />
@@ -76,7 +76,7 @@ function RenameableItem({ calc, isActive, onLoad, onDeselect, onRename, onDelete
             <button
               onClick={handleDelete}
               disabled={deleting}
-              className="p-1 rounded hover:bg-white/10 text-gray-500 hover:text-red-400 transition-colors disabled:opacity-40"
+              className="flex items-center justify-center min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 p-1 rounded hover:bg-white/10 text-gray-500 hover:text-red-400 transition-colors disabled:opacity-40"
               title="Delete"
             >
               <Trash2 className="w-3 h-3" />
