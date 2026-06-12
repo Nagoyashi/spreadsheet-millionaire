@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BarChart2, ArrowRight, Star, Menu, X } from 'lucide-react'
 import { PUBLISHED_CALCULATORS, CATEGORIES } from '../calculators/registry'
+import { UPCOMING_FEATURES } from '../upcomingFeatures'
 import { useFavourites } from '../hooks/useFavourites'
 import UserFooter from '../components/UserFooter'
 
@@ -216,6 +217,31 @@ export default function LandingPage({ auth }) {
                   </div>
                 )
               })}
+
+              {/* Coming-soon teasers — appended after the calculators on the All
+                  tab. Badged and dashed so they don't read as working tools.
+                  Sourced from upcomingFeatures.js, NOT the calculator registry. */}
+              {activeCategory === 'All' && UPCOMING_FEATURES.map(({ slug, label, Icon, blurb, eta }) => (
+                <div
+                  key={slug}
+                  onClick={() => navigate(`/coming-soon/${slug}`)}
+                  className="bg-white/60 rounded-lg border border-dashed border-gray-300 p-5 hover:shadow-md hover:border-gray-400 transition cursor-pointer flex flex-col"
+                >
+                  <div className="h-1 rounded-full bg-gray-200 mb-4" />
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="p-2 rounded-lg bg-gray-50">
+                      <Icon className="w-5 h-5 text-gray-400" />
+                    </div>
+                    <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-amber-100 text-amber-800">Coming soon</span>
+                  </div>
+                  <p className="text-xs font-medium text-gray-400 mb-0.5">{eta}</p>
+                  <h3 className="text-base font-bold text-gray-700 mb-2">{label}</h3>
+                  <p className="text-sm sm:text-xs text-gray-500 leading-relaxed mb-4 flex-1">{blurb}</p>
+                  <div className="flex items-center gap-1 text-gray-500 text-xs font-medium">
+                    Preview <ArrowRight className="w-3.5 h-3.5" />
+                  </div>
+                </div>
+              ))}
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-20 text-center">
