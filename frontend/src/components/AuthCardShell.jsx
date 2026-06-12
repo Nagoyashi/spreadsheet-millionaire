@@ -27,7 +27,7 @@ export default function AuthCardShell({ badge, badgeClass, title, subtitle, foot
       {/* Top bar */}
       <header className="bg-white border-b border-gray-200 px-6 py-4">
         <Link to="/" className="text-xl font-bold text-gray-800 tracking-tight">
-          FIN<span className="text-amber-400">trackr</span>
+          Spreadsheet<span className="text-amber-400">Millionaire</span>
         </Link>
       </header>
 

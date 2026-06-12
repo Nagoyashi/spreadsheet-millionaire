@@ -1,6 +1,7 @@
 import { useParams, useNavigate, Navigate, Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { UPCOMING_MAP } from '../upcomingFeatures'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 
 // Build-in-public teaser page for an upcoming tracker, at /coming-soon/:slug.
 // An unknown slug redirects to the landing page — same guard idiom as an
@@ -15,7 +16,10 @@ export default function ComingSoonPage() {
   const navigate = useNavigate()
 
   const feature = UPCOMING_MAP[slug]
-  if (!feature) return <Navigate to="/" replace />
+  // Set the title before the unknown-slug guard so hook order stays stable
+  // across a valid -> unknown slug change on the same mount.
+  useDocumentTitle(feature ? `${feature.label} — SpreadsheetMillionaire` : 'SpreadsheetMillionaire')
+  if (!feature) return <Navigate to="/app" replace />
 
   const { label, Icon, blurb, eta } = feature
 
@@ -23,7 +27,7 @@ export default function ComingSoonPage() {
     <div className="min-h-screen bg-gray-100 flex flex-col">
       {/* Top bar */}
       <header className="bg-white border-b border-gray-200 px-6 py-4">
-        <Link to="/" className="text-xl font-bold text-gray-800 tracking-tight">
+        <Link to="/app" className="text-xl font-bold text-gray-800 tracking-tight">
           Spreadsheet<span className="text-amber-400">Millionaire</span>
         </Link>
       </header>
@@ -48,7 +52,7 @@ export default function ComingSoonPage() {
           </p>
 
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/app')}
             className="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2.5 sm:py-2 rounded-lg hover:bg-blue-700 transition text-sm font-medium"
           >
             <ArrowLeft className="w-4 h-4" />

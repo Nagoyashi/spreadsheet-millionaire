@@ -4,6 +4,7 @@ import { BarChart2, ArrowRight, Star, Menu, X } from 'lucide-react'
 import { PUBLISHED_CALCULATORS, CATEGORIES } from '../calculators/registry'
 import { UPCOMING_FEATURES } from '../upcomingFeatures'
 import { useFavourites } from '../hooks/useFavourites'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import UserFooter from '../components/UserFooter'
 
 // ─── Small toast for unauthenticated star attempt ─────────────────────────────
@@ -49,7 +50,7 @@ function LandingSidebar({ auth, navigate, onClose }) {
           {UPCOMING_FEATURES.map(({ slug, label, Icon }) => (
             <button
               key={slug}
-              onClick={() => navigate(`/coming-soon/${slug}`)}
+              onClick={() => navigate(`/app/coming-soon/${slug}`)}
               className="w-full flex items-center justify-between gap-2.5 px-3 py-2.5 sm:py-2 rounded-lg text-sm text-gray-500 hover:text-gray-300 hover:bg-white/5 transition"
             >
               <span className="flex items-center gap-2.5 min-w-0">
@@ -82,6 +83,7 @@ function LandingSidebar({ auth, navigate, onClose }) {
 }
 
 export default function LandingPage({ auth }) {
+  useDocumentTitle('Calculators — SpreadsheetMillionaire')
   const navigate = useNavigate()
   const [activeCategory, setActiveCategory] = useState('All')
   const { favourites, toggle } = useFavourites(auth)
@@ -146,7 +148,7 @@ export default function LandingPage({ auth }) {
             >
               <Menu className="w-5 h-5" />
             </button>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Financial Calculators</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Financial Calculators</h1>
           </div>
           {!auth.isAuthenticated && (
             <div className="flex items-center gap-3">
@@ -161,7 +163,7 @@ export default function LandingPage({ auth }) {
           {/* Hero */}
           <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg p-6 text-white mb-6">
             <div className="max-w-xl">
-              <span className="inline-block px-2 py-0.5 text-xs font-semibold rounded-full bg-white/20 text-white mb-3">Free to use</span>
+              <span className="inline-block px-2 py-0.5 text-xs font-semibold rounded-full bg-white/20 text-white mb-3">Free while in beta</span>
               <h2 className="text-2xl font-bold mb-2">Numbers that tell the truth.</h2>
               <p className="text-indigo-100 text-sm leading-relaxed">
                 Use any calculator freely. Create an account to save and revisit your calculations at any time.
@@ -210,7 +212,7 @@ export default function LandingPage({ auth }) {
                 return (
                   <div
                     key={type}
-                    onClick={() => navigate(`/calculator/${type}`)}
+                    onClick={() => navigate(`/app/calculator/${type}`)}
                     className="bg-white rounded-lg shadow-sm border border-gray-100 p-5 hover:shadow-md hover:-translate-y-1 transition cursor-pointer group flex flex-col"
                   >
                     <div className={`h-1 rounded-full bg-gradient-to-r ${gradient} mb-4`} />
@@ -245,7 +247,7 @@ export default function LandingPage({ auth }) {
               {activeCategory === 'All' && UPCOMING_FEATURES.map(({ slug, label, Icon, blurb, eta }) => (
                 <div
                   key={slug}
-                  onClick={() => navigate(`/coming-soon/${slug}`)}
+                  onClick={() => navigate(`/app/coming-soon/${slug}`)}
                   className="bg-white/60 rounded-lg border border-dashed border-gray-300 p-5 hover:shadow-md hover:border-gray-400 transition cursor-pointer flex flex-col"
                 >
                   <div className="h-1 rounded-full bg-gray-200 mb-4" />

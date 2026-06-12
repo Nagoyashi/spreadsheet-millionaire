@@ -43,7 +43,7 @@ export default function CalculatorHeader({
           <div className="p-1.5 rounded-lg bg-gray-50">
             <Icon className={`w-5 h-5 ${iconColor}`} />
           </div>
-          <h1 className="text-xl sm:text-3xl font-bold text-gray-800">{label}</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-800">{label}</h1>
           {activeCalcName && (
             <span className="hidden sm:inline-block px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
               {activeCalcName}

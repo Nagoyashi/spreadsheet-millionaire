@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeft, AlertTriangle } from 'lucide-react'
 import { authApi } from '../api/authApi'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import DeleteAccountModal from '../components/ui/DeleteAccountModal'
 
 // /settings — account management only (auth-guarded in App.jsx via RequireAuth).
@@ -197,16 +198,17 @@ function DangerZone({ auth }) {
 }
 
 export default function SettingsPage({ auth }) {
+  useDocumentTitle('Settings — SpreadsheetMillionaire')
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
       {/* Top bar */}
       <header className="bg-white border-b border-gray-200 px-4 sm:px-6 py-4 flex items-center gap-3">
-        <Link to="/" className="flex items-center gap-2 text-gray-500 hover:text-gray-800 transition text-sm min-h-[44px] sm:min-h-0">
+        <Link to="/app" className="flex items-center gap-2 text-gray-500 hover:text-gray-800 transition text-sm min-h-[44px] sm:min-h-0">
           <ArrowLeft className="w-4 h-4" />
           <span className="hidden sm:inline">Back</span>
         </Link>
         <span className="text-xl font-bold text-gray-800 tracking-tight">
-          FIN<span className="text-amber-400">trackr</span>
+          Spreadsheet<span className="text-amber-400">Millionaire</span>
         </span>
       </header>
 

@@ -52,7 +52,7 @@ export default function UserFooter({ auth, variant = 'compact' }) {
           <span className={`${emailTextCls} truncate`}>{auth.user.email}</span>
         </div>
         <Link
-          to="/settings"
+          to="/app/settings"
           className="flex items-center gap-2 w-full px-3 py-2.5 sm:py-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition text-sm"
         >
           <Settings className="w-4 h-4" />

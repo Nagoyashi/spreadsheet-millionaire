@@ -40,7 +40,7 @@ export default function CalculatorSidebar({
 
       {/* Brand */}
       <div className="px-6 py-5 border-b border-white/10 flex items-center justify-between">
-        <Link to="/" className="text-xl font-bold text-white tracking-tight">
+        <Link to="/app" className="text-xl font-bold text-white tracking-tight">
           Spreadsheet<span className="text-amber-400">Millionaire</span>
         </Link>
         <button className="lg:hidden text-gray-400 hover:text-white" onClick={onClose} aria-label="Close sidebar">
@@ -51,7 +51,7 @@ export default function CalculatorSidebar({
       {/* Grouped nav */}
       <nav className="px-3 py-3 border-b border-white/10 overflow-y-auto">
         <Link
-          to="/"
+          to="/app"
           className="flex items-center gap-3 px-3 py-2.5 sm:py-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition text-sm mb-2"
         >
           <Home className="w-4 h-4 shrink-0" />
@@ -80,7 +80,7 @@ export default function CalculatorSidebar({
                   {calcsInCategory.map(({ type, label, Icon, color }) => (
                     <Link
                       key={type}
-                      to={`/calculator/${type}`}
+                      to={`/app/calculator/${type}`}
                       className={`flex items-center gap-2.5 px-3 py-2.5 sm:py-2 rounded-lg text-sm transition ${
                         type === activeType
                           ? 'bg-white/10 text-white font-medium'
@@ -105,7 +105,7 @@ export default function CalculatorSidebar({
           {UPCOMING_FEATURES.map(({ slug, label, Icon }) => (
             <Link
               key={slug}
-              to={`/coming-soon/${slug}`}
+              to={`/app/coming-soon/${slug}`}
               className="flex items-center justify-between gap-2.5 px-3 py-2.5 sm:py-2 rounded-lg text-sm text-gray-500 hover:text-gray-300 hover:bg-white/5 transition"
             >
               <span className="flex items-center gap-2.5 min-w-0">
