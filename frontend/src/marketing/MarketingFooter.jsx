@@ -29,6 +29,9 @@ export default function MarketingFooter() {
             <Link to="/terms" className="text-sm text-stone-400 hover:text-white transition">
               Terms
             </Link>
+            <Link to="/imprint" className="text-sm text-stone-400 hover:text-white transition">
+              Imprint
+            </Link>
             <a
               href={GITHUB_URL}
               target="_blank"

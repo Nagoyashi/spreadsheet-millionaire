@@ -30,6 +30,15 @@ const PROPS = [
 export default function ValueProps() {
   return (
     <section className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
+      <div className="text-center mb-10 sm:mb-12">
+        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+          Why SpreadsheetMillionaire
+        </h2>
+        <p className="mt-3 text-sm sm:text-base text-stone-400 max-w-xl mx-auto">
+          Honest tools, free to use, with your privacy intact.
+        </p>
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
         {PROPS.map(({ Icon, title, body }) => (
           <div key={title} className="flex flex-col">

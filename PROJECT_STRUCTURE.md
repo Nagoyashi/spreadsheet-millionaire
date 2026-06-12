@@ -143,6 +143,7 @@ frontend/
         ├── MarketingLandingPage.jsx # / — public marketing landing; composes src/marketing/*; auth-adaptive nav (no redirect for logged-in visitors)
         ├── PrivacyPage.jsx        # /privacy — privacy policy on LegalLayout; written against actual data practices
         ├── TermsPage.jsx          # /terms — terms of service on LegalLayout; educational-tools-not-advice disclaimer
+        ├── ImprintPage.jsx        # /imprint — imprint/Impressum on LegalLayout; placeholder operator details to complete before launch
         ├── CalculatorPage.jsx     # /app/calculator/:type — orchestrator; renders explainer + lazy calc inside Suspense
         ├── LandingPage.jsx        # /app — the *in-app* landing: calculator grid + filter tabs + favourites + coming-soon teaser cards. Collapsible sidebar drawer below lg (local mobileSidebarOpen state)
         ├── ComingSoonPage.jsx     # /app/coming-soon/:slug — build-in-public teaser page for an upcoming tracker; unknown slug redirects to /app like an unknown calc type
@@ -168,6 +169,7 @@ existing links and staging bookmarks survive. The Vercel SPA fallback
 | `/` | `MarketingLandingPage` (logged-in users see it too — no redirect) | — |
 | `/privacy` | `PrivacyPage` | — |
 | `/terms` | `TermsPage` | — |
+| `/imprint` | `ImprintPage` | — |
 | `/app` | `LandingPage` (in-app grid) | — |
 | `/app/calculator/:type` | `CalculatorPage` | unpublished/unknown type → `/app` |
 | `/app/coming-soon/:slug` | `ComingSoonPage` | unknown slug → `/app` |
