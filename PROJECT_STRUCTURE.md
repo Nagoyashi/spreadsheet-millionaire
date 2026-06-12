@@ -82,7 +82,7 @@ frontend/
 ├── tailwind.config.js
 ├── postcss.config.js
 └── src/
-    ├── App.jsx                 # BrowserRouter, routes, auth + CSRF loading guard. RequireGuest (login/register) + RequireAuth (settings) wrappers; public /forgot-password + /reset-password/:token
+    ├── App.jsx                 # BrowserRouter + full route map. Marketing at / (+ /privacy, /terms); app namespaced under /app/*; RequireGuest (login/register) + RequireAuth (/app/settings) wrappers; param-preserving redirects from old top-level app paths. See "Route map" below
     ├── main.jsx                # React root mount
     ├── index.css               # Tailwind directives + base styles
     ├── constants.js            # Shared storage key generators (CALC_STORAGE_KEY, FAVOURITES_KEY)
@@ -128,19 +128,63 @@ frontend/
     │   ├── useCalculatorData.js       # Saved-calculations CRUD via API
     │   ├── useCalculatorInputs.js     # Input state plumbing (state + sync + onChange + version migration)
     │   ├── useSave.js                 # Save flow + status states. Strips version key before sending. Resets on type change.
-    │   └── useFavourites.js           # Per-user favourites via localStorage
+    │   ├── useFavourites.js           # Per-user favourites via localStorage
+    │   └── useDocumentTitle.js        # Sets a distinct document.title per route (SPA SEO); resets to default on unmount
+    ├── marketing/                     # Public marketing surface (parallel to calculators/) — consumed only by the landing + legal pages
+    │   ├── links.js                   # Single source for GITHUB_URL + CONTACT_EMAIL placeholder (used by nav/strip/footer/legal)
+    │   ├── MarketingNav.jsx           # Sticky top nav; auth-adaptive CTAs (Open app vs Sign in/Get started); mobile disclosure menu
+    │   ├── Hero.jsx                   # Headline + subline + primary CTA → /app, secondary → /register
+    │   ├── CalculatorShowcase.jsx     # One card per PUBLISHED_CALCULATORS; links straight to /app/calculator/:type
+    │   ├── ComingSoonStrip.jsx        # Trackers from UPCOMING_FEATURES; "built in public" + GitHub link
+    │   ├── ValueProps.jsx             # Four true value props (free, no-signup, save, privacy)
+    │   ├── MarketingFooter.jsx        # Privacy/Terms/GitHub links, © line, not-financial-advice line
+    │   └── LegalLayout.jsx            # Shared prose chrome for legal pages (reuses MarketingNav + MarketingFooter)
     └── pages/
-        ├── CalculatorPage.jsx     # Orchestrator — renders explainer + lazy calc inside Suspense
-        ├── LandingPage.jsx        # Calculator grid + filter tabs + favourites + coming-soon teaser cards. Collapsible sidebar drawer below lg (local mobileSidebarOpen state)  (NB: this is the *in-app* landing; the marketing landing page is a separate upcoming page)
-        ├── ComingSoonPage.jsx     # /coming-soon/:slug — build-in-public teaser page for an upcoming tracker; unknown slug redirects to "/" like an unknown calc type
+        ├── MarketingLandingPage.jsx # / — public marketing landing; composes src/marketing/*; auth-adaptive nav (no redirect for logged-in visitors)
+        ├── PrivacyPage.jsx        # /privacy — privacy policy on LegalLayout; written against actual data practices
+        ├── TermsPage.jsx          # /terms — terms of service on LegalLayout; educational-tools-not-advice disclaimer
+        ├── CalculatorPage.jsx     # /app/calculator/:type — orchestrator; renders explainer + lazy calc inside Suspense
+        ├── LandingPage.jsx        # /app — the *in-app* landing: calculator grid + filter tabs + favourites + coming-soon teaser cards. Collapsible sidebar drawer below lg (local mobileSidebarOpen state)
+        ├── ComingSoonPage.jsx     # /app/coming-soon/:slug — build-in-public teaser page for an upcoming tracker; unknown slug redirects to /app like an unknown calc type
         ├── LoginPage.jsx          # Thin wrapper around AuthForm (+ "Forgot password?" link)
         ├── RegisterPage.jsx       # Thin wrapper around AuthForm
         ├── ForgotPasswordPage.jsx # /forgot-password — email field; always shows the same neutral "check your inbox" state
         ├── ResetPasswordPage.jsx  # /reset-password/:token — new password + confirm; success / generic-invalid-link / weak-password states
-        └── SettingsPage.jsx       # /settings (auth-guarded) — account email + change password + change email + danger zone (DeleteAccountModal)
+        └── SettingsPage.jsx       # /app/settings (auth-guarded) — account email + change password + change email + danger zone (DeleteAccountModal)
 ```
 
 ---
+
+## Route map
+
+Defined in `frontend/src/App.jsx`. The marketing surface owns `/`; the app lives
+under `/app/*`; the auth doors stay top-level (shared between marketing and app).
+Every old top-level app path redirects (param-preserving) to its `/app` home so
+existing links and staging bookmarks survive. The Vercel SPA fallback
+(`vercel.json`) serves all of these on a hard refresh.
+
+| Path | Page / behaviour | Guard |
+|------|------------------|-------|
+| `/` | `MarketingLandingPage` (logged-in users see it too — no redirect) | — |
+| `/privacy` | `PrivacyPage` | — |
+| `/terms` | `TermsPage` | — |
+| `/app` | `LandingPage` (in-app grid) | — |
+| `/app/calculator/:type` | `CalculatorPage` | unpublished/unknown type → `/app` |
+| `/app/coming-soon/:slug` | `ComingSoonPage` | unknown slug → `/app` |
+| `/app/settings` | `SettingsPage` | `RequireAuth` (→ `/login`, `from: /app/settings`) |
+| `/login`, `/register` | `LoginPage` / `RegisterPage` | `RequireGuest` (authed → `/app`) |
+| `/forgot-password` | `ForgotPasswordPage` | — (public) |
+| `/reset-password/:token` | `ResetPasswordPage` | — (public) |
+| `/calculator/:type` | → `/app/calculator/:type` | redirect (param-preserving) |
+| `/coming-soon/:slug` | → `/app/coming-soon/:slug` | redirect (param-preserving) |
+| `/settings` | → `/app/settings` | redirect |
+| `*` | → `/` | catch-all redirect |
+
+**Auth return-to flow:** an anonymous user who clicks Save on a calculator has
+their inputs stashed in `sessionStorage` (keyed by calc *type*, so it's
+path-independent), then is sent to `/login` with `state.from =
+/app/calculator/:type`. On success they're returned there and `CalculatorPage`
+rehydrates the inputs. The `from` fallback for a bare nav "Sign in" is `/app`.
 
 ## Registry entry shape
 
@@ -279,7 +323,7 @@ When you change a saved-data shape (rename a field, change units, restructure):
 
 These will be added as their work begins. Listed here so the file tree above is understood to be the *current* state, not the *final* state.
 
-- **Marketing landing page** — new route (likely `/`), with the in-app landing moved to `/app` or similar
+- **Marketing landing page** — shipped (Phase 6): marketing at `/`, app moved under `/app/*`, legal pages at `/privacy` + `/terms`. See "Route map" above and `src/marketing/`
 - **Net worth tracker** — new pages, new API namespace, new DB tables (entries + optionally accounts)
 - **Income/expense tracker** — new pages, new API namespace, new DB tables (transactions + categories)
 - **Settings page** — account-management slice shipped (`/settings`: change password, change email, delete account; reuses `authApi`, no new namespace). Still upcoming: language preference, currency, tier display, email verification — see `DECISIONS.md` § "Settings as a single stacked page"

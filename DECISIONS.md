@@ -365,6 +365,41 @@
 
 **When to revisit:** If a second contributor joins, tighten enforcement (required reviews, status checks). If `develop` stops earning its keep — features shipping straight to `main` without an integration step — collapse to trunk-based development with short-lived feature branches.
 
+## Marketing landing page — same Vite app, route at `/`
+
+**TL;DR:** The marketing landing lives in the existing Vite SPA at `/`; the app moved under `/app/*`. No separate static site.
+
+**Decision:** Promoted from "Decisions still to make" and made final in Phase 6. The public marketing page is a route (`/`) in the same Vite/React app, alongside `/privacy` and `/terms`; the entire in-app surface moved under `/app/*` with param-preserving redirects from the old top-level paths. Marketing section components live in `frontend/src/marketing/` (parallel to `calculators/`); the page itself is `pages/MarketingLandingPage.jsx`.
+
+**Why same app, not a separate Astro/Next site:**
+- **One deploy, one origin.** The Vercel single-origin rewrite (see § "Single-origin deployment") already serves the SPA and proxies `/api/*`. A second site would mean a second deploy, a second origin, and either a shared-cookie story or a redirect dance. Not worth it for a handful of static sections.
+- **Shared auth + session.** The nav adapts to auth state using the same prop-drilled `auth` object the app uses; "Open app" vs "Sign in / Get started" needs no new machinery.
+- **Shared design tokens.** Marketing and app draw from the same Tailwind config, so the brand (amber accent, dark base, the `SpreadsheetMillionaire` wordmark) stays consistent across the click-through.
+
+**Design note — visual language defined here, font deferred.** Phase 6 establishes the public visual language on a `stone-950` base with a single amber accent. The product currently ships a `system-ui` font stack (no DM font in `tailwind.config.js`), so the literal "DM font family" direction was **deferred to the later app-wide design refresh** rather than introduced as a marketing-only divergence — adding a webfont to marketing alone would have made the click-through *less* consistent, not more. The refresh is the right place to adopt a brand typeface app-wide, if it adopts one at all.
+
+**When to revisit:** If the marketing page grows real CMS needs (non-developers editing copy) or organic search becomes a channel that SSR/prerender would materially help (see § "SPA SEO limitation accepted"), splitting marketing out to a static generator becomes worth the second deploy. Until then, one app is correct.
+
+## SPA SEO limitation accepted
+
+**TL;DR:** The marketing page is client-rendered. We accept the SEO ceiling that comes with that, and don't add SSR/prerender/helmet to paper over it.
+
+**Decision:** SEO for the marketing surface is limited to what a client-rendered SPA can do: a static `<title>` + meta description + Open Graph/Twitter tags in `index.html`, plus a `useDocumentTitle` hook giving each route a distinct title. No server-side rendering, no prerender/SSG step, and no `react-helmet` (a dependency for what two `<head>` tags and one hook already cover).
+
+**Why accept it:** The product's traffic isn't organic-search-led today — it comes from build-in-public channels (the GitHub repo, direct shares). JS-executing crawlers (Googlebot) do pick up the per-route titles. The cost of "proper" SEO — SSR or a static generator — is a second rendering path or a second site, which is real complexity for a channel that isn't yet load-bearing.
+
+**When to revisit:** If organic search becomes a channel we actually want to compete in, the marketing page (and only the marketing page) moves to a static generator or gains a prerender step. That's the trigger; until it fires, the SPA approach is intentional, not an oversight.
+
+## Marketing page invents nothing
+
+**TL;DR:** Everything on the marketing page must be true of the product today. No fabricated social proof, ever.
+
+**Decision:** A standing constraint on all marketing copy and UI: no testimonials, no user/download counts, no "as seen in" or partner logos, no stock-photo people, no claims that aren't verifiable against the current product. The calculator showcase derives from `PUBLISHED_CALCULATORS` and the coming-soon strip from `UPCOMING_FEATURES` — real features, never a hand-curated highlight reel. "Free while in beta" is the honest framing for the not-yet-existent pricing story; a `/pricing` page waits until a paid tier actually exists.
+
+**Why:** A build-in-public product's credibility *is* its honesty — and the genuinely public GitHub repo means any fabrication is trivially falsifiable. Invented social proof is both an integrity problem and a liability the moment a visitor checks. The authentic signals (open source, usable with no signup, no ads/no data sale) are stronger than manufactured ones anyway.
+
+**When to revisit:** Never as a relaxation. When real proof exists (actual testimonials with permission, real metrics worth citing), it can be added *because it's true* — the constraint is "nothing fabricated," not "nothing persuasive."
+
 ---
 
 ## Decisions deliberately NOT made (and why)
@@ -401,11 +436,6 @@ These are explicitly open and need to be settled before or during the work that 
 **The question:** Trackers have lists, history, and time-series. Calculators have a single input set. Whether trackers ride on the calculator registry / save flow, or sit on their own pattern, is open.
 **Initial leaning:** Shared primitives (NumInput, StatCard, the save flow's *shape* via versioning + IDOR), but distinct page-level orchestration and likely a distinct sidebar section. Probably their own registry if they share enough structure with each other.
 **Decide before:** Writing the second tracker. The first tracker will accidentally define the pattern; the second is where you find out whether the accident was a good one.
-
-### Landing page — same Vite app, or separate?
-
-**The question:** A marketing landing page has different SEO, perf, and design priorities than the app. One Vite project with a marketing route is the cheap answer; a separate Astro / Next static site is the higher-quality answer.
-**Initial leaning:** Same Vite app, marketing route at `/`, app at `/app`. Reassess if the marketing page wants real CMS or real SEO complexity.
 
 ### i18n — when, how, and how deeply
 
