@@ -16,7 +16,7 @@ export default function StatCard({ label, value, sub, Icon, iconClass, gradientC
           <Icon className={`w-4 h-4 ${iconClass}`} />
         </div>
       </div>
-      <p className="text-4xl font-bold text-gray-800">{value}</p>
+      <p className="text-3xl sm:text-4xl font-bold text-gray-800">{value}</p>
       {sub && <p className="text-sm text-gray-400 mt-1">{sub}</p>}
       <div className={`h-1 rounded-full bg-gradient-to-r ${gradientClass} mt-4`} />
     </div>

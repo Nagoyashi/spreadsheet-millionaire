@@ -1,0 +1,448 @@
+# SpreadsheetMillionaire — Architectural Decisions
+
+> A snapshot of the *why* behind SpreadsheetMillionaire's structure. `PROJECT_STRUCTURE.md`
+> tells you *where* things live; this tells you *why* they live there.
+>
+> Use this when you (or a new contributor) need to understand a choice before
+> changing it. If a decision in here gets reversed, update this file.
+>
+> Each section starts with a one-line summary so you can scan. Read in full
+> before challenging a pattern.
+
+---
+
+## State management
+
+**TL;DR:** Local component state + custom hooks. No global store.
+
+**Decision:** Local component state + custom hooks. No Redux, no Zustand, no Context for application state.
+**Why:** At ~30 React components and one-user-at-a-time interactions, a global store would be ceremony without benefit. Hooks (`useAuth`, `useCalculatorData`, `useSave`, `useCalculatorInputs`, `useFavourites`) give us the same separation of concerns with less indirection.
+**When to revisit:** If prop-drilling exceeds ~4 levels in any subtree, or if cross-cutting state (e.g. theming, feature flags) shows up. Until then, props are correct.
+
+## Auth state via props, not Context
+
+**TL;DR:** `useAuth` runs in `App.jsx`, `auth` is prop-drilled.
+
+**Decision:** `useAuth` runs in `App.jsx`; the resulting `auth` object is passed as a prop wherever it's needed.
+**Why:** Two consumers (`LandingPage`, `CalculatorPage`) and a small handful of leaf components. The prop trail is ≤3 levels everywhere. Context would obscure where auth comes from for ~zero ergonomic benefit at this scale.
+**When to revisit:** If a fourth top-level page is added that also needs auth, or if auth-aware components proliferate. The upcoming trackers and settings page will be the test — if both end up needing auth-derived state, the trail may still be short enough for props. If it isn't, switching to Context is a 30-min refactor — no need to preempt.
+
+## Registry-driven calculator system
+
+**TL;DR:** One `registry.js` defines all calculator metadata. Components consume; never duplicate.
+
+**Decision:** A single `registry.js` is the source of truth for which calculators exist, their metadata, and their lazy-loaded component reference. Backend mirrors with `VALID_CALC_TYPES` in `calc_types.py`.
+**Why:** Adding a 13th calculator should be ~4 file touches max (component, registry entry, backend type, db migration). Anything more invites drift. The registry also feeds the landing-page grid, sidebar nav, the calculator page header, and the explainer banner — one source, many consumers.
+**Anti-pattern guard:** Never duplicate the calculator list in another file. If a new surface needs a derived list (e.g. "all retirement calcs"), it derives from the registry inline.
+**Note for next phase:** No more calculators are planned. The pattern may extend to the upcoming trackers if they share enough structure to benefit, but trackers are bigger and may justify their own registry instead of crowding this one.
+
+## MVP narrowing via `published` flag
+
+**TL;DR:** A required `published` boolean on each registry entry gates the public app. Four calculators are published; eight are hidden, not deleted.
+
+**Decision:** Every `registry.js` entry carries a required `published` boolean. The public MVP publishes four (`fire`, `compound`, `emergency_fund`, `debt_payoff`); the other eight stay in the codebase with `published: false`. The user-facing surface (sidebar nav, landing grid, category tabs, routing guard) derives from `PUBLISHED_CALCULATORS`; `backend/calc_types.py` keeps all twelve types valid.
+
+**Why flag instead of delete:**
+- Re-enabling a calculator as a build-in-public patch is a one-line flip (`false` → `true`), not a resurrection from git history — no dead-code rot, no re-wiring.
+- Saved user rows for hidden calculators stay loadable: the backend still accepts all twelve types, so nothing breaks for data created before the narrowing or on `develop`.
+- The hidden calculators stay testable on `develop` — their components still build and route there during development — without being exposed in production.
+- A flag keeps the diff that re-enables a calculator tiny and reviewable; deleting would mean losing the work and re-reviewing it on return.
+
+**Why a frontend-only concern:** The narrowing is about what the public *sees*, not what the server *accepts*. Gating server-side too would break saved rows and make the hidden calculators untestable. The single backend `VALID_CALC_TYPES` list stays at twelve on purpose.
+
+**When to revisit:** Once all twelve are published (or any that won't ship are genuinely retired), the flag can be removed and the derived `PUBLISHED_*` exports collapsed back into the base list. Until the set is final, the flag stays.
+
+## Tracker teasers outside the calculator registry
+
+**TL;DR:** The two upcoming trackers live in their own `upcomingFeatures.js` module, not in `registry.js`. The registry stays calculators-only.
+
+**Decision:** The build-in-public teasers for the Net Worth and Income/Expense trackers are defined once in `frontend/src/upcomingFeatures.js` (`UPCOMING_FEATURES`: `{ slug, label, Icon, blurb, eta }`). Only two surfaces consume that list — the `LandingPage` grid (dashed "Coming soon" cards after the calculators) and the `CalculatorSidebar` "Coming soon" section. They link to `ComingSoonPage` at `/coming-soon/:slug`, which redirects unknown slugs to `/` exactly as `CalculatorPage` redirects unknown/unpublished calculator types.
+
+**Why not just add them to the registry with `published: false`:** The `published` flag hides a calculator from the *public surface*, but every registry entry is still a fully-formed, saveable calculator — it has a lazy `component`, an `explainer: { heading, body }`, a backend `VALID_CALC_TYPES` mirror, and it flows through the save/load/version machinery. Trackers are none of those yet: no component, no saved-data shape, no backend type. Putting them in the registry would force fake values into all of those fields and leak non-calculators into the save flow, the explainer banner, the routing guard, and `backend/calc_types.py`. A separate module keeps the registry's invariant intact — *every registry entry is a real calculator* — and keeps the teasers to exactly the two surfaces that should show them.
+
+**Why a flat module and not a second registry yet:** Teasers need four strings and an icon each; that doesn't justify a registry abstraction. Whether the *real* trackers get their own registry (vs. riding the calculator one, vs. ad-hoc pages) is still an open question — see § "Decisions still to make → Tracker architecture — reuse calculator patterns, or new pattern?". `upcomingFeatures.js` is teaser metadata only; it does not pre-decide that architecture.
+
+**When to revisit:** When the first real tracker is built. At that point the teaser entry for it is replaced by whatever the tracker architecture decision lands on, and this module either grows into that pattern or is retired alongside the last teaser.
+
+## Single source of truth for calc types (backend)
+
+**TL;DR:** `calc_types.py` is the only place `VALID_CALC_TYPES` is defined.
+
+**Decision:** `calc_types.py` holds `VALID_CALC_TYPES`. Both `schemas/calculator_schema.py` (Marshmallow `OneOf`) and `db_init.py` (CHECK constraint) import from it.
+**Why:** Previously these two lists had to be kept in sync manually. Adding a calculator would silently let invalid types into the DB or block valid ones from being saved. Now they can't diverge.
+**Trade-off accepted:** `db_init.py` rebuilds the named `calc_type` CHECK constraint via `DROP CONSTRAINT IF EXISTS` + `ADD CONSTRAINT` on every run, so the allowed set always matches `VALID_CALC_TYPES`. Postgres alters constraints in place — the old SQLite full-table-rebuild hack is gone. (The allowed-values list is composed with `psycopg.sql.Literal`, not f-strings, since DDL can't take bind parameters.)
+
+## Shared HTTP client + CSRF injection
+
+**TL;DR:** `createApi(baseUrl)` factory in `httpClient.js`. CSRF handled centrally.
+
+**Decision:** `httpClient.js` exports `createApi(baseUrl)` returning `{ get, post, put, delete }`. `authApi` registers a getter for the CSRF token at module load; `httpClient` calls it on every mutating request and attaches `X-CSRF-Token` automatically.
+**Why:** Two API modules used to define their own near-identical `request()` function with CSRF logic copy-pasted. Easy to forget on a third module. The getter-registration pattern keeps the dependency one-way: `httpClient` knows nothing about auth state, `authApi` owns the token.
+**Adding a new API namespace** is now one file with one import — see `PROJECT_STRUCTURE.md` § "Adding a New API Namespace".
+
+## CSRF token lives in JS memory, not localStorage
+
+**TL;DR:** Token in a module-level variable in `authApi`. Re-fetched on full reload.
+
+**Decision:** The token is held in a module-level variable inside `authApi`. Fetched on app mount via `authApi.fetchCsrfToken()`. Cleared automatically on full page reload (re-fetched on next mount).
+**Why:** Tokens in localStorage are readable by any XSS-injected script. Tokens in HttpOnly cookies are safe but require double-submit patterns. JS-memory storage is the sweet spot: no XSS exposure (a script would need to be inside `authApi`'s module scope), no cookie complexity, automatic invalidation on reload.
+**Server-side detail:** `clear_session()` preserves the CSRF token across logout so the next login doesn't fail.
+
+## CSRF on session, not cookie
+
+**TL;DR:** Server-side session-stored token, verified via header.
+
+**Decision:** Backend stores the CSRF token in the server-side Flask session, not in a cookie.
+**Why:** With server-side sessions, the token is already protected from client tampering — no need for double-submit cookie patterns. The header-based scheme (`X-CSRF-Token`) is the simpler half of double-submit.
+
+## No ORM — raw SQL via psycopg
+
+**TL;DR:** Raw `psycopg` (psycopg 3) with parameterised queries. SQLAlchemy is not coming.
+
+**Decision:** All DB access uses `psycopg` directly with parameterised (`%s`) queries. (This was `sqlite3` before the Postgres/Neon migration; the no-ORM stance carried over unchanged — only the driver and placeholder style changed.)
+**Why:** Two tables, ~10 queries total at MVP. SQLAlchemy would mean a week of refactor for zero correctness or performance gain. Raw SQL is also more transparent about what's actually hitting the database.
+**Safety:** Every query against `saved_calculators` includes `AND user_id = %s` — IDOR protection enforced at the query layer, not at a permission layer.
+**Stress-test for next phase:** The trackers will add at least two new user-scoped tables (entries, optionally categories). Same rule applies — no query without the user_id filter. If the table count climbs past 6–8, the no-ORM call should be revisited.
+
+## Postgres on Neon
+
+**TL;DR:** SQLite is retired. The app runs on Postgres (Neon), one connection per request, no in-process pool, `data` stored as JSONB.
+
+**Decision:** The database is Postgres, hosted on Neon, accessed via `psycopg` (psycopg 3). A new `db.py` opens one connection per request on Flask `g` and closes it on teardown. `DATABASE_URL` is validated at startup — the app exits if it's missing or not a Postgres URL — with no SQLite fallback and no dual-driver support.
+
+**Why move off SQLite:**
+- Render's filesystem is ephemeral, so a SQLite file doesn't survive a deploy or restart — production needs a real, managed database.
+- SQLite under multiple gunicorn workers is a correctness/locking hazard; Postgres is built for concurrent writers.
+- Neon gives a branch-per-environment workflow: the **dev branch** backs local/staging, the **main branch** backs production. Same engine, isolated data, one env var (`DATABASE_URL`) apart.
+
+**Why no in-process pool:** `DATABASE_URL` points at Neon's **pooled (PgBouncer)** endpoint, which does the pooling. A second pool in-process would just fight it. One connection per request, closed on teardown, is the boring correct choice.
+
+**Why JSONB for `data`:** It's Postgres-native — the engine validates the JSON, can query into it later if needed, and `psycopg` round-trips it directly to/from a Python `dict` (no manual `json.dumps`/`loads`). The route sees the same dict shape it always did.
+
+**No-ORM stance carries over:** see § "No ORM — raw SQL via psycopg". Parameterised `%s` queries, `AND user_id = %s` on every user-scoped query, identity PKs, `TIMESTAMPTZ` timestamps, and an idempotent `db_init.py` (`python db_init.py` still creates/migrates the schema, now Postgres-side).
+
+**When to revisit:** If query volume or table count grows enough that hand-written SQL becomes a maintenance drag (see the no-ORM revisit trigger), or if Neon's pooling model stops fitting (e.g. needing long-lived connections / `LISTEN`/`NOTIFY`), reconsider the per-request-connection shape.
+
+## Redis sessions via Upstash
+
+**TL;DR:** Sessions and rate limiting live in Redis (Upstash) so they hold across workers. Dev can fall back to filesystem sessions + in-memory limiting with one env var unset.
+
+**Decision:** Server-side sessions use `flask-session` with the Redis backend (`SESSION_TYPE = "redis"`, `SESSION_REDIS = redis.from_url(REDIS_URL)`), and the rate limiter stores its counters in the same Redis (`RATELIMIT_STORAGE_URI = REDIS_URL`). In **production**, `REDIS_URL` is mandatory — the app exits at startup without it. In **development**, `REDIS_URL` is optional: set it for full prod parity, or leave it unset to fall back to filesystem sessions + `memory://` rate limiting, with a single clear startup warning.
+
+**Why this replaces "filesystem sessions in dev":** That decision's revisit condition has triggered. Filesystem sessions don't survive across gunicorn worker processes, and Render's filesystem is ephemeral besides — so a multi-worker production deploy needs a shared session store. Likewise, in-memory rate-limit counters are per-process: with `-w 2+` the limits wouldn't actually limit. Redis fixes both with one store.
+
+**Why keep the dev fallback:** A fresh checkout should still run with zero infrastructure. Making `REDIS_URL` optional in dev preserves that — and the gap between "works on my machine" and "works in prod" is exactly one environment variable.
+
+**Upstash specifics:** Upstash connection strings are `rediss://` (TLS). `redis.from_url` negotiates TLS automatically — no extra flags. The CSRF token still lives in the server-side session, so `clear_session()` continuing to preserve the token across logout is unchanged; only the storage backend moved.
+
+**When to revisit:** If Redis becomes a hard dependency for more than sessions + rate limiting (e.g. caching, queues), or if Upstash's per-command pricing model stops fitting the request volume, reassess the provider — not the decision to use Redis.
+
+## Number formatting via shared `fmt()`
+
+**TL;DR:** One `fmt()` in `utils/format.js`. No local copies, ever.
+
+**Decision:** One `fmt()` in `utils/format.js`. Every calculator imports it. No local `fmt()` definitions allowed.
+**Why:** Twelve calculators had near-identical local `fmt()` functions before extraction — small variations meant `$1.5K` here and `$1,500` there. Centralising fixes the inconsistency and gives us a single place to add features (currency override, decimal-place override).
+**Next phase consideration:** The upcoming i18n / language setting will likely interact with `fmt()` (localised currency symbols, decimal/thousand separators). When that lands, extend `fmt()` — don't add a parallel formatter.
+
+## Calculator input state via `useCalculatorInputs`
+
+**TL;DR:** One hook owns input state, sync, change-notification, and version injection.
+
+**Decision:** A hook that owns `useState`, the `initialData` sync effect, the `onDataChange` notification effect, and a `set(field)` curry. Returns `{ inputs, set, setInputs }`.
+**Why:** All twelve calculators had the same 4-line boilerplate. Now they have one hook call. Adding a 13th calculator means writing inputs + render — no plumbing.
+**Exception:** `SankeyDiagram` has two state slices (income sources, expense groups), so it calls `migrate()` and `stripVersion()` directly instead. The exception is documented in code. See § "Sankey v2 — nested groups, restyle, permalink" for the full shape.
+
+## Saved-data versioning
+
+**TL;DR:** Every saved shape has a `version` field. Migrations live in `migrateCalcData.js`. `__v` is internal — stripped before save.
+
+**Decision:** Every calculator's `DEFAULTS` includes `version: 1` as the first field. `migrateCalcData.js` holds a per-type migration registry. The internal `__v` key is stripped before save and re-injected on load.
+**Why:** Saved data is opaque JSON in SQLite. Without a versioning system, renaming a field or changing units would silently break every existing saved record. Now we have a controlled upgrade path: bump the version, register a migration, old records upgrade on load.
+**Why strip the key before save:** Stored JSON stays clean — `__v` is metadata, not user input. Re-injection happens on load via `injectVersion()` (defaults to 1 for legacy records that pre-date versioning).
+**First real migration:** Sankey is the first calculator to advance past `version: 1` — its v1→v2 migration (flat `expense_categories[]` → nested `expense_groups[]`) is the proof that the versioning system works end-to-end on real saved data. See § "Sankey v2".
+**Next phase rule:** The tracker features will store their own user data. Same versioning rule applies — no shape without a `version: 1` field and a stub migration entry.
+
+## Calculator explainers driven by registry
+
+**TL;DR:** Registry holds `{ heading, body }`. One `<CalculatorExplainer>` renders it. Calculators must not render their own.
+
+**Decision:** Each registry entry has `explainer: { heading, body }`. A single `<CalculatorExplainer>` component renders the gradient banner above the Suspense boundary in `CalculatorPage`. Calculator components do not render their own explainer.
+**Why:** Originally only BaristaFIRE had an inline explainer. Extending the pattern would have meant 11 copies of nearly-identical JSX, plus a maintenance burden on the structure. Now adding an explainer to a new calculator means writing two strings in the registry — and the banner appears for free, including during the lazy-load skeleton (a nice side effect).
+
+## Sankey v2 — nested groups, restyle, permalink
+
+**TL;DR:** Sankey is a 4-column diagram (income → Budget hub → group → subcategory) with its own nested data shape, a soft pastel restyle, currency picker, %/amount toggle, and a client-side permalink.
+
+**Decision:** Sankey diverges from the other 11 calculators in four ways:
+1. **Nested data shape (v2).** `{ income_sources[], expense_groups[] }` where each group has `items[]`. This is the only calculator whose saved shape isn't a flat input map.
+2. **Four-column diagram.** income source → `Budget` hub → expense group → subcategory. Mirrors the structure of a real budget (group totals roll up from their items).
+3. **Toolbar controls.** A currency picker (`$ / € / £`), an amount/% toggle (% = share of total income), and a "Copy permalink" button.
+4. **Permalink via URL state.** Full diagram state is encoded as `?data=<base64>` — no backend, no DB column. On mount, a `?data=` param takes precedence over `initialData`. The button writes the URL to the clipboard and the address bar via `history.replaceState`.
+
+**Why nested groups:** The original flat `expense_categories[]` couldn't express "Housing = Rent + Electricity". A real budget groups spending, and the diagram is far more legible with a middle layer. Cost: a breaking data-shape change, handled by a v1→v2 migration (flat list wrapped into a single "Expenses" group — non-destructive, idempotent).
+
+**Why permalink is client-side, not backed by the DB:** A shareable budget snapshot doesn't need to be a persisted record — it's a point-in-time view someone pastes into a chat or bookmark. URL state is zero-infra and the link works for logged-out users. If we later want named, editable shared budgets, that becomes a backend feature (`?id=` + a public-share endpoint) — but that's a different product decision, not a prerequisite.
+
+**Why the restyle is Sankey-only:** The pastel palette, inline band labels, and dark hub bar were tuned for flow legibility — they're not the app's global design language (that refresh is still pending; see § "Design system extraction"). Sankey got the treatment first because it was the calculator whose old styling read as most broken (saturated colours, colliding labels, 1px stub bands from the old `Math.max(1, value)` hack).
+
+**Layout-bug fixes that shipped with the rebuild:** label truncation with ellipsis (names no longer overflow the box); sub-threshold entries (`< 1`) filtered from the diagram but kept editable in inputs (no more 1px stub bands); thin middle bands skip their label to avoid collisions; endpoints always labelled.
+
+**When to revisit:** If a second tracker/calculator needs nested groups, consider whether the group/item editor UI is worth extracting into a shared primitive. For now it lives in `SankeyDiagram.jsx` — one consumer, no extraction.
+
+## Lazy-loaded calculators with skeleton fallback
+
+**TL;DR:** All calculator components are `lazy()`-imported. `<Suspense>` + `CalculatorSkeleton`.
+
+**Decision:** Every calculator component is `lazy()`-imported in `registry.js`. `CalculatorPage` wraps the render in `<Suspense>` with `CalculatorSkeleton` as fallback.
+**Why:** First-page-paint shouldn't pay for code the user hasn't navigated to. The 12 calculators include Recharts and d3 in some bundles — non-trivial weight. Lazy loading defers those costs until the user actually visits each calc.
+**Why a skeleton:** The chunk fetch is ~50–200ms on a typical connection. A skeleton during that interval signals progress; a flash of nothing feels broken.
+
+## Login/Register pages as thin wrappers around `<AuthForm>`
+
+**TL;DR:** One form shell, two pages. They differ only in copy and submit handler.
+
+**Decision:** Both pages share a single form shell. They differ only in badge, copy, button labels, and submit handler.
+**Why:** They were ~95% identical before extraction. Two files, same maintenance burden when fixing a styling bug or adjusting validation rendering.
+
+## `<UserFooter>` shared across LandingPage + CalculatorSidebar
+
+**TL;DR:** One component, two variants (`compact`, `roomy`). Owns the delete-modal state internally.
+
+**Decision:** The authenticated-user footer block (email, sign-out, delete account modal) is one component with two variants (`compact`, `roomy`). Owns the delete-confirmation modal state internally.
+**Why:** The block was duplicated, *and* both parents owned their own copy of the delete-modal state with identical handlers. Extraction collapsed both. The variants exist because the surrounding contexts have slightly different visual weight.
+**Why unauthenticated CTAs are NOT shared:** LandingPage shows two buttons (Sign in + Create account, the latter as an amber CTA). CalculatorSidebar shows a single muted "Sign in to save" link. Different surfaces, different intent — sharing would force a worse compromise on both.
+
+## Save logic in `useSave` with `activeSavedCalcId` reset on type change
+
+**TL;DR:** `useSave` owns all save state. Resets on type change to prevent cross-calc leak.
+
+**Decision:** All save state and handlers live in `useSave`. When the URL `type` param changes, `activeSavedCalcId` resets to `null`.
+**Why for the hook:** Save state (`activeSavedCalcId`, `saveStatus`, `saveError`, modal open) is a coherent unit. Keeping it in one place means `CalculatorPage` orchestrates without owning the mechanics.
+**Why the reset:** `CalculatorPage` doesn't unmount when you click a different calculator in the sidebar — only the `type` param changes. Without the reset, a saved-record ID from FIRE would leak into Mortgage and the save button would mis-render as "Update" on a different calculator entirely. (This was a real bug; the reset is the fix.)
+
+## "New" button + sidebar click-to-deselect
+
+**TL;DR:** Two ways to detach from an active record without resetting inputs.
+
+**Decision:** Two ways to detach from an active saved record without losing inputs: (a) the "New" button in the header, visible only when a record is loaded; (b) clicking the active record in the saved sidebar.
+**Why two:** Discoverability + ergonomics. The button is the obvious affordance; the sidebar click-to-deselect is faster for users who already understand the saved list. Power users get the shortcut; new users see the button.
+**Why don't reset inputs:** The common workflow is "I just saved 'Conservative FIRE'; let me tweak and save 'Aggressive FIRE'." Resetting to DEFAULTS would force re-entering nearly the same values.
+
+## Favourites in localStorage, not in the DB
+
+**TL;DR:** Per-user favourites stored locally. Don't sync across devices. Acceptable for MVP.
+
+**Decision:** Per-user favourites stored in `localStorage` keyed by `sm_favourites_${user.id}`.
+**Why:** Favourites are a UX preference, not user data. They don't need to survive across devices, don't need backups, don't need ACID. Adding a `favourites` table would mean a migration, a new endpoint, a new query — all for a star button.
+**Trade-off accepted:** Favourites don't sync across devices. Acceptable for an MVP. If users complain, this becomes one of the first features to move server-side.
+
+## CalculatorPage as orchestrator only
+
+**TL;DR:** Routing guards + data fetching + sidebar state. Header / skeleton / explainer / save extracted.
+
+**Decision:** `CalculatorPage` does routing guards, data fetching, save coordination, and sidebar state. The header, skeleton, explainer, save flow, and inputs are all separate components/hooks.
+**Why:** Originally `CalculatorPage` was ~230 lines mixing all of this. Now it's ~120 and reads as a top-down summary of the page. Each extracted piece has one job.
+
+## Rate limiting via Flask-Limiter with per-route configuration
+
+**TL;DR:** Tight limits on auth, looser on data. Memory in dev, Redis in prod.
+
+**Decision:** Limiter instance lives in `app.py`. Routes import it and apply `@limiter.limit()` per endpoint. Auth routes get tighter limits than data routes.
+**Why:** Brute-force auth is the main attack vector. Login gets 5/min + 20/hr; register gets 10/hr; account deletion gets 5/hr. Data routes are looser.
+**Storage:** Redis (Upstash) via `REDIS_URL` so counters are shared across workers — see § "Redis sessions via Upstash". In dev, leaving `REDIS_URL` unset falls back to `memory://` (per-process, resets on restart). Multi-process without Redis means the limits don't actually limit.
+
+## Transactional email via Resend
+
+**TL;DR:** Email goes through Resend, wrapped in a `services/email.py` module. It's best-effort — registration never fails because of an email error.
+
+**Decision:** Transactional email is sent via Resend, behind a small `services/email.py` wrapper (`send_email(to, subject, html)` + the concrete `send_welcome_email(to_email)`). `MAIL_FROM` and `RESEND_API_KEY` come from `.env`. If `RESEND_API_KEY` is unset, email is disabled — `send_email` becomes a logged no-op and a single startup warning fires (dev **and** prod). The registration route sends the welcome email **after** the user row is committed, inside its own `try/except` that logs and swallows any failure.
+
+**Why a service module:** Email is a side-effect with its own SDK, config, and failure modes — it doesn't belong inlined in a route. A module gives one place for the SDK wiring, the enabled/disabled gate, and future templates (password reset is the next caller). Routes just call `send_welcome_email(...)` and move on.
+
+**Why registration never fails on email errors:** Account creation and "did the welcome email send" are independent concerns. A Resend outage, a rate limit, or an unverified-domain rejection must not cost a user their signup or even noticeably slow it. So the send happens after the commit, in a guarded block, and its result is ignored. Email is not availability-critical **yet** — that calculus changes when password reset lands (a reset email that silently fails is a real problem), at which point this decision gets a second look.
+
+**Domain caveat:** Until `spreadsheetmillionaire.com` is verified in Resend (a DNS task), sends only succeed to the Resend account owner's own address. That's expected and not a code concern.
+
+## Single-origin deployment via Vercel rewrite proxy
+
+**TL;DR:** Vercel serves the built frontend and rewrites `/api/*` to the Render backend server-side. The browser only ever talks to the Vercel origin, so session cookies stay first-party and there's no CORS surface.
+
+**Decision:** The backend (Flask under gunicorn) runs on **Render**; the built frontend runs on **Vercel** as static files. They live on different domains, but `frontend/vercel.json` rewrites `/api/:path*` to the Render service so the browser never sees the cross-origin hop. Two rewrite rules, order-significant: the API proxy first, then a `/(.*) → /index.html` SPA fallback so hard-refreshing a client route (e.g. `/calculator/fire`) doesn't 404. The frontend keeps calling relative `/api/...` paths — exactly what it already does behind the Vite dev proxy — so **zero `src/` changes** are required.
+
+**Why single-origin instead of direct cross-origin calls:**
+- **First-party cookies.** The session cookie is set by, and sent to, the Vercel origin only. Safari (and increasingly others) block third-party cookies outright — a frontend calling `api.onrender.com` directly would have its session cookie dropped. The rewrite keeps the cookie first-party.
+- **Zero CORS surface.** Same-origin requests mean no preflight, no `Access-Control-*` juggling, no credentialed-CORS footguns. `CORS_ORIGINS` still exists for defence in depth but isn't load-bearing for the happy path.
+- **No frontend rewrite.** Relative `/api` paths already work behind the Vite proxy; the same paths work behind the Vercel proxy. One config file, no code.
+
+**Trade-off accepted:** Every API call hops through Vercel's edge before reaching Render — a small added latency, and Render free-tier **cold starts** (the process sleeps after 15 idle minutes) can exceed the rewrite's timeout on the first request after a sleep. Mitigated by a keepalive pinger hitting `/api/health` every ~10 minutes (see the deployment runbook); the real fix is the $7/mo always-on Render instance at launch.
+
+**When to revisit:** At launch, custom domains make `app.spreadsheetmillionaire.com` and `api.spreadsheetmillionaire.com` **same-site** (shared registrable domain), so first-party cookies survive a direct call. If proxy latency ever measurably matters then, direct API calls become viable — but only after the domains are same-site, never before.
+
+## gunicorn with 2 workers + ProxyFix
+
+**TL;DR:** Render runs the app under `gunicorn -w 2`, and the WSGI app is wrapped in `ProxyFix` so Flask trusts Render's forwarding headers.
+
+**Decision:** Production serves via `gunicorn --workers 2 --bind 0.0.0.0:$PORT 'app:create_app()'`, run from `backend/`. The app object is exposed as the `create_app()` factory, so the gunicorn target is the factory-call form. Inside `create_app()`, `app.wsgi_app` is wrapped with `ProxyFix(x_for=1, x_proto=1, x_host=1)` — applied unconditionally.
+
+**Why 2 workers:** It's the smallest count that would expose any residual shared-state bug (a session or rate-limit counter living in one worker's memory instead of Redis). Phase 2 moved both to Redis precisely so multi-worker is safe; 2 workers is the cheap proof that it is.
+
+**Why ProxyFix, unconditionally:** Render terminates TLS and forwards requests over HTTP with `X-Forwarded-Proto`/`-For`/`-Host` headers. Without trusting them, `request.is_secure` reports HTTP and Talisman's HTTPS redirect loops forever. Trusting exactly **one** hop (the values are `1`) is correct for Render's single proxy and avoids spoofing from additional untrusted hops. It's harmless in dev behind the Vite proxy (also one hop), so there's no environment branch.
+
+**When to revisit:** If the instance is upsized, raise the worker count (`(2 × cores) + 1` is the usual rule of thumb). If a second proxy layer is ever added in front of Render (e.g. a CDN that also forwards), bump the `ProxyFix` hop counts to match — undercounting trusts a spoofable header, overcounting trusts a hop that isn't there.
+
+## bcrypt + 8-char password rule
+
+**TL;DR:** bcrypt + 8 chars with letter + number. Reasonable floor without being onerous.
+
+**Decision:** bcrypt for hashing, Marshmallow schema enforces 8+ chars with at least 1 letter and 1 number.
+**Why bcrypt:** Battle-tested, adaptive cost factor, no foot-guns.
+**Why the password rule:** Reasonable floor without being onerous. Long enough to defeat trivial brute-forcing combined with rate limiting; lax enough that a real human can remember their password.
+
+## Account deletion requires password re-confirmation
+
+**TL;DR:** `DELETE /api/auth/account` checks the password. Cascades via `ON DELETE CASCADE`.
+
+**Decision:** `DELETE /api/auth/account` rejects the request unless the request body contains the user's current password (verified via bcrypt). Cascades via `ON DELETE CASCADE` on `saved_calculators`.
+**Why:** Hijacked session shouldn't be able to nuke the account silently. Requiring the password means an attacker would also need the credentials — at which point they could log into a fresh session anyway, but the friction stops casual session-hijack scenarios.
+**Next phase note:** The new tracker tables will need `ON DELETE CASCADE` to `users` for the same reason.
+
+## Password reset via hashed single-use tokens
+
+**TL;DR:** A forgotten password is recoverable via an emailed link backed by a hashed, single-use, 60-minute token. The raw token is never stored; the request endpoint never reveals whether an email exists.
+
+**Decision:** `POST /api/auth/forgot-password` issues a reset token; `POST /api/auth/reset-password` consumes it. Tokens live in `password_reset_tokens` (identity PK, `user_id` FK `ON DELETE CASCADE`, `token_hash`, `expires_at`, `used_at`, `created_at`). The raw token is `secrets.token_urlsafe(32)`; only its SHA-256 hex digest is persisted. Lifetime is 60 minutes; consumption stamps `used_at` (single-use); a successful reset also invalidates every other outstanding token for that user. Expired rows are deleted opportunistically on each forgot-password call (no cron).
+
+**Why hash at rest:** The token is a bearer credential — anyone holding it can reset the password. Storing only the digest means a database leak yields hashes, not working links: the raw value exists solely in the emailed link and, transiently, in the request that consumes it. (Same reasoning as not storing plaintext passwords, applied to a short-lived credential.)
+
+**Why 60-minute, single-use:** A reset link is a one-shot action. A short TTL bounds the window in which a leaked link (forwarded email, shared inbox, proxy log) is usable; single-use means a consumed link can't be replayed, and superseding earlier tokens means requesting a new link silently retires the old one.
+
+**Why uniform responses (no enumeration):** `forgot-password` returns one identical `200 {"message": "If that email exists, a reset link has been sent."}` on every path — registered, unregistered, malformed input, or email-send failure. It deliberately has **no `422` validation path** (unlike `register`/`login`), because a differing status on a bad email is itself an enumeration signal. `reset-password` collapses every token problem (unknown / expired / used / missing) into one generic `400 invalid or expired link` with no hint as to which. The cost is slightly less helpful errors; the benefit is that neither endpoint is an account-existence oracle.
+
+**Accepted limitation — timing, not constant-time:** The uniform body is byte-identical, but the endpoint is not perfectly constant-time: a registered email incurs the Resend send latency that a non-existent one doesn't. Flattening that fully would require backgrounding the send (a job queue / thread), which we judged not worth new infrastructure for an endpoint already capped at `3/hour` per IP. This matches `login`'s existing posture (it also short-circuits when the user doesn't exist). The uniform body + tight rate limit are the primary protections; the residual timing side-channel is accepted. Revisit if a cheap background-send path appears.
+
+**Accepted limitation — sessions not force-revoked:** A successful reset updates the bcrypt hash and invalidates outstanding reset tokens, but does **not** revoke already-logged-in sessions elsewhere. Flask sessions live in Redis keyed by session id, not indexed per-user, so there's no efficient "log out all this user's sessions." The password change itself is the protection — an attacker with a live stolen session keeps it until it expires (30 days) or the user logs out, but can no longer re-authenticate. Revisit if per-user session revocation becomes a requirement (it would mean indexing sessions by user id).
+
+**Reuse, not redefinition:** The new-password rules come from the existing `validate_password` in `user_schema.py` (extracted from `RegisterSchema` so there's exactly one copy). `change-email`'s duplicate-email response is byte-identical to `register`'s `409` — matching register's existing enumeration posture rather than inventing a new one.
+
+## Settings as a single stacked page
+
+**TL;DR:** `/settings` is one auth-guarded page with stacked sections, scoped to account management only until tier / i18n land.
+
+**Decision:** `SettingsPage` (`/settings`, guarded by `RequireAuth`) is a single page with stacked sections: account email (read-only), change password, change email (password-confirmed), and a danger zone hosting the existing `DeleteAccountModal`. It reuses `authApi` (no new API namespace) and the existing visual language; entry points are a "Settings" link in `UserFooter` (both variants). Reset/forgot/settings share chrome via an extracted `AuthCardShell`, leaving the high-traffic `AuthForm` (login/register) mechanically untouched.
+
+**Why deliberately minimal:** The product needs account recovery and management to launch; it does not yet need preferences. Language/i18n, currency, tier display, and email-verification-on-change are explicitly out of scope this phase — they depend on systems that don't exist yet (the i18n integration, the tier/entitlement model). Building the page now as a plain stack of forms means adding those later is appending a section, not a redesign.
+
+**When to revisit:** When tier or i18n ships, the page gains a section (or splits into tabs if the count grows past ~5). Email verification on change is the most likely near-term addition — when it lands, `change-email` becomes a two-step confirm-then-apply flow rather than the immediate update it is now.
+
+## Security headers via Flask-Talisman
+
+**TL;DR:** HTTPS in prod, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, strict `Referrer-Policy`.
+
+**Decision:** Talisman enabled in `app.py`. Forces HTTPS in production, sets `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, and a strict `Referrer-Policy`.
+**Why:** Defence in depth. Each header blocks a specific attack class — clickjacking, MIME confusion, referrer leakage. Cheap to add, hard to remember to add later.
+
+## Config from `.env`, app exits on missing/invalid secret
+
+**TL;DR:** Loud failure beats silent fragility.
+
+**Decision:** All sensitive values in `.env`. `config.py` reads them via `python-dotenv`. App exits at startup if `FLASK_SECRET_KEY` is missing, under 32 chars, or still the placeholder.
+**Why:** Loud failure beats silent fragility. A misconfigured production server should refuse to boot rather than run with a weak key.
+
+## Git branching model
+
+**TL;DR:** `main` ← `develop` ← `feature/*`, conventional commits, squash merge, tags on releases.
+
+**Decision:** Three-tier branching: `main` is production, `develop` is staging/integration, and `feature/*` branches cut from `develop` and merge back via a squash-merged PR. Commits follow Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`, `refactor:`) — one logical change each. A release is a PR from `develop` to `main` followed by a version tag (`v0.2.0`, …). The original prototype is preserved at the `v0.1.0-prototype` tag.
+
+**Why this shape:**
+- Solo dev deliberately learning a production-grade workflow before there are users or collaborators forcing it. Practising the discipline now makes adding a second contributor a non-event rather than a process retrofit.
+- Squash merge keeps `main`'s history one-commit-per-feature and readable; the messy in-progress commits stay on the feature branch.
+- The `develop` tier is a place to integrate and verify several features together before they reach production — and a natural target for per-branch preview deploys (Vercel) once that lands.
+- Tags make every release — and the prototype — recoverable by name.
+
+**Repo-settings caveat:** Squash-only merge settings and branch protection on `main` are configured through GitHub's API/UI, not in the repo. On a private repo with a limited token (or a free plan), those server-side rules may not be enforceable. Until they are, the workflow is upheld by discipline, not by GitHub blocking a bad push — which is acceptable for a solo dev and revisited the moment that changes.
+
+**When to revisit:** If a second contributor joins, tighten enforcement (required reviews, status checks). If `develop` stops earning its keep — features shipping straight to `main` without an integration step — collapse to trunk-based development with short-lived feature branches.
+
+## Marketing landing page — same Vite app, route at `/`
+
+**TL;DR:** The marketing landing lives in the existing Vite SPA at `/`; the app moved under `/app/*`. No separate static site.
+
+**Decision:** Promoted from "Decisions still to make" and made final in Phase 6. The public marketing page is a route (`/`) in the same Vite/React app, alongside `/privacy` and `/terms`; the entire in-app surface moved under `/app/*` with param-preserving redirects from the old top-level paths. Marketing section components live in `frontend/src/marketing/` (parallel to `calculators/`); the page itself is `pages/MarketingLandingPage.jsx`.
+
+**Why same app, not a separate Astro/Next site:**
+- **One deploy, one origin.** The Vercel single-origin rewrite (see § "Single-origin deployment") already serves the SPA and proxies `/api/*`. A second site would mean a second deploy, a second origin, and either a shared-cookie story or a redirect dance. Not worth it for a handful of static sections.
+- **Shared auth + session.** The nav adapts to auth state using the same prop-drilled `auth` object the app uses; "Open app" vs "Sign in / Get started" needs no new machinery.
+- **Shared design tokens.** Marketing and app draw from the same Tailwind config, so the brand (amber accent, dark base, the `SpreadsheetMillionaire` wordmark) stays consistent across the click-through.
+
+**Design note — visual language defined here, font deferred.** Phase 6 establishes the public visual language on a `stone-950` base with a single amber accent. The product currently ships a `system-ui` font stack (no DM font in `tailwind.config.js`), so the literal "DM font family" direction was **deferred to the later app-wide design refresh** rather than introduced as a marketing-only divergence — adding a webfont to marketing alone would have made the click-through *less* consistent, not more. The refresh is the right place to adopt a brand typeface app-wide, if it adopts one at all.
+
+**When to revisit:** If the marketing page grows real CMS needs (non-developers editing copy) or organic search becomes a channel that SSR/prerender would materially help (see § "SPA SEO limitation accepted"), splitting marketing out to a static generator becomes worth the second deploy. Until then, one app is correct.
+
+## SPA SEO limitation accepted
+
+**TL;DR:** The marketing page is client-rendered. We accept the SEO ceiling that comes with that, and don't add SSR/prerender/helmet to paper over it.
+
+**Decision:** SEO for the marketing surface is limited to what a client-rendered SPA can do: a static `<title>` + meta description + Open Graph/Twitter tags in `index.html`, plus a `useDocumentTitle` hook giving each route a distinct title. No server-side rendering, no prerender/SSG step, and no `react-helmet` (a dependency for what two `<head>` tags and one hook already cover).
+
+**Why accept it:** The product's traffic isn't organic-search-led today — it comes from build-in-public channels (the GitHub repo, direct shares). JS-executing crawlers (Googlebot) do pick up the per-route titles. The cost of "proper" SEO — SSR or a static generator — is a second rendering path or a second site, which is real complexity for a channel that isn't yet load-bearing.
+
+**When to revisit:** If organic search becomes a channel we actually want to compete in, the marketing page (and only the marketing page) moves to a static generator or gains a prerender step. That's the trigger; until it fires, the SPA approach is intentional, not an oversight.
+
+## Marketing page invents nothing
+
+**TL;DR:** Everything on the marketing page must be true of the product today. No fabricated social proof, ever.
+
+**Decision:** A standing constraint on all marketing copy and UI: no testimonials, no user/download counts, no "as seen in" or partner logos, no stock-photo people, no claims that aren't verifiable against the current product. The calculator showcase derives from `PUBLISHED_CALCULATORS` and the coming-soon strip from `UPCOMING_FEATURES` — real features, never a hand-curated highlight reel. "Free while in beta" is the honest framing for the not-yet-existent pricing story; a `/pricing` page waits until a paid tier actually exists.
+
+**Why:** A build-in-public product's credibility *is* its honesty — and the genuinely public GitHub repo means any fabrication is trivially falsifiable. Invented social proof is both an integrity problem and a liability the moment a visitor checks. The authentic signals (open source, usable with no signup, no ads/no data sale) are stronger than manufactured ones anyway.
+
+**When to revisit:** Never as a relaxation. When real proof exists (actual testimonials with permission, real metrics worth citing), it can be added *because it's true* — the constraint is "nothing fabricated," not "nothing persuasive."
+
+---
+
+## Decisions deliberately NOT made (and why)
+
+These come up in conversations as "should we add this?" — the answers below are durable until something changes:
+
+- **TypeScript** — highest single-refactor ROI available, but ~1–2 days of work. Defer until before the trackers ship or before adding another dev.
+- **Card-shell extraction** (a `<Card>` primitive for the white shadow boxes) — saves ~24 lines across 12 files. Thin abstraction, weak win. Skip — *unless* the design refresh introduces enough card variants to justify it.
+- **`<InsightCard>` extraction** for the per-calculator "Insight" footer blocks — the content varies wildly; extracting the shell obscures meaningful copy. Skip.
+- **SQLAlchemy** — see § "No ORM."
+- **A backend calculator engine** — calculations on the frontend means free, no roundtrip, instant feedback. Don't move them.
+- **Server-side favourites** — see § "Favourites in localStorage."
+
+---
+
+## Decisions still to make (the next phase)
+
+These are explicitly open and need to be settled before or during the work that triggers them. Each one will become its own section above once decided.
+
+### How tier / entitlement state lives
+
+**The question:** When the freemium model lands, every gated feature needs to ask "what tier is the user on?" The cheapest answer is `auth.tier` (added to the user record, read off the existing prop-drilled `auth` object). The more sophisticated answer is a dedicated `useEntitlements` hook with cached server checks and feature-flag semantics.
+**Default until decided:** Add `tier` to the user record, expose it on `auth`. Promote to a dedicated hook only if (a) we add more than ~3 gated features, or (b) entitlements ever need to be checked against more than the user's stored tier (e.g. trial expiry dates, grandfathered users).
+**What forces the decision:** The first paid feature shipping. Don't pre-build the hook.
+
+### Three-layer entitlement enforcement
+
+**The question:** Gating a paid feature at the UI alone is a bug — a curl request can bypass it. Where the checks live needs to be conventional, not ad-hoc per feature.
+**Likely answer:** A small `@requires_tier('paid')` decorator on the route side (analogous to `@login_required` and `@csrf_protect`), an `<EntitlementGate tier="paid">` component on the UI side, and the `AND user_id = ?` rule already handles the DB side because tier-gated features will live in tier-specific tables or tier-gated rows.
+**Decide before:** Net worth tracker ships, since net worth is the first feature with a paid-tier slice.
+
+### Tracker architecture — reuse calculator patterns, or new pattern?
+
+**The question:** Trackers have lists, history, and time-series. Calculators have a single input set. Whether trackers ride on the calculator registry / save flow, or sit on their own pattern, is open.
+**Initial leaning:** Shared primitives (NumInput, StatCard, the save flow's *shape* via versioning + IDOR), but distinct page-level orchestration and likely a distinct sidebar section. Probably their own registry if they share enough structure with each other.
+**Decide before:** Writing the second tracker. The first tracker will accidentally define the pattern; the second is where you find out whether the accident was a good one.
+
+### i18n — when, how, and how deeply
+
+**The question:** Language as a user setting means at minimum a translation table for all UI strings. At maximum, it means localised currency formatting, dates, and number conventions throughout.
+**Initial leaning:** Use `react-i18next` for strings; extend `fmt()` for currency/number locale. Tackle as part of the design refresh, not as a separate pass.
+
+### Design system extraction
+
+**The question:** The visual refresh will touch every component. Whether to extract a `<Card>`, `<Button`, `<Section>` primitive layer first, or refresh in place, is open.
+**Initial leaning:** Refresh in place for two or three components first to see what the new visual language actually looks like, *then* extract primitives once the patterns are visible. Premature abstraction here is worse than duplication.

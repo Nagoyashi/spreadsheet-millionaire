@@ -211,9 +211,9 @@ export default function DebtPayoffCalculator({ initialData, onDataChange }) {
 
       {/* Debt inputs */}
       <div className="bg-white rounded-lg shadow-md p-6">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
           <h3 className="text-xl font-bold text-gray-800">Your Debts</h3>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-wrap">
             <div className="flex items-center gap-2">
               <label className="text-sm font-medium text-gray-600">Extra monthly payment</label>
               <div className="w-28">
@@ -227,7 +227,7 @@ export default function DebtPayoffCalculator({ initialData, onDataChange }) {
             </div>
             <button
               onClick={addDebt}
-              className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium"
+              className="inline-flex items-center gap-1.5 px-3 py-2.5 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium"
             >
               <Plus className="w-4 h-4" /> Add Debt
             </button>
@@ -268,7 +268,8 @@ export default function DebtPayoffCalculator({ initialData, onDataChange }) {
                   <td className="py-2">
                     <button
                       onClick={() => removeDebt(debt.id)}
-                      className="p-1.5 text-gray-400 hover:text-red-500 transition-colors rounded"
+                      aria-label="Remove debt"
+                      className="flex items-center justify-center min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 p-1.5 text-gray-400 hover:text-red-500 transition-colors rounded"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>

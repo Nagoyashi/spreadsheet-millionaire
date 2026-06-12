@@ -62,7 +62,7 @@ export function useSave({ type, auth, saveCalc, navigate, currentDataRef, onLoad
     if (!auth.isAuthenticated) {
       const cleanData = stripVersion(currentDataRef.current)
       sessionStorage.setItem(CALC_STORAGE_KEY(type), JSON.stringify(cleanData))
-      navigate('/login', { state: { from: `/calculator/${type}` } })
+      navigate('/login', { state: { from: `/app/calculator/${type}` } })
       return
     }
 

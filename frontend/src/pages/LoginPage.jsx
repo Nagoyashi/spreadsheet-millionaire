@@ -4,7 +4,7 @@ import AuthForm from '../components/AuthForm'
 export default function LoginPage({ auth }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const from     = location.state?.from || '/'
+  const from     = location.state?.from || '/app'
 
   async function handleSubmit(email, password) {
     const result = await auth.login(email, password)
@@ -22,6 +22,11 @@ export default function LoginPage({ auth }) {
       submittingLabel="Signing in…"
       passwordPlaceholder="••••••••"
       onSubmit={handleSubmit}
+      belowPassword={
+        <Link to="/forgot-password" className="text-xs text-blue-600 hover:text-blue-700 font-medium transition">
+          Forgot password?
+        </Link>
+      }
       footer={
         <>
           No account?{' '}

@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { LogOut, User, Trash2 } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { LogOut, User, Trash2, Settings } from 'lucide-react'
 import DeleteAccountModal from './ui/DeleteAccountModal'
 
 // Authenticated-user footer: shows email, sign-out button, delete-account
@@ -50,16 +51,23 @@ export default function UserFooter({ auth, variant = 'compact' }) {
           <User className={`${emailIconCls} shrink-0`} />
           <span className={`${emailTextCls} truncate`}>{auth.user.email}</span>
         </div>
+        <Link
+          to="/app/settings"
+          className="flex items-center gap-2 w-full px-3 py-2.5 sm:py-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition text-sm"
+        >
+          <Settings className="w-4 h-4" />
+          Settings
+        </Link>
         <button
           onClick={auth.logout}
-          className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition text-sm"
+          className="flex items-center gap-2 w-full px-3 py-2.5 sm:py-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition text-sm"
         >
           <LogOut className="w-4 h-4" />
           Sign out
         </button>
         <button
           onClick={() => { setDeleteError(null); setShowDeleteModal(true) }}
-          className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-gray-600 hover:text-red-400 hover:bg-white/10 transition text-sm"
+          className="flex items-center gap-2 w-full px-3 py-2.5 sm:py-2 rounded-lg text-gray-600 hover:text-red-400 hover:bg-white/10 transition text-sm"
         >
           <Trash2 className="w-4 h-4" />
           Delete account

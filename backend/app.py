@@ -1,12 +1,15 @@
 import os
+import sys
 from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_session import Session
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_talisman import Talisman
+from werkzeug.middleware.proxy_fix import ProxyFix
 
-from config import Config
+import db
+from config import Config, STARTUP_WARNINGS
 from db_init import init_db
 
 # ── Rate limiter — shared instance imported by route files ────────────────────
@@ -22,8 +25,24 @@ def create_app() -> Flask:
     app = Flask(__name__)
     app.config.from_object(Config)
 
-    # ── Flask-Session (filesystem-backed server-side sessions) ────────────────
-    os.makedirs(Config.SESSION_FILE_DIR, exist_ok=True)
+    # ── Proxy awareness ───────────────────────────────────────────────────────
+    # Render (and the Vite dev proxy) terminate TLS and forward requests with
+    # X-Forwarded-* headers. Without this, Flask sees the inbound hop as plain
+    # HTTP — request.is_secure lies and Talisman's HTTPS redirect loops. Trust
+    # exactly one proxy hop for the client IP, scheme, and host. Applied
+    # unconditionally: harmless behind the dev proxy (one hop there too).
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+
+    # ── Startup warnings (Redis fallback, email disabled, …) ──────────────────
+    for warning in STARTUP_WARNINGS:
+        print(f"[WARN] {warning}", file=sys.stderr)
+
+    # ── Per-request Postgres connection (psycopg) ─────────────────────────────
+    db.init_app(app)
+
+    # ── Server-side sessions — Redis (Upstash) or filesystem dev fallback ─────
+    if Config.SESSION_TYPE == "filesystem":
+        os.makedirs(Config.SESSION_FILE_DIR, exist_ok=True)
     Session(app)
 
     # ── Rate limiter ──────────────────────────────────────────────────────────
@@ -53,9 +72,11 @@ def create_app() -> Flask:
     # ── Blueprints ────────────────────────────────────────────────────────────
     from routes.auth        import bp as auth_bp
     from routes.calculators import bp as calculators_bp
+    from routes.health      import bp as health_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(calculators_bp)
+    app.register_blueprint(health_bp)
 
     # ── Global error handlers ─────────────────────────────────────────────────
     @app.errorhandler(404)

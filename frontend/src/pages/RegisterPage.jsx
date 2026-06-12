@@ -4,7 +4,7 @@ import AuthForm from '../components/AuthForm'
 export default function RegisterPage({ auth }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const from     = location.state?.from || '/'
+  const from     = location.state?.from || '/app'
 
   async function handleSubmit(email, password) {
     const result = await auth.register(email, password)
@@ -14,7 +14,7 @@ export default function RegisterPage({ auth }) {
 
   return (
     <AuthForm
-      badge="Free forever"
+      badge="Welcome"
       badgeClass="bg-emerald-100 text-emerald-800"
       title="Create account"
       subtitle="Save and revisit your calculations any time."
