@@ -135,9 +135,9 @@ frontend/
     │   ├── MarketingNav.jsx           # Sticky top nav; auth-adaptive CTAs (Open app vs Sign in/Get started); mobile disclosure menu
     │   ├── Hero.jsx                   # Headline + subline + primary CTA → /app, secondary → /register
     │   ├── CalculatorShowcase.jsx     # One card per PUBLISHED_CALCULATORS; links straight to /app/calculator/:type
-    │   ├── ComingSoonStrip.jsx        # Trackers from UPCOMING_FEATURES; "built in public" + GitHub link
+    │   ├── ComingSoonStrip.jsx        # Trackers from UPCOMING_FEATURES ("More on the way")
     │   ├── ValueProps.jsx             # Four true value props (free, no-signup, save, privacy)
-    │   ├── MarketingFooter.jsx        # Privacy/Terms/GitHub links, © line, not-financial-advice line
+    │   ├── MarketingFooter.jsx        # Privacy/Terms links + "View source on GitHub" button, © line, not-financial-advice line
     │   └── LegalLayout.jsx            # Shared prose chrome for legal pages (reuses MarketingNav + MarketingFooter)
     └── pages/
         ├── MarketingLandingPage.jsx # / — public marketing landing; composes src/marketing/*; auth-adaptive nav (no redirect for logged-in visitors)
