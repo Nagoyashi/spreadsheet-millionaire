@@ -7,9 +7,17 @@ import CalculatorPage from './pages/CalculatorPage'
 import ComingSoonPage from './pages/ComingSoonPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
+import ForgotPasswordPage from './pages/ForgotPasswordPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
+import SettingsPage from './pages/SettingsPage'
 
 function RequireGuest({ isAuthenticated, children }) {
   if (isAuthenticated) return <Navigate to="/" replace />
+  return children
+}
+
+function RequireAuth({ isAuthenticated, children }) {
+  if (!isAuthenticated) return <Navigate to="/login" replace state={{ from: '/settings' }} />
   return children
 }
 
@@ -47,6 +55,19 @@ export default function App() {
         />
 
         <Route path="/coming-soon/:slug" element={<ComingSoonPage />} />
+
+        {/* Password reset — public; reachable while logged out via the email link */}
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+
+        <Route
+          path="/settings"
+          element={
+            <RequireAuth isAuthenticated={auth.isAuthenticated}>
+              <SettingsPage auth={auth} />
+            </RequireAuth>
+          }
+        />
 
         <Route
           path="/login"

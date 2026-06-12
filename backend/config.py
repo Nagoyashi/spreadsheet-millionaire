@@ -97,6 +97,20 @@ if not os.getenv("RESEND_API_KEY", "").strip():
     )
 
 
+# ── Public frontend origin (reset links) ──────────────────────────────────────
+# Used to build password-reset links: {APP_BASE_URL}/reset-password/{token}.
+# Defaults to the Vite dev origin; in production it must be the real frontend
+# domain or reset emails will point at localhost. Warn (don't exit) if it's
+# left at the dev default in production — email is best-effort, not boot-critical.
+_app_base_url = os.getenv("APP_BASE_URL", "http://localhost:5173").strip().rstrip("/")
+
+if _is_production and "localhost" in _app_base_url:
+    STARTUP_WARNINGS.append(
+        "APP_BASE_URL is unset or points at localhost while FLASK_ENV=production "
+        "— password-reset links will be wrong. Set it to the public frontend origin."
+    )
+
+
 class Config:
     # ── Security ──────────────────────────────────────────────────────────────
     SECRET_KEY = _secret_key
@@ -140,6 +154,9 @@ class Config:
         else os.getenv("RATELIMIT_STORAGE_URI", "memory://")
     )
     RATELIMIT_HEADERS_ENABLED = True  # sends X-RateLimit-* headers to clients
+
+    # ── Public frontend origin (reset links) ─────────────────────────────────
+    APP_BASE_URL = _app_base_url
 
     # ── Environment ───────────────────────────────────────────────────────────
     FLASK_ENV   = _flask_env

@@ -22,6 +22,11 @@ export default function LoginPage({ auth }) {
       submittingLabel="Signing in…"
       passwordPlaceholder="••••••••"
       onSubmit={handleSubmit}
+      belowPassword={
+        <Link to="/forgot-password" className="text-xs text-blue-600 hover:text-blue-700 font-medium transition">
+          Forgot password?
+        </Link>
+      }
       footer={
         <>
           No account?{' '}

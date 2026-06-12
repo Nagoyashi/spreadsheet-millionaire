@@ -80,6 +80,32 @@ def init_db() -> None:
             """)
 
             # ---------------------------------------------------------------- #
+            # password_reset_tokens
+            #   Only the SHA-256 hex digest of the reset token is stored — the
+            #   raw token exists solely in the emailed link, so a DB leak yields
+            #   no usable reset links. user_id cascades on user deletion.
+            #   used_at is nullable: NULL = unused, a timestamp = consumed
+            #   (single-use). expires_at enforces the 60-minute lifetime; the
+            #   UNIQUE on token_hash also serves the by-hash lookup, and the
+            #   user_id index serves invalidate-all-for-user.
+            # ---------------------------------------------------------------- #
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                    id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                    user_id    BIGINT      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    token_hash TEXT        NOT NULL UNIQUE,
+                    expires_at TIMESTAMPTZ NOT NULL,
+                    used_at    TIMESTAMPTZ,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                )
+            """)
+
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user_id
+                ON password_reset_tokens(user_id)
+            """)
+
+            # ---------------------------------------------------------------- #
             # calc_type CHECK — drop-and-recreate so the allowed set always
             # matches VALID_CALC_TYPES. Idempotent and ALTER-in-place (no table
             # rebuild, unlike the old SQLite migration hack).

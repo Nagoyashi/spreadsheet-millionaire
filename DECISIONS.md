@@ -307,6 +307,34 @@
 **Why:** Hijacked session shouldn't be able to nuke the account silently. Requiring the password means an attacker would also need the credentials — at which point they could log into a fresh session anyway, but the friction stops casual session-hijack scenarios.
 **Next phase note:** The new tracker tables will need `ON DELETE CASCADE` to `users` for the same reason.
 
+## Password reset via hashed single-use tokens
+
+**TL;DR:** A forgotten password is recoverable via an emailed link backed by a hashed, single-use, 60-minute token. The raw token is never stored; the request endpoint never reveals whether an email exists.
+
+**Decision:** `POST /api/auth/forgot-password` issues a reset token; `POST /api/auth/reset-password` consumes it. Tokens live in `password_reset_tokens` (identity PK, `user_id` FK `ON DELETE CASCADE`, `token_hash`, `expires_at`, `used_at`, `created_at`). The raw token is `secrets.token_urlsafe(32)`; only its SHA-256 hex digest is persisted. Lifetime is 60 minutes; consumption stamps `used_at` (single-use); a successful reset also invalidates every other outstanding token for that user. Expired rows are deleted opportunistically on each forgot-password call (no cron).
+
+**Why hash at rest:** The token is a bearer credential — anyone holding it can reset the password. Storing only the digest means a database leak yields hashes, not working links: the raw value exists solely in the emailed link and, transiently, in the request that consumes it. (Same reasoning as not storing plaintext passwords, applied to a short-lived credential.)
+
+**Why 60-minute, single-use:** A reset link is a one-shot action. A short TTL bounds the window in which a leaked link (forwarded email, shared inbox, proxy log) is usable; single-use means a consumed link can't be replayed, and superseding earlier tokens means requesting a new link silently retires the old one.
+
+**Why uniform responses (no enumeration):** `forgot-password` returns one identical `200 {"message": "If that email exists, a reset link has been sent."}` on every path — registered, unregistered, malformed input, or email-send failure. It deliberately has **no `422` validation path** (unlike `register`/`login`), because a differing status on a bad email is itself an enumeration signal. `reset-password` collapses every token problem (unknown / expired / used / missing) into one generic `400 invalid or expired link` with no hint as to which. The cost is slightly less helpful errors; the benefit is that neither endpoint is an account-existence oracle.
+
+**Accepted limitation — timing, not constant-time:** The uniform body is byte-identical, but the endpoint is not perfectly constant-time: a registered email incurs the Resend send latency that a non-existent one doesn't. Flattening that fully would require backgrounding the send (a job queue / thread), which we judged not worth new infrastructure for an endpoint already capped at `3/hour` per IP. This matches `login`'s existing posture (it also short-circuits when the user doesn't exist). The uniform body + tight rate limit are the primary protections; the residual timing side-channel is accepted. Revisit if a cheap background-send path appears.
+
+**Accepted limitation — sessions not force-revoked:** A successful reset updates the bcrypt hash and invalidates outstanding reset tokens, but does **not** revoke already-logged-in sessions elsewhere. Flask sessions live in Redis keyed by session id, not indexed per-user, so there's no efficient "log out all this user's sessions." The password change itself is the protection — an attacker with a live stolen session keeps it until it expires (30 days) or the user logs out, but can no longer re-authenticate. Revisit if per-user session revocation becomes a requirement (it would mean indexing sessions by user id).
+
+**Reuse, not redefinition:** The new-password rules come from the existing `validate_password` in `user_schema.py` (extracted from `RegisterSchema` so there's exactly one copy). `change-email`'s duplicate-email response is byte-identical to `register`'s `409` — matching register's existing enumeration posture rather than inventing a new one.
+
+## Settings as a single stacked page
+
+**TL;DR:** `/settings` is one auth-guarded page with stacked sections, scoped to account management only until tier / i18n land.
+
+**Decision:** `SettingsPage` (`/settings`, guarded by `RequireAuth`) is a single page with stacked sections: account email (read-only), change password, change email (password-confirmed), and a danger zone hosting the existing `DeleteAccountModal`. It reuses `authApi` (no new API namespace) and the existing visual language; entry points are a "Settings" link in `UserFooter` (both variants). Reset/forgot/settings share chrome via an extracted `AuthCardShell`, leaving the high-traffic `AuthForm` (login/register) mechanically untouched.
+
+**Why deliberately minimal:** The product needs account recovery and management to launch; it does not yet need preferences. Language/i18n, currency, tier display, and email-verification-on-change are explicitly out of scope this phase — they depend on systems that don't exist yet (the i18n integration, the tier/entitlement model). Building the page now as a plain stack of forms means adding those later is appending a section, not a redesign.
+
+**When to revisit:** When tier or i18n ships, the page gains a section (or splits into tabs if the count grows past ~5). Email verification on change is the most likely near-term addition — when it lands, `change-email` becomes a two-step confirm-then-apply flow rather than the immediate update it is now.
+
 ## Security headers via Flask-Talisman
 
 **TL;DR:** HTTPS in prod, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, strict `Referrer-Policy`.

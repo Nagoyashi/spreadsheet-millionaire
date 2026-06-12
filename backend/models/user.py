@@ -72,6 +72,36 @@ class User:
         return cls(**row) if row else None
 
     @classmethod
+    def update_password(cls, user_id: int, plain_password: str) -> None:
+        """Replace a user's password hash. Scoped to the user's own id."""
+        password_hash = cls.hash_password(plain_password)
+        conn = get_db()
+        conn.execute(
+            "UPDATE users SET password_hash = %s WHERE id = %s",
+            (password_hash, user_id),
+        )
+        conn.commit()
+
+    @classmethod
+    def update_email(cls, user_id: int, new_email: str) -> "User | None":
+        """
+        Change a user's email. Scoped to the user's own id.
+        Raises ValueError if the new email is already taken — same message and
+        shape as create(), so the route surfaces register's existing posture.
+        """
+        conn = get_db()
+        try:
+            conn.execute(
+                "UPDATE users SET email = %s WHERE id = %s",
+                (new_email.lower().strip(), user_id),
+            )
+            conn.commit()
+        except psycopg.errors.UniqueViolation:
+            conn.rollback()
+            raise ValueError("An account with that email already exists.")
+        return cls.get_by_id(user_id)
+
+    @classmethod
     def delete(cls, user_id: int) -> bool:
         """
         Permanently deletes a user and all their saved calculations.
