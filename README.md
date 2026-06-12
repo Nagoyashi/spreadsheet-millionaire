@@ -87,7 +87,8 @@ Create `backend/.env`. The app **will not start** if `FLASK_SECRET_KEY` is missi
 
 ## Where to learn more
 
-- **`PROJECT_STRUCTURE.md`** — full file tree, conventions, and how-to recipes (adding a calculator, adding an API namespace, versioning saved data)
+- **`STATUS.md`** — technical reference: tech stack, providers, architecture, data model, and the full API documentation
+- **`PROJECT_STRUCTURE.md`** — full file tree, route map, conventions, and how-to recipes (adding a calculator, adding an API namespace, versioning saved data)
 - **`DECISIONS.md`** — the *why* behind every architectural choice, with conditions for when to revisit
 - **`CLAUDE.md`** — context and hard rules for the AI assistant working on this codebase
 

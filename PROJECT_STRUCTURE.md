@@ -10,7 +10,11 @@
 ```
 money-calculators/
 ├── .gitignore
-├── README.md
+├── README.md                   # Quickstart, local dev, env vars, roadmap
+├── STATUS.md                   # Technical reference — stack, providers, architecture, data model, API docs
+├── PROJECT_STRUCTURE.md        # This file — canonical tree, route map, conventions
+├── DECISIONS.md                # The *why* behind every architectural choice
+├── CLAUDE.md                   # Hard rules + working style for AI assistants
 ├── docs/
 │   ├── DEPLOYMENT.md           # Staging deploy runbook — Render + Vercel, env tables, smoke test
 │   └── tasks/                  # Phase task prompts (phase-1, phase-2, phase-3, …)
