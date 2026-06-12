@@ -41,6 +41,27 @@ function LandingSidebar({ auth, navigate, onClose }) {
           <BarChart2 className="w-5 h-5 text-amber-400" />
           Calculators
         </div>
+
+        {/* Coming soon — same muted, badged teasers as the calculator-page
+            sidebar. Sourced from upcomingFeatures.js, NOT the registry. */}
+        <div className="mt-3 pt-3 border-t border-white/10">
+          <p className="px-3 mb-1 text-xs font-semibold uppercase tracking-wider text-gray-600">Coming soon</p>
+          {UPCOMING_FEATURES.map(({ slug, label, Icon }) => (
+            <button
+              key={slug}
+              onClick={() => navigate(`/coming-soon/${slug}`)}
+              className="w-full flex items-center justify-between gap-2.5 px-3 py-2.5 sm:py-2 rounded-lg text-sm text-gray-500 hover:text-gray-300 hover:bg-white/5 transition"
+            >
+              <span className="flex items-center gap-2.5 min-w-0">
+                <Icon className="w-4 h-4 shrink-0 opacity-60" />
+                <span className="truncate">{label}</span>
+              </span>
+              <span className="shrink-0 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-full bg-white/10 text-gray-400">
+                Soon
+              </span>
+            </button>
+          ))}
+        </div>
       </nav>
       <div className="px-4 py-4 border-t border-white/10">
         {auth.isAuthenticated ? (
