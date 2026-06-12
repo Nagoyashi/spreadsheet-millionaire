@@ -68,8 +68,8 @@ export default function App() {
       <Routes>
         {/* ── Public marketing surface ─────────────────────────────────────── */}
         <Route path="/" element={<MarketingLandingPage auth={auth} />} />
-        <Route path="/privacy" element={<PrivacyPage />} />
-        <Route path="/terms" element={<TermsPage />} />
+        <Route path="/privacy" element={<PrivacyPage auth={auth} />} />
+        <Route path="/terms" element={<TermsPage auth={auth} />} />
 
         {/* ── The app, namespaced under /app ───────────────────────────────── */}
         <Route path="/app" element={<LandingPage auth={auth} />} />
