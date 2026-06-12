@@ -30,21 +30,22 @@ backend/
 ├── config.py                   # All config read from .env — exits if SECRET_KEY/DATABASE_URL invalid (and REDIS_URL in prod)
 ├── calc_types.py               # Single source of truth for VALID_CALC_TYPES (imported by schema + db_init)
 ├── db.py                       # Per-request psycopg connection on Flask g, closed on teardown (no in-process pool)
-├── db_init.py                  # Postgres schema creation + idempotent CHECK-constraint rebuild
+├── db_init.py                  # Postgres schema creation + idempotent CHECK-constraint rebuild (users, saved_calculators, password_reset_tokens)
 ├── __pycache__/
 ├── venv/                       # Python virtual environment — never committed
 ├── models/
-│   ├── user.py                 # User model — bcrypt hashing, create/get/delete
-│   └── calculator.py           # SavedCalculator model — all queries include AND user_id = %s
+│   ├── user.py                 # User model — bcrypt hashing, create/get/delete, update_password/update_email
+│   ├── calculator.py           # SavedCalculator model — all queries include AND user_id = %s
+│   └── password_reset.py       # PasswordResetToken model — stores only the SHA-256 hash; create/find-valid-by-hash/mark-used/invalidate-all-for-user/delete-expired
 ├── routes/
-│   ├── auth.py                 # /api/auth/* — register (+welcome email), login, logout, status, delete account, csrf-token
+│   ├── auth.py                 # /api/auth/* — register (+welcome email), login, logout, status, delete account, csrf-token, forgot-password, reset-password, change-password, change-email
 │   ├── calculators.py          # /api/calculators/* — CRUD for saved calculations
 │   └── health.py               # GET /api/health — liveness probe, rate-limit exempt, no DB/Redis
 ├── schemas/
-│   ├── user_schema.py          # Password: 8+ chars, 1 letter, 1 number enforced
+│   ├── user_schema.py          # Shared validate_password (8+ chars, 1 letter, 1 number) + Register/Login/ResetPassword/ChangePassword/ChangeEmail schemas
 │   └── calculator_schema.py    # Imports VALID_CALC_TYPES from calc_types.py
 ├── services/
-│   └── email.py                # Resend wrapper — send_email + send_welcome_email; disabled (no-op) without RESEND_API_KEY
+│   └── email.py                # Resend wrapper — send_email + send_welcome_email + send_password_reset_email; disabled (no-op) without RESEND_API_KEY
 └── utils/
     └── auth_helpers.py         # login_required, csrf_protect, set/clear session, generate_csrf_token
 ```
@@ -60,6 +61,7 @@ backend/
 | `REDIS_URL` | Upstash `rediss://…` (optional in dev — unset falls back to filesystem sessions) | Upstash `rediss://…` — app exits if missing |
 | `RESEND_API_KEY` | Resend key (optional — unset disables email) | Resend key (email disabled with a warning if unset) |
 | `MAIL_FROM` | sender address, e.g. `noreply@spreadsheetmillionaire.com` | same |
+| `APP_BASE_URL` | `http://localhost:5173` | public frontend origin (e.g. `https://app.spreadsheetmillionaire.com`) — used to build password-reset links; warns at startup if left on localhost in prod |
 | `SESSION_COOKIE_SECURE` | `False` | `True` |
 
 > `DATABASE_URL` must point at Neon's **pooled** (PgBouncer) endpoint — connection
@@ -80,14 +82,14 @@ frontend/
 ├── tailwind.config.js
 ├── postcss.config.js
 └── src/
-    ├── App.jsx                 # BrowserRouter, routes, auth + CSRF loading guard
+    ├── App.jsx                 # BrowserRouter, routes, auth + CSRF loading guard. RequireGuest (login/register) + RequireAuth (settings) wrappers; public /forgot-password + /reset-password/:token
     ├── main.jsx                # React root mount
     ├── index.css               # Tailwind directives + base styles
     ├── constants.js            # Shared storage key generators (CALC_STORAGE_KEY, FAVOURITES_KEY)
     ├── upcomingFeatures.js     # UPCOMING_FEATURES tracker teasers (Net Worth, Income/Expense) — deliberately NOT in the calculator registry; consumed only by the LandingPage grid + CalculatorSidebar "Coming soon" section
     ├── api/
     │   ├── httpClient.js       # Shared fetch wrapper. createApi(baseUrl) factory + central CSRF injection
-    │   ├── authApi.js          # register / login / logout / deleteAccount / getStatus / fetchCsrfToken
+    │   ├── authApi.js          # register / login / logout / deleteAccount / getStatus / fetchCsrfToken / forgotPassword / resetPassword / changePassword / changeEmail
     │   └── calculatorApi.js    # getAll / create / update / remove
     ├── utils/
     │   ├── format.js           # Shared fmt() — replaces 12 local copies, supports custom currency
@@ -118,8 +120,9 @@ frontend/
     │   ├── CalculatorHeader.jsx           # Header: title, save button, status pill, mobile menu, "New" button
     │   ├── CalculatorExplainer.jsx        # ← "What is X?" gradient banner, driven by registry data
     │   ├── SavedCalculationsSidebar.jsx   # List of saved calcs with click-to-deselect on active item
-    │   ├── AuthForm.jsx                   # Shared form shell for LoginPage + RegisterPage
-    │   └── UserFooter.jsx                 # Authenticated-user footer (email + sign out + delete account modal)
+    │   ├── AuthCardShell.jsx              # Presentational chrome (gray page + top bar + white card + badge/title/subtitle/footer) for the auth family; used by AuthForm + Forgot/Reset pages
+    │   ├── AuthForm.jsx                   # Shared email+password form for LoginPage + RegisterPage (renders inside AuthCardShell)
+    │   └── UserFooter.jsx                 # Authenticated-user footer (email + Settings link + sign out + delete account modal)
     ├── hooks/
     │   ├── useAuth.js                 # login / logout / register / deleteAccount + session rehydration
     │   ├── useCalculatorData.js       # Saved-calculations CRUD via API
@@ -130,8 +133,11 @@ frontend/
         ├── CalculatorPage.jsx     # Orchestrator — renders explainer + lazy calc inside Suspense
         ├── LandingPage.jsx        # Calculator grid + filter tabs + favourites + coming-soon teaser cards. Collapsible sidebar drawer below lg (local mobileSidebarOpen state)  (NB: this is the *in-app* landing; the marketing landing page is a separate upcoming page)
         ├── ComingSoonPage.jsx     # /coming-soon/:slug — build-in-public teaser page for an upcoming tracker; unknown slug redirects to "/" like an unknown calc type
-        ├── LoginPage.jsx          # Thin wrapper around AuthForm
-        └── RegisterPage.jsx       # Thin wrapper around AuthForm
+        ├── LoginPage.jsx          # Thin wrapper around AuthForm (+ "Forgot password?" link)
+        ├── RegisterPage.jsx       # Thin wrapper around AuthForm
+        ├── ForgotPasswordPage.jsx # /forgot-password — email field; always shows the same neutral "check your inbox" state
+        ├── ResetPasswordPage.jsx  # /reset-password/:token — new password + confirm; success / generic-invalid-link / weak-password states
+        └── SettingsPage.jsx       # /settings (auth-guarded) — account email + change password + change email + danger zone (DeleteAccountModal)
 ```
 
 ---
@@ -276,6 +282,6 @@ These will be added as their work begins. Listed here so the file tree above is 
 - **Marketing landing page** — new route (likely `/`), with the in-app landing moved to `/app` or similar
 - **Net worth tracker** — new pages, new API namespace, new DB tables (entries + optionally accounts)
 - **Income/expense tracker** — new pages, new API namespace, new DB tables (transactions + categories)
-- **Settings page** — new route, new API namespace, language preference, tier display, account management
+- **Settings page** — account-management slice shipped (`/settings`: change password, change email, delete account; reuses `authApi`, no new namespace). Still upcoming: language preference, currency, tier display, email verification — see `DECISIONS.md` § "Settings as a single stacked page"
 - **Tier / entitlement system** — `tier` field on users table, decorator on routes, gate component on UI, see `DECISIONS.md` § "Decisions still to make"
 - **i18n** — `react-i18next` integration, `fmt()` localisation, message catalogues
