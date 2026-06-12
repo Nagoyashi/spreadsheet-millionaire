@@ -1,6 +1,7 @@
 import { useParams, useNavigate, Navigate, Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { UPCOMING_MAP } from '../upcomingFeatures'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 
 // Build-in-public teaser page for an upcoming tracker, at /coming-soon/:slug.
 // An unknown slug redirects to the landing page — same guard idiom as an
@@ -15,6 +16,9 @@ export default function ComingSoonPage() {
   const navigate = useNavigate()
 
   const feature = UPCOMING_MAP[slug]
+  // Set the title before the unknown-slug guard so hook order stays stable
+  // across a valid -> unknown slug change on the same mount.
+  useDocumentTitle(feature ? `${feature.label} — SpreadsheetMillionaire` : 'SpreadsheetMillionaire')
   if (!feature) return <Navigate to="/app" replace />
 
   const { label, Icon, blurb, eta } = feature

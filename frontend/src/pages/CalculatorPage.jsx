@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'rea
 import { useParams, useNavigate, Navigate } from 'react-router-dom'
 import { useCalculatorData } from '../hooks/useCalculatorData'
 import { useSave } from '../hooks/useSave'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { CALC_MAP, PUBLISHED_TYPES } from '../calculators/registry'
 import { CALC_STORAGE_KEY } from '../constants'
 import CalculatorSidebar from '../components/CalculatorSidebar'
@@ -26,6 +27,8 @@ export default function CalculatorPage({ auth }) {
   if (!PUBLISHED_TYPES.includes(type)) return <Navigate to="/app" replace />
 
   const { component: CalcComponent, label, Icon, color, gradient, explainer } = CALC_MAP[type]
+
+  useDocumentTitle(`${label} — SpreadsheetMillionaire`)
 
   const {
     savedCalcs,

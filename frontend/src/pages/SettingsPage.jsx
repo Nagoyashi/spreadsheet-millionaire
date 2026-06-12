@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeft, AlertTriangle } from 'lucide-react'
 import { authApi } from '../api/authApi'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import DeleteAccountModal from '../components/ui/DeleteAccountModal'
 
 // /settings — account management only (auth-guarded in App.jsx via RequireAuth).
@@ -197,6 +198,7 @@ function DangerZone({ auth }) {
 }
 
 export default function SettingsPage({ auth }) {
+  useDocumentTitle('Settings — SpreadsheetMillionaire')
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
       {/* Top bar */}

@@ -4,6 +4,7 @@ import { BarChart2, ArrowRight, Star, Menu, X } from 'lucide-react'
 import { PUBLISHED_CALCULATORS, CATEGORIES } from '../calculators/registry'
 import { UPCOMING_FEATURES } from '../upcomingFeatures'
 import { useFavourites } from '../hooks/useFavourites'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import UserFooter from '../components/UserFooter'
 
 // ─── Small toast for unauthenticated star attempt ─────────────────────────────
@@ -82,6 +83,7 @@ function LandingSidebar({ auth, navigate, onClose }) {
 }
 
 export default function LandingPage({ auth }) {
+  useDocumentTitle('Calculators — SpreadsheetMillionaire')
   const navigate = useNavigate()
   const [activeCategory, setActiveCategory] = useState('All')
   const { favourites, toggle } = useFavourites(auth)
