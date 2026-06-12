@@ -4,7 +4,7 @@ import AuthForm from '../components/AuthForm'
 export default function RegisterPage({ auth }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const from     = location.state?.from || '/'
+  const from     = location.state?.from || '/app'
 
   async function handleSubmit(email, password) {
     const result = await auth.register(email, password)

@@ -15,7 +15,7 @@ export default function ComingSoonPage() {
   const navigate = useNavigate()
 
   const feature = UPCOMING_MAP[slug]
-  if (!feature) return <Navigate to="/" replace />
+  if (!feature) return <Navigate to="/app" replace />
 
   const { label, Icon, blurb, eta } = feature
 
@@ -23,7 +23,7 @@ export default function ComingSoonPage() {
     <div className="min-h-screen bg-gray-100 flex flex-col">
       {/* Top bar */}
       <header className="bg-white border-b border-gray-200 px-6 py-4">
-        <Link to="/" className="text-xl font-bold text-gray-800 tracking-tight">
+        <Link to="/app" className="text-xl font-bold text-gray-800 tracking-tight">
           Spreadsheet<span className="text-amber-400">Millionaire</span>
         </Link>
       </header>
@@ -48,7 +48,7 @@ export default function ComingSoonPage() {
           </p>
 
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/app')}
             className="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2.5 sm:py-2 rounded-lg hover:bg-blue-700 transition text-sm font-medium"
           >
             <ArrowLeft className="w-4 h-4" />

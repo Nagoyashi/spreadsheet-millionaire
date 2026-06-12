@@ -49,7 +49,7 @@ function LandingSidebar({ auth, navigate, onClose }) {
           {UPCOMING_FEATURES.map(({ slug, label, Icon }) => (
             <button
               key={slug}
-              onClick={() => navigate(`/coming-soon/${slug}`)}
+              onClick={() => navigate(`/app/coming-soon/${slug}`)}
               className="w-full flex items-center justify-between gap-2.5 px-3 py-2.5 sm:py-2 rounded-lg text-sm text-gray-500 hover:text-gray-300 hover:bg-white/5 transition"
             >
               <span className="flex items-center gap-2.5 min-w-0">
@@ -210,7 +210,7 @@ export default function LandingPage({ auth }) {
                 return (
                   <div
                     key={type}
-                    onClick={() => navigate(`/calculator/${type}`)}
+                    onClick={() => navigate(`/app/calculator/${type}`)}
                     className="bg-white rounded-lg shadow-sm border border-gray-100 p-5 hover:shadow-md hover:-translate-y-1 transition cursor-pointer group flex flex-col"
                   >
                     <div className={`h-1 rounded-full bg-gradient-to-r ${gradient} mb-4`} />
@@ -245,7 +245,7 @@ export default function LandingPage({ auth }) {
               {activeCategory === 'All' && UPCOMING_FEATURES.map(({ slug, label, Icon, blurb, eta }) => (
                 <div
                   key={slug}
-                  onClick={() => navigate(`/coming-soon/${slug}`)}
+                  onClick={() => navigate(`/app/coming-soon/${slug}`)}
                   className="bg-white/60 rounded-lg border border-dashed border-gray-300 p-5 hover:shadow-md hover:border-gray-400 transition cursor-pointer flex flex-col"
                 >
                   <div className="h-1 rounded-full bg-gray-200 mb-4" />
