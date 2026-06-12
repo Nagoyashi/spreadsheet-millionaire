@@ -208,7 +208,7 @@ export default function SettingsPage({ auth }) {
           <span className="hidden sm:inline">Back</span>
         </Link>
         <span className="text-xl font-bold text-gray-800 tracking-tight">
-          FIN<span className="text-amber-400">trackr</span>
+          Spreadsheet<span className="text-amber-400">Millionaire</span>
         </span>
       </header>
 

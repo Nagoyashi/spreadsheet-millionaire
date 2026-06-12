@@ -14,7 +14,7 @@ export default function RegisterPage({ auth }) {
 
   return (
     <AuthForm
-      badge="Free forever"
+      badge="Welcome to SpreadsheetMillionaire"
       badgeClass="bg-emerald-100 text-emerald-800"
       title="Create account"
       subtitle="Save and revisit your calculations any time."

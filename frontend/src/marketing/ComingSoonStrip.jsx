@@ -1,26 +1,19 @@
-import { Github } from 'lucide-react'
 import { UPCOMING_FEATURES } from '../upcomingFeatures'
-import { GITHUB_URL } from './links'
 
-// The "built in public" strip: the upcoming trackers, driven by UPCOMING_FEATURES
-// (never duplicated here — same single source the in-app teasers use). Framed
-// honestly as work in progress with a link to the genuinely-public GitHub repo,
-// which is the real credibility here: anyone can watch these get built.
+// The upcoming trackers, driven by UPCOMING_FEATURES (never duplicated here —
+// same single source the in-app teasers use). Framed honestly as work in
+// progress; the "view the source" link lives in the footer, not here.
 
 export default function ComingSoonStrip() {
   return (
     <section className="border-y border-white/10 bg-white/[0.02]">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
         <div className="text-center mb-10">
-          <span className="inline-block px-3 py-1 mb-4 text-xs font-semibold uppercase tracking-wider rounded-full bg-white/5 border border-white/10 text-stone-300">
-            Built in public
-          </span>
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
             More on the way
           </h2>
           <p className="mt-3 text-sm sm:text-base text-stone-400 max-w-xl mx-auto">
-            Trackers are next. The whole thing is open source — follow along, or
-            read exactly how it works.
+            Trackers are next, and the whole project is open source.
           </p>
         </div>
 
@@ -42,18 +35,6 @@ export default function ComingSoonStrip() {
               <p className="text-sm text-stone-400 leading-relaxed">{blurb}</p>
             </div>
           ))}
-        </div>
-
-        <div className="mt-10 text-center">
-          <a
-            href={GITHUB_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-2 min-h-[44px] px-5 rounded-lg border border-white/15 text-sm font-semibold text-white hover:bg-white/5 transition"
-          >
-            <Github className="w-4 h-4" />
-            View the source on GitHub
-          </a>
         </div>
       </div>
     </section>

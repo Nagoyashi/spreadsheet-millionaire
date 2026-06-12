@@ -148,7 +148,7 @@ export default function LandingPage({ auth }) {
             >
               <Menu className="w-5 h-5" />
             </button>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Financial Calculators</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Financial Calculators</h1>
           </div>
           {!auth.isAuthenticated && (
             <div className="flex items-center gap-3">
@@ -163,7 +163,7 @@ export default function LandingPage({ auth }) {
           {/* Hero */}
           <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg p-6 text-white mb-6">
             <div className="max-w-xl">
-              <span className="inline-block px-2 py-0.5 text-xs font-semibold rounded-full bg-white/20 text-white mb-3">Free to use</span>
+              <span className="inline-block px-2 py-0.5 text-xs font-semibold rounded-full bg-white/20 text-white mb-3">Free while in beta</span>
               <h2 className="text-2xl font-bold mb-2">Numbers that tell the truth.</h2>
               <p className="text-indigo-100 text-sm leading-relaxed">
                 Use any calculator freely. Create an account to save and revisit your calculations at any time.

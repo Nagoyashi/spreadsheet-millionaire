@@ -22,7 +22,7 @@ export default function MarketingFooter() {
             </p>
           </div>
 
-          <nav className="flex flex-wrap items-center gap-x-6 gap-y-2">
+          <nav className="flex flex-wrap items-center gap-x-6 gap-y-3">
             <Link to="/privacy" className="text-sm text-stone-400 hover:text-white transition">
               Privacy
             </Link>
@@ -33,10 +33,10 @@ export default function MarketingFooter() {
               href={GITHUB_URL}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1.5 text-sm text-stone-400 hover:text-white transition"
+              className="inline-flex items-center gap-2 min-h-[44px] px-5 rounded-lg border border-white/15 text-sm font-semibold text-white hover:bg-white/5 transition"
             >
               <Github className="w-4 h-4" />
-              GitHub
+              View source on GitHub
             </a>
           </nav>
         </div>

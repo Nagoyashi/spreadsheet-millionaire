@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Github, Menu, X } from 'lucide-react'
-import { GITHUB_URL } from './links'
+import { Menu, X } from 'lucide-react'
 
 // Top navigation for the public marketing surface.
 //
@@ -35,16 +34,6 @@ export default function MarketingNav({ auth }) {
       >
         Calculators
       </Link>
-      <a
-        href={GITHUB_URL}
-        target="_blank"
-        rel="noreferrer"
-        onClick={() => setOpen(false)}
-        className="flex items-center gap-1.5 min-h-[44px] text-sm text-stone-300 hover:text-white transition"
-      >
-        <Github className="w-4 h-4" />
-        GitHub
-      </a>
     </>
   )
 
