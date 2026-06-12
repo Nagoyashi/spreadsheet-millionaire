@@ -91,12 +91,13 @@ export default function AuthForm({
               <label className="block text-sm font-medium text-gray-600 mb-1">Email</label>
               <input
                 type="email"
+                inputMode="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 required
                 autoFocus
                 placeholder="you@example.com"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                className="w-full px-3 py-2.5 sm:py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base sm:text-sm"
               />
               {fieldErrors.email && (
                 <p className="text-xs text-red-500 mt-1">{fieldErrors.email[0]}</p>
@@ -111,7 +112,7 @@ export default function AuthForm({
                 onChange={e => setPassword(e.target.value)}
                 required
                 placeholder={passwordPlaceholder}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                className="w-full px-3 py-2.5 sm:py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base sm:text-sm"
               />
               {fieldErrors.password && (
                 <p className="text-xs text-red-500 mt-1">{fieldErrors.password[0]}</p>
@@ -121,7 +122,7 @@ export default function AuthForm({
             <button
               type="submit"
               disabled={submitting}
-              className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-blue-600 text-white px-4 py-2.5 sm:py-2 rounded-lg hover:bg-blue-700 transition font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {submitting ? submittingLabel : submitLabel}
             </button>

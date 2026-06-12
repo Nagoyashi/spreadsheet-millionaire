@@ -52,14 +52,14 @@ export default function UserFooter({ auth, variant = 'compact' }) {
         </div>
         <button
           onClick={auth.logout}
-          className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition text-sm"
+          className="flex items-center gap-2 w-full px-3 py-2.5 sm:py-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition text-sm"
         >
           <LogOut className="w-4 h-4" />
           Sign out
         </button>
         <button
           onClick={() => { setDeleteError(null); setShowDeleteModal(true) }}
-          className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-gray-600 hover:text-red-400 hover:bg-white/10 transition text-sm"
+          className="flex items-center gap-2 w-full px-3 py-2.5 sm:py-2 rounded-lg text-gray-600 hover:text-red-400 hover:bg-white/10 transition text-sm"
         >
           <Trash2 className="w-4 h-4" />
           Delete account

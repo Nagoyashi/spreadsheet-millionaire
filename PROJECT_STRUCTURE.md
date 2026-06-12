@@ -84,6 +84,7 @@ frontend/
     ├── main.jsx                # React root mount
     ├── index.css               # Tailwind directives + base styles
     ├── constants.js            # Shared storage key generators (CALC_STORAGE_KEY, FAVOURITES_KEY)
+    ├── upcomingFeatures.js     # UPCOMING_FEATURES tracker teasers (Net Worth, Income/Expense) — deliberately NOT in the calculator registry; consumed only by the LandingPage grid + CalculatorSidebar "Coming soon" section
     ├── api/
     │   ├── httpClient.js       # Shared fetch wrapper. createApi(baseUrl) factory + central CSRF injection
     │   ├── authApi.js          # register / login / logout / deleteAccount / getStatus / fetchCsrfToken
@@ -127,7 +128,8 @@ frontend/
     │   └── useFavourites.js           # Per-user favourites via localStorage
     └── pages/
         ├── CalculatorPage.jsx     # Orchestrator — renders explainer + lazy calc inside Suspense
-        ├── LandingPage.jsx        # Calculator grid + filter tabs + favourites  (NB: this is the *in-app* landing; the marketing landing page is a separate upcoming page)
+        ├── LandingPage.jsx        # Calculator grid + filter tabs + favourites + coming-soon teaser cards. Collapsible sidebar drawer below lg (local mobileSidebarOpen state)  (NB: this is the *in-app* landing; the marketing landing page is a separate upcoming page)
+        ├── ComingSoonPage.jsx     # /coming-soon/:slug — build-in-public teaser page for an upcoming tracker; unknown slug redirects to "/" like an unknown calc type
         ├── LoginPage.jsx          # Thin wrapper around AuthForm
         └── RegisterPage.jsx       # Thin wrapper around AuthForm
 ```
@@ -197,6 +199,8 @@ See `DECISIONS.md` § "MVP narrowing via `published` flag".
 | Sidebar nav | Grouped by category, collapsible — active category expanded by default |
 | API calls | All go through `httpClient.createApi(baseUrl)`. Never call `fetch` directly from a feature module. New API namespaces just add one file in `src/api/` |
 | CSRF | Token fetched on app mount via `authApi.fetchCsrfToken()`, stored in memory in `authApi`. `httpClient` injects it as `X-CSRF-Token` on all mutating requests via a getter registered by `authApi` at load time |
+| Mobile-first floors | Base classes target the 375px phone; `sm:`/`lg:` prefixes restore the current desktop look (desktop stays visually unchanged). Body text ≥ `text-sm` on mobile (`text-xs` only for true captions); interactive elements ≥ 44px hit area on mobile (`min-h-[44px]` / `py-2.5`, reverted at `sm:`); numeric & text inputs use `text-base sm:text-sm` + an `inputMode` so phones show the right keypad and iOS doesn't zoom on focus. The single app-wide sidebar drawer is hidden below `lg` and opens from a header hamburger |
+| Sidebar drawer | One drawer pattern for the whole app: the dark sidebar is `hidden lg:block` with a `lg:hidden` overlay + backdrop, opened from a header hamburger, closed by backdrop tap / close button / navigation. `LandingPage` and `CalculatorPage` both use it (drawer open/close is local `useState`, no global state) |
 
 ### Backend
 

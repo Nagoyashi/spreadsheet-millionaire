@@ -4,6 +4,7 @@ import { useAuth } from './hooks/useAuth'
 import { authApi } from './api/authApi'
 import LandingPage from './pages/LandingPage'
 import CalculatorPage from './pages/CalculatorPage'
+import ComingSoonPage from './pages/ComingSoonPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 
@@ -44,6 +45,8 @@ export default function App() {
           path="/calculator/:type"
           element={<CalculatorPage auth={auth} />}
         />
+
+        <Route path="/coming-soon/:slug" element={<ComingSoonPage />} />
 
         <Route
           path="/login"

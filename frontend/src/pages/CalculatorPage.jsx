@@ -111,12 +111,12 @@ export default function CalculatorPage({ auth }) {
   return (
     <div className="min-h-screen flex">
 
-      <div className="hidden md:block">
+      <div className="hidden lg:block">
         <CalculatorSidebar {...sidebarProps} />
       </div>
 
       {mobileSidebarOpen && (
-        <div className="fixed inset-0 z-50 flex md:hidden">
+        <div className="fixed inset-0 z-50 flex lg:hidden">
           <CalculatorSidebar {...sidebarProps} />
           <div className="flex-1 bg-black/50" onClick={() => setMobileSidebarOpen(false)} />
         </div>
