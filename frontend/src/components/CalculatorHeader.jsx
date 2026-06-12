@@ -34,7 +34,7 @@ export default function CalculatorHeader({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button
-            className="md:hidden text-gray-500 hover:text-gray-800 mr-1"
+            className="lg:hidden text-gray-500 hover:text-gray-800 mr-1"
             onClick={onMobileMenuClick}
             aria-label="Open sidebar"
           >

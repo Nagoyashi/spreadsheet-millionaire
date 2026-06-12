@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BarChart2, ArrowRight, Star } from 'lucide-react'
+import { BarChart2, ArrowRight, Star, Menu, X } from 'lucide-react'
 import { PUBLISHED_CALCULATORS, CATEGORIES } from '../calculators/registry'
 import { useFavourites } from '../hooks/useFavourites'
 import UserFooter from '../components/UserFooter'
@@ -16,11 +16,55 @@ function AuthToast({ visible }) {
   )
 }
 
+// ─── Dark in-app sidebar ──────────────────────────────────────────────────────
+// Rendered twice by LandingPage: once in the desktop slot (hidden below lg) and
+// once inside the mobile drawer overlay. `onClose` is only passed in the drawer,
+// where it shows a close button and lets backdrop/nav taps dismiss it. Mirrors
+// the CalculatorPage / CalculatorSidebar drawer pattern — one drawer mechanism
+// for the whole app.
+function LandingSidebar({ auth, navigate, onClose }) {
+  return (
+    <aside className="w-64 shrink-0 bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 flex flex-col h-full">
+      <div className="px-6 py-5 border-b border-white/10 flex items-center justify-between">
+        <span className="text-xl font-bold text-white tracking-tight">
+          Spreadsheet<span className="text-amber-400">Millionaire</span>
+        </span>
+        {onClose && (
+          <button className="lg:hidden text-gray-400 hover:text-white" onClick={onClose} aria-label="Close sidebar">
+            <X className="w-5 h-5" />
+          </button>
+        )}
+      </div>
+      <nav className="flex-1 px-3 py-4 space-y-1">
+        <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-white/10 text-white font-medium text-sm">
+          <BarChart2 className="w-5 h-5 text-amber-400" />
+          Calculators
+        </div>
+      </nav>
+      <div className="px-4 py-4 border-t border-white/10">
+        {auth.isAuthenticated ? (
+          <UserFooter auth={auth} variant="roomy" />
+        ) : (
+          <div className="space-y-2">
+            <button onClick={() => navigate('/login')} className="w-full px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition text-sm text-left">
+              Sign in
+            </button>
+            <button onClick={() => navigate('/register')} className="w-full px-3 py-2 rounded-lg bg-amber-400 text-gray-900 font-medium text-sm hover:bg-amber-300 transition text-center">
+              Create account
+            </button>
+          </div>
+        )}
+      </div>
+    </aside>
+  )
+}
+
 export default function LandingPage({ auth }) {
   const navigate = useNavigate()
   const [activeCategory, setActiveCategory] = useState('All')
   const { favourites, toggle } = useFavourites(auth)
   const [showAuthToast, setShowAuthToast]   = useState(false)
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const toastTimerRef                       = useRef(null)
 
   function handleStarClick(e, type) {
@@ -55,40 +99,33 @@ export default function LandingPage({ auth }) {
   return (
     <div className="min-h-screen flex">
 
-      {/* ── Dark Sidebar ─────────────────────────────────────────────────── */}
-      <aside className="w-64 shrink-0 bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 flex flex-col min-h-screen">
-        <div className="px-6 py-5 border-b border-white/10">
-          <span className="text-xl font-bold text-white tracking-tight">
-            Spreadsheet<span className="text-amber-400">Millionaire</span>
-          </span>
+      {/* ── Dark Sidebar — desktop slot ───────────────────────────────────── */}
+      <div className="hidden lg:block">
+        <LandingSidebar auth={auth} navigate={navigate} />
+      </div>
+
+      {/* ── Dark Sidebar — mobile drawer ──────────────────────────────────── */}
+      {mobileSidebarOpen && (
+        <div className="fixed inset-0 z-50 flex lg:hidden">
+          <LandingSidebar auth={auth} navigate={navigate} onClose={() => setMobileSidebarOpen(false)} />
+          <div className="flex-1 bg-black/50" onClick={() => setMobileSidebarOpen(false)} />
         </div>
-        <nav className="flex-1 px-3 py-4 space-y-1">
-          <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-white/10 text-white font-medium text-sm">
-            <BarChart2 className="w-5 h-5 text-amber-400" />
-            Calculators
-          </div>
-        </nav>
-        <div className="px-4 py-4 border-t border-white/10">
-          {auth.isAuthenticated ? (
-            <UserFooter auth={auth} variant="roomy" />
-          ) : (
-            <div className="space-y-2">
-              <button onClick={() => navigate('/login')} className="w-full px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition text-sm text-left">
-                Sign in
-              </button>
-              <button onClick={() => navigate('/register')} className="w-full px-3 py-2 rounded-lg bg-amber-400 text-gray-900 font-medium text-sm hover:bg-amber-300 transition text-center">
-                Create account
-              </button>
-            </div>
-          )}
-        </div>
-      </aside>
+      )}
 
       {/* ── Light Content Area ────────────────────────────────────────────── */}
       <div className="flex-1 bg-gray-100 overflow-y-auto">
 
         <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-          <h1 className="text-3xl font-bold text-gray-800">Financial Calculators</h1>
+          <div className="flex items-center gap-3">
+            <button
+              className="lg:hidden text-gray-500 hover:text-gray-800"
+              onClick={() => setMobileSidebarOpen(true)}
+              aria-label="Open sidebar"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <h1 className="text-3xl font-bold text-gray-800">Financial Calculators</h1>
+          </div>
           {!auth.isAuthenticated && (
             <div className="flex items-center gap-3">
               <button onClick={() => navigate('/login')} className="text-sm text-gray-600 hover:text-gray-900 transition">Sign in</button>
