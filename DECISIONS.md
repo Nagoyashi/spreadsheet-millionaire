@@ -252,6 +252,33 @@
 
 **Domain caveat:** Until `spreadsheetmillionaire.com` is verified in Resend (a DNS task), sends only succeed to the Resend account owner's own address. That's expected and not a code concern.
 
+## Single-origin deployment via Vercel rewrite proxy
+
+**TL;DR:** Vercel serves the built frontend and rewrites `/api/*` to the Render backend server-side. The browser only ever talks to the Vercel origin, so session cookies stay first-party and there's no CORS surface.
+
+**Decision:** The backend (Flask under gunicorn) runs on **Render**; the built frontend runs on **Vercel** as static files. They live on different domains, but `frontend/vercel.json` rewrites `/api/:path*` to the Render service so the browser never sees the cross-origin hop. Two rewrite rules, order-significant: the API proxy first, then a `/(.*) → /index.html` SPA fallback so hard-refreshing a client route (e.g. `/calculator/fire`) doesn't 404. The frontend keeps calling relative `/api/...` paths — exactly what it already does behind the Vite dev proxy — so **zero `src/` changes** are required.
+
+**Why single-origin instead of direct cross-origin calls:**
+- **First-party cookies.** The session cookie is set by, and sent to, the Vercel origin only. Safari (and increasingly others) block third-party cookies outright — a frontend calling `api.onrender.com` directly would have its session cookie dropped. The rewrite keeps the cookie first-party.
+- **Zero CORS surface.** Same-origin requests mean no preflight, no `Access-Control-*` juggling, no credentialed-CORS footguns. `CORS_ORIGINS` still exists for defence in depth but isn't load-bearing for the happy path.
+- **No frontend rewrite.** Relative `/api` paths already work behind the Vite proxy; the same paths work behind the Vercel proxy. One config file, no code.
+
+**Trade-off accepted:** Every API call hops through Vercel's edge before reaching Render — a small added latency, and Render free-tier **cold starts** (the process sleeps after 15 idle minutes) can exceed the rewrite's timeout on the first request after a sleep. Mitigated by a keepalive pinger hitting `/api/health` every ~10 minutes (see the deployment runbook); the real fix is the $7/mo always-on Render instance at launch.
+
+**When to revisit:** At launch, custom domains make `app.spreadsheetmillionaire.com` and `api.spreadsheetmillionaire.com` **same-site** (shared registrable domain), so first-party cookies survive a direct call. If proxy latency ever measurably matters then, direct API calls become viable — but only after the domains are same-site, never before.
+
+## gunicorn with 2 workers + ProxyFix
+
+**TL;DR:** Render runs the app under `gunicorn -w 2`, and the WSGI app is wrapped in `ProxyFix` so Flask trusts Render's forwarding headers.
+
+**Decision:** Production serves via `gunicorn --workers 2 --bind 0.0.0.0:$PORT 'app:create_app()'`, run from `backend/`. The app object is exposed as the `create_app()` factory, so the gunicorn target is the factory-call form. Inside `create_app()`, `app.wsgi_app` is wrapped with `ProxyFix(x_for=1, x_proto=1, x_host=1)` — applied unconditionally.
+
+**Why 2 workers:** It's the smallest count that would expose any residual shared-state bug (a session or rate-limit counter living in one worker's memory instead of Redis). Phase 2 moved both to Redis precisely so multi-worker is safe; 2 workers is the cheap proof that it is.
+
+**Why ProxyFix, unconditionally:** Render terminates TLS and forwards requests over HTTP with `X-Forwarded-Proto`/`-For`/`-Host` headers. Without trusting them, `request.is_secure` reports HTTP and Talisman's HTTPS redirect loops forever. Trusting exactly **one** hop (the values are `1`) is correct for Render's single proxy and avoids spoofing from additional untrusted hops. It's harmless in dev behind the Vite proxy (also one hop), so there's no environment branch.
+
+**When to revisit:** If the instance is upsized, raise the worker count (`(2 × cores) + 1` is the usual rule of thumb). If a second proxy layer is ever added in front of Render (e.g. a CDN that also forwards), bump the `ProxyFix` hop counts to match — undercounting trusts a spoofable header, overcounting trusts a hop that isn't there.
+
 ## bcrypt + 8-char password rule
 
 **TL;DR:** bcrypt + 8 chars with letter + number. Reasonable floor without being onerous.

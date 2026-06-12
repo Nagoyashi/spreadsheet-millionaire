@@ -6,6 +6,7 @@ from flask_session import Session
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_talisman import Talisman
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 import db
 from config import Config, STARTUP_WARNINGS
@@ -23,6 +24,14 @@ limiter = Limiter(
 def create_app() -> Flask:
     app = Flask(__name__)
     app.config.from_object(Config)
+
+    # ── Proxy awareness ───────────────────────────────────────────────────────
+    # Render (and the Vite dev proxy) terminate TLS and forward requests with
+    # X-Forwarded-* headers. Without this, Flask sees the inbound hop as plain
+    # HTTP — request.is_secure lies and Talisman's HTTPS redirect loops. Trust
+    # exactly one proxy hop for the client IP, scheme, and host. Applied
+    # unconditionally: harmless behind the dev proxy (one hop there too).
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
     # ── Startup warnings (Redis fallback, email disabled, …) ──────────────────
     for warning in STARTUP_WARNINGS:
@@ -63,9 +72,11 @@ def create_app() -> Flask:
     # ── Blueprints ────────────────────────────────────────────────────────────
     from routes.auth        import bp as auth_bp
     from routes.calculators import bp as calculators_bp
+    from routes.health      import bp as health_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(calculators_bp)
+    app.register_blueprint(health_bp)
 
     # ── Global error handlers ─────────────────────────────────────────────────
     @app.errorhandler(404)

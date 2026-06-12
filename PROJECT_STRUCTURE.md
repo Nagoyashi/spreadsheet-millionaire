@@ -11,6 +11,9 @@
 money-calculators/
 ├── .gitignore
 ├── README.md
+├── docs/
+│   ├── DEPLOYMENT.md           # Staging deploy runbook — Render + Vercel, env tables, smoke test
+│   └── tasks/                  # Phase task prompts (phase-1, phase-2, phase-3, …)
 ├── backend/
 └── frontend/
 ```
@@ -22,8 +25,8 @@ money-calculators/
 ```
 backend/
 ├── .env                        # Secret key + Neon/Upstash/Resend config — never committed
-├── requirements.txt            # flask, flask-cors, flask-session, flask-limiter, flask-talisman, bcrypt, marshmallow, python-dotenv, psycopg, redis, resend
-├── app.py                      # Flask app factory — db teardown, limiter + Talisman, startup warnings
+├── requirements.txt            # flask, flask-cors, flask-session, flask-limiter, flask-talisman, bcrypt, marshmallow, python-dotenv, psycopg, redis, resend, gunicorn
+├── app.py                      # Flask app factory — ProxyFix, db teardown, limiter + Talisman, startup warnings
 ├── config.py                   # All config read from .env — exits if SECRET_KEY/DATABASE_URL invalid (and REDIS_URL in prod)
 ├── calc_types.py               # Single source of truth for VALID_CALC_TYPES (imported by schema + db_init)
 ├── db.py                       # Per-request psycopg connection on Flask g, closed on teardown (no in-process pool)
@@ -35,7 +38,8 @@ backend/
 │   └── calculator.py           # SavedCalculator model — all queries include AND user_id = %s
 ├── routes/
 │   ├── auth.py                 # /api/auth/* — register (+welcome email), login, logout, status, delete account, csrf-token
-│   └── calculators.py          # /api/calculators/* — CRUD for saved calculations
+│   ├── calculators.py          # /api/calculators/* — CRUD for saved calculations
+│   └── health.py               # GET /api/health — liveness probe, rate-limit exempt, no DB/Redis
 ├── schemas/
 │   ├── user_schema.py          # Password: 8+ chars, 1 letter, 1 number enforced
 │   └── calculator_schema.py    # Imports VALID_CALC_TYPES from calc_types.py
@@ -72,6 +76,7 @@ frontend/
 ├── index.html
 ├── package.json
 ├── vite.config.js              # Proxies /api/* → localhost:5000
+├── vercel.json                 # Single-origin deploy — rewrites /api/* to Render + SPA fallback
 ├── tailwind.config.js
 ├── postcss.config.js
 └── src/

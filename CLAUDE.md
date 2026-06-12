@@ -11,6 +11,7 @@ Personal-finance calculator web app. Flask API + React/Vite SPA. Anonymous users
 ## Commands
 
 - Backend: `cd backend && python -m app` (Flask on :5000 — must run from `backend/`)
+- Backend (prod-style): `cd backend && gunicorn --workers 2 --bind 0.0.0.0:$PORT 'app:create_app()'` (the Render start command — `app:create_app()` factory target, run from `backend/`)
 - Frontend: `cd frontend && npm run dev` (Vite on :5173, proxies `/api/*` to :5000)
 - DB schema/migrations: `cd backend && python db_init.py` (idempotent)
 - Frontend build check: `cd frontend && npm run build`
