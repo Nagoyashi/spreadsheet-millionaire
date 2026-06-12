@@ -5,6 +5,7 @@ import { authApi } from './api/authApi'
 import MarketingLandingPage from './pages/MarketingLandingPage'
 import PrivacyPage from './pages/PrivacyPage'
 import TermsPage from './pages/TermsPage'
+import ImprintPage from './pages/ImprintPage'
 import LandingPage from './pages/LandingPage'
 import CalculatorPage from './pages/CalculatorPage'
 import ComingSoonPage from './pages/ComingSoonPage'
@@ -70,6 +71,7 @@ export default function App() {
         <Route path="/" element={<MarketingLandingPage auth={auth} />} />
         <Route path="/privacy" element={<PrivacyPage auth={auth} />} />
         <Route path="/terms" element={<TermsPage auth={auth} />} />
+        <Route path="/imprint" element={<ImprintPage auth={auth} />} />
 
         {/* ── The app, namespaced under /app ───────────────────────────────── */}
         <Route path="/app" element={<LandingPage auth={auth} />} />
