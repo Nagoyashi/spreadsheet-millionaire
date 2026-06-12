@@ -72,9 +72,11 @@ def create_app() -> Flask:
     # ── Blueprints ────────────────────────────────────────────────────────────
     from routes.auth        import bp as auth_bp
     from routes.calculators import bp as calculators_bp
+    from routes.health      import bp as health_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(calculators_bp)
+    app.register_blueprint(health_bp)
 
     # ── Global error handlers ─────────────────────────────────────────────────
     @app.errorhandler(404)
