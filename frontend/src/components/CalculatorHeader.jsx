@@ -30,7 +30,7 @@ export default function CalculatorHeader({
   const showNewButton = !!(onNewClick && activeCalcName)
 
   return (
-    <header className="bg-white border-b border-gray-200 px-6 py-4 shrink-0">
+    <header className="sticky top-0 z-30 lg:static bg-white border-b border-gray-200 px-6 py-4 shrink-0">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button
@@ -45,7 +45,7 @@ export default function CalculatorHeader({
           </div>
           <h1 className="text-xl sm:text-3xl font-bold text-gray-800">{label}</h1>
           {activeCalcName && (
-            <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+            <span className="hidden sm:inline-block px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
               {activeCalcName}
             </span>
           )}
