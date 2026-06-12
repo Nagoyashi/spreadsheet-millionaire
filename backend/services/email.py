@@ -74,3 +74,33 @@ def send_welcome_email(to_email: str) -> bool:
         </div>
     """
     return send_email(to_email, subject, html)
+
+
+def send_password_reset_email(to_email: str, reset_url: str) -> bool:
+    """
+    Send the password-reset link. Best-effort (see send_email).
+
+    The reset_url carries the raw, single-use token and must never be logged.
+    send_email logs only the recipient address on failure, never the body.
+    """
+    subject = "Reset your SpreadsheetMillionaire password"
+    html = f"""
+        <div style="font-family: -apple-system, Segoe UI, Roboto, sans-serif; max-width: 480px; margin: 0 auto; color: #1f2937;">
+          <h1 style="font-size: 20px; margin-bottom: 8px;">Reset your password</h1>
+          <p style="font-size: 15px; line-height: 1.6;">
+            We received a request to reset the password for your
+            SpreadsheetMillionaire account. Click the link below to choose a new one:
+          </p>
+          <p style="font-size: 15px; line-height: 1.6;">
+            <a href="{reset_url}" style="color: #2563eb;">Reset my password</a>
+          </p>
+          <p style="font-size: 13px; color: #6b7280; line-height: 1.6;">
+            This link expires in 60 minutes and can only be used once.
+          </p>
+          <p style="font-size: 13px; color: #6b7280; margin-top: 24px;">
+            If you didn't request this, you can safely ignore this email — your
+            password won't change.
+          </p>
+        </div>
+    """
+    return send_email(to_email, subject, html)
