@@ -147,7 +147,7 @@ at launch and the keepalive becomes optional.
 
 Backend, directly on Render (bypasses Vercel):
 
-- [ ] `curl https://<render-url>.onrender.com/api/health` → `200 {"status":"ok"}`
+- [x] `curl https://<render-url>.onrender.com/api/health` → `200 {"status":"ok"}`
 
 Then on the **Vercel URL** (exercises the full single-origin path):
 
