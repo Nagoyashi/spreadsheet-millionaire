@@ -43,5 +43,16 @@ export const authApi = {
   // Permanently deletes the account. Requires password confirmation.
   deleteAccount: (password) => api.delete('/account', { password }),
 
+  // Password reset (anonymous). forgotPassword always resolves with the same
+  // neutral message regardless of whether the email is registered.
+  forgotPassword: (email)            => api.post('/forgot-password', { email }),
+  resetPassword:  (token, password)  => api.post('/reset-password',  { token, password }),
+
+  // Account management (authenticated).
+  changePassword: (current_password, new_password) =>
+    api.post('/change-password', { current_password, new_password }),
+  changeEmail:    (password, new_email) =>
+    api.post('/change-email', { password, new_email }),
+
   getStatus: () => api.get('/status'),
 }

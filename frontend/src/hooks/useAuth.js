@@ -41,6 +41,10 @@ export function useAuth() {
     setUser(null)
   }, [])
 
+  // Replace the cached user with a fresh server copy (e.g. after an email
+  // change). Keeps the prop-drilled auth object the single source of truth.
+  const applyUser = useCallback((u) => setUser(u), [])
+
   const deleteAccount = useCallback(async (password) => {
     const { ok, data } = await authApi.deleteAccount(password)
     if (ok) {
@@ -58,5 +62,6 @@ export function useAuth() {
     register,
     logout,
     deleteAccount,
+    applyUser,
   }
 }
