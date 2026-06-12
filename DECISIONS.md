@@ -52,6 +52,18 @@
 
 **When to revisit:** Once all twelve are published (or any that won't ship are genuinely retired), the flag can be removed and the derived `PUBLISHED_*` exports collapsed back into the base list. Until the set is final, the flag stays.
 
+## Tracker teasers outside the calculator registry
+
+**TL;DR:** The two upcoming trackers live in their own `upcomingFeatures.js` module, not in `registry.js`. The registry stays calculators-only.
+
+**Decision:** The build-in-public teasers for the Net Worth and Income/Expense trackers are defined once in `frontend/src/upcomingFeatures.js` (`UPCOMING_FEATURES`: `{ slug, label, Icon, blurb, eta }`). Only two surfaces consume that list — the `LandingPage` grid (dashed "Coming soon" cards after the calculators) and the `CalculatorSidebar` "Coming soon" section. They link to `ComingSoonPage` at `/coming-soon/:slug`, which redirects unknown slugs to `/` exactly as `CalculatorPage` redirects unknown/unpublished calculator types.
+
+**Why not just add them to the registry with `published: false`:** The `published` flag hides a calculator from the *public surface*, but every registry entry is still a fully-formed, saveable calculator — it has a lazy `component`, an `explainer: { heading, body }`, a backend `VALID_CALC_TYPES` mirror, and it flows through the save/load/version machinery. Trackers are none of those yet: no component, no saved-data shape, no backend type. Putting them in the registry would force fake values into all of those fields and leak non-calculators into the save flow, the explainer banner, the routing guard, and `backend/calc_types.py`. A separate module keeps the registry's invariant intact — *every registry entry is a real calculator* — and keeps the teasers to exactly the two surfaces that should show them.
+
+**Why a flat module and not a second registry yet:** Teasers need four strings and an icon each; that doesn't justify a registry abstraction. Whether the *real* trackers get their own registry (vs. riding the calculator one, vs. ad-hoc pages) is still an open question — see § "Decisions still to make → Tracker architecture — reuse calculator patterns, or new pattern?". `upcomingFeatures.js` is teaser metadata only; it does not pre-decide that architecture.
+
+**When to revisit:** When the first real tracker is built. At that point the teaser entry for it is replaced by whatever the tracker architecture decision lands on, and this module either grows into that pattern or is retired alongside the last teaser.
+
 ## Single source of truth for calc types (backend)
 
 **TL;DR:** `calc_types.py` is the only place `VALID_CALC_TYPES` is defined.
