@@ -36,9 +36,12 @@ TypeScript, SQLAlchemy/any ORM, Redux/Zustand/Context-for-app-state, auth provid
 ## Git workflow
 
 - Branches: `main` (production) ← `develop` (staging) ← `feature/*`
-- Never commit directly to `main`. Feature branches branch off `develop` and merge back via PR (squash merge).
+- Never commit directly to `main`. Feature branches branch off `develop` and merge back via PR.
+- **Merge strategy (matters — don't mix these up):**
+  - `feature/*` → `develop`: **squash-merge**. One clean commit per feature on `develop`; the messy in-progress commits stay on the branch.
+  - `develop` → `main` (releases): **merge commit** (`gh pr merge --merge`), *never* squash. Squashing a release rewrites `develop`'s commits as a brand-new commit on `main`, so the branches **diverge** and every subsequent release fights phantom conflicts. A merge commit keeps `main` and `develop` sharing history, and preserves the per-phase commits on `main`.
 - Conventional commits: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`. One logical change per commit.
-- Releases: PR `develop` → `main`, then tag (`v0.2.0`, ...).
+- Releases: PR `develop` → `main` (merge commit), then tag (`v0.6.0`, ...).
 
 ## Known flakes (don't chase these)
 
