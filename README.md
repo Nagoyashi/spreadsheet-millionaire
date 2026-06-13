@@ -4,6 +4,8 @@ A personal-finance web app. Use the calculators without an account; sign in to s
 
 **Public MVP calculators:** FIRE, Compound Interest, Emergency Fund, Debt Payoff.
 
+Every calculator is robust to extreme or invalid input: numeric fields are bounded and clamped at the shared input component, so out-of-range or pasted values can't produce `Infinity`/`NaN`, broken charts, or overflowing figures. See `DECISIONS.md` § "Numeric input is bounded and clamped at the shared component".
+
 ---
 
 ## Roadmap

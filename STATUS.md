@@ -232,6 +232,14 @@ liveness probe for Render + the keepalive pinger.
 - **Saved-data versioning.** Every saved shape carries `version: 1` (first field)
   with a migration path in `migrateCalcData.js`. The internal `__v` key is
   stripped before save, re-injected on load. Live example: Sankey v1→v2.
+- **Input hardening (shared).** Numeric robustness lives in three shared touchpoints,
+  so all calculators inherit it: `NumInput` **clamps on change** to `[min, max]` (native
+  attributes only drive the spinner, so the clamp is the real guard against typed/pasted
+  values); `fmt()` has a K/M/B/T ladder + a `$999T+` display ceiling so huge-but-valid
+  numbers never form an overflow string; and `finiteOr(value, fallback)` guards derived
+  ratios that bypass `fmt()` (Money Multiplier, Interest %, Coverage %). Per-calculator
+  work is just passing bounds (monetary `0…1e9`, rates `0…30–50%`, periods bounded; Debt
+  APR capped at `50%`).
 - **Trackers** (Net Worth, Income/Expense) are **not** in the registry — they live
   as teasers in `upcomingFeatures.js` until built (no component/saved-shape/backend
   type yet).
@@ -249,6 +257,7 @@ liveness probe for Render + the keepalive pinger.
 - Single-origin Vercel rewrite proxy · gunicorn 2 workers + ProxyFix
 - Password reset via hashed single-use tokens · transactional email via Resend
 - Marketing = same Vite app at `/` · SPA SEO limitation accepted · marketing invents nothing
+- Numeric input bounded + clamped at the shared component (robustness only; model depth is post-launch)
 
 **Open (not yet decided):** tier/entitlement model, three-layer paid-feature gating,
 tracker architecture, i18n depth, design-system primitive extraction.
