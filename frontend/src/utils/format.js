@@ -20,6 +20,12 @@ const DEFAULT_OPTS = {
   thousandDecimals: 1,
 }
 
+// Display ceiling. Bounded inputs keep normal results well under this, but a
+// valid-yet-extreme combination (e.g. 50%/yr compounded for 100 years) can still
+// produce a legitimately huge finite number. Rather than emit a 20-digit
+// "$…M" overflow string, anything at or above this renders as a capped marker.
+const DISPLAY_CEILING = 1e15
+
 export function fmt(n, opts = {}) {
   const { currency, compact, millionDecimals, thousandDecimals } = { ...DEFAULT_OPTS, ...opts }
   const num = Number(n)
@@ -28,13 +34,26 @@ export function fmt(n, opts = {}) {
   const sign = num < 0 ? '-' : ''
   const abs  = Math.abs(num)
 
+  // Display safety net for extreme-but-valid magnitudes.
+  if (abs >= DISPLAY_CEILING) return `${sign}${currency}999T+`
+
   if (compact) {
-    if (abs >= 1_000_000) return `${sign}${currency}${(abs / 1_000_000).toFixed(millionDecimals)}M`
-    if (abs >= 1_000)     return `${sign}${currency}${(abs / 1_000).toFixed(thousandDecimals)}K`
+    if (abs >= 1_000_000_000_000) return `${sign}${currency}${(abs / 1_000_000_000_000).toFixed(millionDecimals)}T`
+    if (abs >= 1_000_000_000)     return `${sign}${currency}${(abs / 1_000_000_000).toFixed(millionDecimals)}B`
+    if (abs >= 1_000_000)         return `${sign}${currency}${(abs / 1_000_000).toFixed(millionDecimals)}M`
+    if (abs >= 1_000)             return `${sign}${currency}${(abs / 1_000).toFixed(thousandDecimals)}K`
     return `${sign}${currency}${Math.round(abs)}`
   }
 
   return `${sign}${currency}${Math.round(abs).toLocaleString('en-US')}`
+}
+
+// Derived-metric guard. Computed ratios/percentages (Money Multiplier, Interest %,
+// Coverage %, ROI) can divide by zero or overflow before they reach the UI, where
+// fmt() never sees them. Route them through this so a non-finite result renders the
+// fallback instead of "Infinity"/"NaN". One helper, reused — no scattered isFinite.
+export function finiteOr(value, fallback = 0) {
+  return Number.isFinite(value) ? value : fallback
 }
 
 // Convenience: percentage formatter — used in a couple of calculators.
