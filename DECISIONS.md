@@ -145,6 +145,24 @@
 **Why:** Twelve calculators had near-identical local `fmt()` functions before extraction — small variations meant `$1.5K` here and `$1,500` there. Centralising fixes the inconsistency and gives us a single place to add features (currency override, decimal-place override).
 **Next phase consideration:** The upcoming i18n / language setting will likely interact with `fmt()` (localised currency symbols, decimal/thousand separators). When that lands, extend `fmt()` — don't add a parallel formatter.
 
+## Numeric input is bounded and clamped at the shared component
+
+**TL;DR:** Every calculator numeric field passes `min`/`max` and `NumInput` clamps on change. The robustness fix lives in shared code (`NumInput` + `fmt` + one `finiteOr` helper); per-calculator work is just passing bounds.
+
+**Decision:** Numeric inputs are made robust to bad input centrally, so all calculators inherit it:
+- **`NumInput` clamps on change.** Out-of-range values snap to the bound, non-numeric input is ignored, empty stays empty (calculators read `""` as `0`). Native `min`/`max`/`step` are kept for the spinner and a11y but are *not* relied on — they don't stop typed or pasted values like `8e31` or `-5`, which was the actual failure mode.
+- **`fmt()` gained B/T tiers + a `$999T+` display ceiling.** Below `1e9` nothing changes; above it, a legitimately huge finite number (e.g. 50%/yr compounded for 100 years) renders as `$1.00B`/`$2.50T`/`$999T+` instead of a 20-digit `$…M` overflow string.
+- **`finiteOr(value, fallback)`** — one shared helper for derived ratios/percentages that bypass `fmt()` (Money Multiplier, Interest %, Coverage %, FIRE savings-rate), so a zero denominator or overflow renders the fallback, never `Infinity`/`NaN`.
+- **Chart domains are clamped** (`YAxis domain [0, min(dataMax, 1e15)]`) so a still-large-but-valid input can't produce an unreadable axis.
+
+**Bound ranges chosen:** monetary fields `0…1e9` ($1B — beyond any real personal-finance figure, finite enough to keep arithmetic well-conditioned); rates `0…30–50%` per field (equity return 30, interest/APR 50, HYSA/SWR 20); periods `1…100` (years) / `1…24` (months); savings rate `0…100%`. Debt APR was lowered from `100` to `50` — that ceiling is what removes the reported 316-vs-317 payoff instability (at implausible rates a debt barely amortises, hits the correct 600-month cap, and interest compounds astronomically; a dollar of extra payment flips convergence).
+
+**Why centralised:** One fix in `NumInput`/`fmt`/`finiteOr` hardens all twelve calculators (the eight unpublished ones inherit it for free) and any future calculator, instead of scattering `isFinite`/clamp checks per field. Per-calculator edits are bounds-passing only, not logic rewrites.
+
+**Scope — robustness only.** This phase makes the four published calculators robust to bad input; it deliberately does **not** change financial models. Calculator-model depth is a separate, still-open post-launch track: more FIRE inputs, whether the savings-rate metric is reworked, and whether the avalanche/snowball comparison stays as-is. One known artefact left for that track: a debt whose minimum payment is below its monthly interest negative-amortises to the 600-month cap and shows a large (now `fmt`-bounded, non-overflow) interest figure — real-world-correct, not an input bug, so not silently rewritten here.
+
+**When to revisit:** When the calculator-depth redesign starts (the model-change track above), or if a real user legitimately needs a figure above `1e9` (revisit the monetary ceiling, not the clamp).
+
 ## Calculator input state via `useCalculatorInputs`
 
 **TL;DR:** One hook owns input state, sync, change-notification, and version injection.

@@ -240,7 +240,9 @@ See `DECISIONS.md` § "MVP narrowing via `published` flag".
 |-----------|--------|
 | Calculator inputs | Use `useCalculatorInputs({ defaults, initialData, onDataChange, calcType })` — returns `{ inputs, set, setInputs }`. Use `set('field')` for scalars, `setInputs(prev => ...)` for nested arrays |
 | Calculator DEFAULTS | Must include `version: 1` as the first field. Bump and add a migration in `migrateCalcData.js` whenever you rename/restructure a saved field |
-| Number formatting | `import { fmt } from '../utils/format'` — never write a local `fmt()`. `fmt(1500)` → `"$1.5K"`. Pass `{ currency: '€' }` or `{ thousandDecimals: 0 }` for variants |
+| Number formatting | `import { fmt } from '../utils/format'` — never write a local `fmt()`. `fmt(1500)` → `"$1.5K"`. Compact ladder is K/M/B/T with a `$999T+` display ceiling so extreme-but-valid magnitudes never render as overflow strings. Pass `{ currency: '€' }` or `{ thousandDecimals: 0 }` for variants |
+| Numeric input bounds | Every calculator `NumInput` passes `min`/`max` (monetary fields `0…1e9`, rates `0…30–50%`, periods `1…100`). `NumInput` **clamps on change** — native `min`/`max` only constrain the spinner and don't stop typed/pasted values, so the clamp is the real guard. New calculators must pass bounds to comply |
+| Derived metrics | Computed ratios/percentages that bypass `fmt()` (Money Multiplier, Interest %, Coverage %, ROI) route through `finiteOr(value, fallback)` from `utils/format.js` so a zero denominator or non-finite result renders the fallback, never `Infinity`/`NaN` |
 | Calculator explainers | Driven by `registry.js`'s `explainer: { heading, body }`. Rendered once in `CalculatorPage` above the Suspense boundary via `<CalculatorExplainer>`. Calculator components must NOT render their own explainer |
 | Shared UI | All reusable primitives live in `src/components/ui/`. Larger composed components (sidebar, header, explainer, footer, auth form) live one level up in `src/components/` |
 | Auth state | Owned by `App.jsx` via `useAuth`, passed down as props — no Context |
