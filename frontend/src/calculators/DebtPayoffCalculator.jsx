@@ -5,6 +5,9 @@ import NumInput from '../components/ui/NumInput'
 import { useCalculatorInputs } from '../hooks/useCalculatorInputs'
 import { fmt } from '../utils/format'
 
+const MONEY_MAX = 1_000_000_000 // $1B — beyond any real personal-finance figure
+const RATE_MAX = 50            // % APR ceiling — caps the amortisation instability
+
 const DEFAULTS = {
   version: 1,
   extra_payment: 200,
@@ -222,6 +225,7 @@ export default function DebtPayoffCalculator({ initialData, onDataChange }) {
                   value={inputs.extra_payment}
                   onChange={v => setInputs(prev => ({ ...prev, extra_payment: v }))}
                   min={0}
+                  max={MONEY_MAX}
                 />
               </div>
             </div>
@@ -257,13 +261,13 @@ export default function DebtPayoffCalculator({ initialData, onDataChange }) {
                     />
                   </td>
                   <td className="py-2 pr-3">
-                    <NumInput prefix="$" value={debt.balance} onChange={v => updateDebt(debt.id, 'balance', v)} min={0} />
+                    <NumInput prefix="$" value={debt.balance} onChange={v => updateDebt(debt.id, 'balance', v)} min={0} max={MONEY_MAX} />
                   </td>
                   <td className="py-2 pr-3">
-                    <NumInput suffix="%" value={debt.rate} onChange={v => updateDebt(debt.id, 'rate', v)} min={0} max={100} step={0.1} />
+                    <NumInput suffix="%" value={debt.rate} onChange={v => updateDebt(debt.id, 'rate', v)} min={0} max={RATE_MAX} step={0.1} />
                   </td>
                   <td className="py-2 pr-3">
-                    <NumInput prefix="$" value={debt.minimum} onChange={v => updateDebt(debt.id, 'minimum', v)} min={0} />
+                    <NumInput prefix="$" value={debt.minimum} onChange={v => updateDebt(debt.id, 'minimum', v)} min={0} max={MONEY_MAX} />
                   </td>
                   <td className="py-2">
                     <button

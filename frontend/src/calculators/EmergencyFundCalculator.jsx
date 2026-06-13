@@ -2,7 +2,9 @@ import { Shield, Calendar, DollarSign, TrendingUp } from 'lucide-react'
 import StatCard from '../components/ui/StatCard'
 import NumInput from '../components/ui/NumInput'
 import { useCalculatorInputs } from '../hooks/useCalculatorInputs'
-import { fmt } from '../utils/format'
+import { fmt, finiteOr } from '../utils/format'
+
+const MONEY_MAX = 1_000_000_000 // $1B — beyond any real personal-finance figure
 
 const DEFAULTS = {
   version: 1,
@@ -22,7 +24,7 @@ function calculate(inputs) {
 
   const targetAmount  = expenses * months
   const gap           = Math.max(0, targetAmount - current)
-  const progressPct   = targetAmount > 0 ? Math.min(100, (current / targetAmount) * 100) : 0
+  const progressPct   = targetAmount > 0 ? Math.min(100, finiteOr((current / targetAmount) * 100, 0)) : 0
   const alreadyFunded = current >= targetAmount
 
   // Months to reach target with contributions + interest
@@ -129,16 +131,16 @@ export default function EmergencyFundCalculator({ initialData, onDataChange }) {
         <div className="bg-white rounded-lg shadow-md p-6">
           <h3 className="text-xl font-bold text-gray-800 mb-4">Your Expenses</h3>
           <div className="space-y-4">
-            <NumInput label="Monthly Expenses"    prefix="$"   value={inputs.monthly_expenses}    onChange={set('monthly_expenses')}    min={0} />
+            <NumInput label="Monthly Expenses"    prefix="$"   value={inputs.monthly_expenses}    onChange={set('monthly_expenses')}    min={0} max={MONEY_MAX} />
             <NumInput label="Target Months"       suffix="mo"  value={inputs.target_months}       onChange={set('target_months')}       min={1} max={24} step={1} />
-            <NumInput label="Current Savings"     prefix="$"   value={inputs.current_savings}     onChange={set('current_savings')}     min={0} />
+            <NumInput label="Current Savings"     prefix="$"   value={inputs.current_savings}     onChange={set('current_savings')}     min={0} max={MONEY_MAX} />
           </div>
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-6">
           <h3 className="text-xl font-bold text-gray-800 mb-4">Building the Fund</h3>
           <div className="space-y-4">
-            <NumInput label="Monthly Contribution" prefix="$" value={inputs.monthly_contribution} onChange={set('monthly_contribution')} min={0} />
+            <NumInput label="Monthly Contribution" prefix="$" value={inputs.monthly_contribution} onChange={set('monthly_contribution')} min={0} max={MONEY_MAX} />
             <NumInput label="Savings Interest Rate" suffix="%" hint="HYSA rate" value={inputs.interest_rate} onChange={set('interest_rate')} min={0} max={20} step={0.1} />
           </div>
 
