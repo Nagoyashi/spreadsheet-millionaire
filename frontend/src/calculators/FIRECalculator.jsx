@@ -7,7 +7,9 @@ import StatCard from '../components/ui/StatCard'
 import NumInput from '../components/ui/NumInput'
 import ChartTooltip from '../components/ui/ChartTooltip'
 import { useCalculatorInputs } from '../hooks/useCalculatorInputs'
-import { fmt } from '../utils/format'
+import { fmt, finiteOr } from '../utils/format'
+
+const MONEY_MAX = 1_000_000_000 // $1B — beyond any real personal-finance figure
 
 const DEFAULTS = {
   version: 1,
@@ -114,7 +116,7 @@ export default function FIRECalculator({ initialData, onDataChange }) {
         />
         <StatCard
           label="Savings Rate"
-          value={`${parseFloat(inputs.savings_rate).toFixed(0)}%`}
+          value={`${finiteOr(parseFloat(inputs.savings_rate), 0).toFixed(0)}%`}
           sub="Of gross income"
           Icon={Percent}
           iconClass="text-amber-500"
@@ -175,7 +177,7 @@ export default function FIRECalculator({ initialData, onDataChange }) {
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
             <XAxis dataKey="year" tick={{ fontSize: 12, fill: '#6b7280' }} tickLine={false} axisLine={false} tickFormatter={v => `Yr ${v}`} />
-            <YAxis tickFormatter={fmt} tick={{ fontSize: 12, fill: '#6b7280' }} tickLine={false} axisLine={false} width={54} />
+            <YAxis domain={[0, dataMax => Math.min(dataMax, 1e15)]} tickFormatter={fmt} tick={{ fontSize: 12, fill: '#6b7280' }} tickLine={false} axisLine={false} width={54} />
             <Tooltip content={<ChartTooltip fmt={fmt} />} />
             {results.fireYear != null && (
               <ReferenceLine x={results.fireYear} stroke="#ef4444" strokeDasharray="4 3" strokeWidth={1.5}
@@ -193,10 +195,10 @@ export default function FIRECalculator({ initialData, onDataChange }) {
         <div className="bg-white rounded-lg shadow-md p-6">
           <h3 className="text-xl font-bold text-gray-800 mb-4">Your finances</h3>
           <div className="space-y-4">
-            <NumInput label="Annual Income"   prefix="$" value={inputs.annual_income}   onChange={set('annual_income')}   min={0} />
-            <NumInput label="Annual Expenses" prefix="$" value={inputs.annual_expenses} onChange={set('annual_expenses')} min={0} />
+            <NumInput label="Annual Income"   prefix="$" value={inputs.annual_income}   onChange={set('annual_income')}   min={0} max={MONEY_MAX} />
+            <NumInput label="Annual Expenses" prefix="$" value={inputs.annual_expenses} onChange={set('annual_expenses')} min={0} max={MONEY_MAX} />
             <NumInput label="Savings Rate"    suffix="%" value={inputs.savings_rate}    onChange={set('savings_rate')}    min={0} max={100} />
-            <NumInput label="Current Savings" prefix="$" value={inputs.current_savings} onChange={set('current_savings')} min={0} />
+            <NumInput label="Current Savings" prefix="$" value={inputs.current_savings} onChange={set('current_savings')} min={0} max={MONEY_MAX} />
           </div>
         </div>
 

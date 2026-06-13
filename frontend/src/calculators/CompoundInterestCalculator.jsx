@@ -7,7 +7,9 @@ import StatCard from '../components/ui/StatCard'
 import NumInput from '../components/ui/NumInput'
 import ChartTooltip from '../components/ui/ChartTooltip'
 import { useCalculatorInputs } from '../hooks/useCalculatorInputs'
-import { fmt } from '../utils/format'
+import { fmt, finiteOr } from '../utils/format'
+
+const MONEY_MAX = 1_000_000_000 // $1B — beyond any real personal-finance figure
 
 const DEFAULTS = {
   version: 1,
@@ -64,10 +66,10 @@ export default function CompoundInterestCalculator({ initialData, onDataChange }
   const results = calculate(inputs)
 
   const multiplier = results.totalContrib > 0
-    ? (results.totalValue / results.totalContrib).toFixed(2)
+    ? finiteOr(results.totalValue / results.totalContrib, 0).toFixed(2)
     : '—'
   const interestPct = results.totalValue > 0
-    ? ((results.totalInterest / results.totalValue) * 100).toFixed(1)
+    ? finiteOr((results.totalInterest / results.totalValue) * 100, 0).toFixed(1)
     : 0
 
   return (
@@ -144,7 +146,7 @@ export default function CompoundInterestCalculator({ initialData, onDataChange }
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
             <XAxis dataKey="year" tick={{ fontSize: 12, fill: '#6b7280' }} tickLine={false} axisLine={false} tickFormatter={v => `Yr ${v}`} />
-            <YAxis tickFormatter={fmt} tick={{ fontSize: 12, fill: '#6b7280' }} tickLine={false} axisLine={false} width={54} />
+            <YAxis domain={[0, dataMax => Math.min(dataMax, 1e15)]} tickFormatter={fmt} tick={{ fontSize: 12, fill: '#6b7280' }} tickLine={false} axisLine={false} width={54} />
             <Tooltip content={<ChartTooltip fmt={fmt} />} />
             <Area type="monotone" dataKey="contributions" name="Contributions"   stroke="#10b981" strokeWidth={1.5} fill="url(#gGreenCI)" strokeDasharray="5 3" dot={false} />
             <Area type="monotone" dataKey="value"         name="Portfolio value" stroke="#f59e0b" strokeWidth={2}   fill="url(#gAmber)"   dot={false} />
@@ -157,8 +159,8 @@ export default function CompoundInterestCalculator({ initialData, onDataChange }
         <div className="bg-white rounded-lg shadow-md p-6">
           <h3 className="text-xl font-bold text-gray-800 mb-4">Investment</h3>
           <div className="space-y-4">
-            <NumInput label="Initial Amount"       prefix="$" value={inputs.principal}            onChange={set('principal')}            min={0} />
-            <NumInput label="Monthly Contribution" prefix="$" value={inputs.monthly_contribution} onChange={set('monthly_contribution')} min={0} />
+            <NumInput label="Initial Amount"       prefix="$" value={inputs.principal}            onChange={set('principal')}            min={0} max={MONEY_MAX} />
+            <NumInput label="Monthly Contribution" prefix="$" value={inputs.monthly_contribution} onChange={set('monthly_contribution')} min={0} max={MONEY_MAX} />
           </div>
         </div>
 
