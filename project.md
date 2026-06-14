@@ -14,10 +14,13 @@ expanding from calculators into trackers and a freemium tier.
 
 ## Current phase
 
-**Phase 8 — Launch** · status: **in progress** · per-task status on the
+**Launched** · `v0.8.0` live in production at www.spreadsheetmillionaire.com
+(2026-06-14) · per-task status on the
 [GitHub Project board](https://github.com/users/Nagoyashi/projects) ↗
 
-Env-driven API proxy + the two-environment (production / staging) cutover.
+No single active phase. Work now continues as build-in-public patches on the
+shipped two-environment (production / staging) setup — next candidates in
+§ "Future" (re-enabling the flag-gated calculators, then the trackers).
 
 ## Roadmap
 
@@ -33,21 +36,10 @@ Env-driven API proxy + the two-environment (production / staging) cutover.
 | **Phase 5 — Password reset + settings** | 2026-06-12 | Hashed single-use reset tokens; `/settings`. |
 | **Phase 6 — Marketing landing + `/app` restructure + legal** | `v0.6.0` · 2026-06-13 | First production release. |
 | **Phase 7 — Numeric input hardening** | `v0.7.0` · 2026-06-13 | Bounded/clamped inputs; `fmt()` ceiling; `finiteOr`. |
+| **Phase 8 — Launch** | `v0.8.0` · 2026-06-14 | Two-environment cutover: env-driven `BACKEND_ORIGIN` proxy (edge middleware); prod on `main` + Neon production branch; staging service on `develop`. |
 
 > Phases 1–5 integrated on `develop` (2026-06-11/12) with **no individual
 > release tags**; they first reached production bundled in **`v0.6.0`**.
-
-### ▶ Current — Phase 8 — Launch
-
-**Scope:** replace the hardcoded Vercel `/api/*` rewrite with an env-driven proxy
-target (`BACKEND_ORIGIN`) so production and preview deployments proxy to separate
-backends; stand up a second Render service tracking `develop` for staging; point
-production at the Neon **main** branch; document the two-environment launch
-runbook.
-
-**Acceptance:** production (`main`) build proxies to the production backend, the
-`develop` preview proxies to staging, local dev is unchanged; the backend URL
-never enters the client bundle; the two-environment runbook is documented.
 
 ### ⬜ Future (prose only — not issues yet)
 
@@ -66,6 +58,24 @@ See `DECISIONS.md` § "Decisions still to make" for the open questions these car
 
 > Durable completion notes, newest first. Deeper rationale → `DECISIONS.md`
 > (linked per entry); per-task history lives on the board.
+
+### 2026-06-14 — Phase 8 · `v0.8.0` — launch (two-environment cutover)
+- **Env-driven API proxy.** Replaced the hardcoded Vercel `/api/*` rewrite with a
+  zero-dependency Vercel Edge Middleware that reads `BACKEND_ORIGIN` at the edge,
+  so production and preview deployments proxy to separate backends and the backend
+  URL never enters the client bundle (#49). → DECISIONS.md § "API proxy target is
+  environment-driven".
+- **Two-environment topology stood up.** Production: Vercel + the original Render
+  service both track `main`, on the Neon **production** branch + prod Upstash + a
+  prod-only `FLASK_SECRET_KEY`; www.spreadsheetmillionaire.com serves from `main`.
+  Staging: a second Render service (`spreadsheetmillionaire-staging.onrender.com`)
+  tracks `develop`, on the Neon **dev** branch + the original Upstash. Vercel
+  `BACKEND_ORIGIN` scoped Production → prod Render, Preview → staging Render.
+  → docs/DEPLOYMENT.md.
+- **Verified live.** Environment isolation confirmed both directions (a production
+  account fails on staging and vice versa); production Redis credentials fixed;
+  production auth fully working (register / login / save / password-reset). First
+  post-MVP production release on the custom domain — launch complete.
 
 ### 2026-06-13 — Phase 7 · `v0.7.0` — numeric input hardening
 - Bounded + clamped numeric inputs across the four published calculators; `fmt()`
