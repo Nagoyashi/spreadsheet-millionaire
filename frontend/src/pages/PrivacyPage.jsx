@@ -1,14 +1,5 @@
-/*
-  GENERATED BOILERPLATE — REQUIRES HUMAN REVIEW. NOT LEGAL ADVICE.
-
-  PR note: This policy was drafted against the app's actual data practices as of
-  Phase 6 (account = email + bcrypt hash; saved calculator inputs per-user in
-  Neon/Postgres; essential-only session cookie backed by Redis; transactional
-  email via Resend; no ads, no analytics, no data sale; self-service account +
-  data deletion). It is not a lawyer's work product. Before launch: have it
-  reviewed, and replace the CONTACT_EMAIL placeholder in src/marketing/links.js
-  with a real published address.
-*/
+// Privacy Policy — written against the app's actual data practices (no ads, no
+// analytics, no data sale; self-service account + data deletion).
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import LegalLayout from '../marketing/LegalLayout'
 import { CONTACT_EMAIL } from '../marketing/links'

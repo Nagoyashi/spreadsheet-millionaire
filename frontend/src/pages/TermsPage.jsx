@@ -1,11 +1,4 @@
-/*
-  GENERATED BOILERPLATE — REQUIRES HUMAN REVIEW. NOT LEGAL ADVICE.
-
-  PR note: Standard service-terms boilerplate adapted to this product. The
-  load-bearing clause is "educational tools, not financial advice" — keep it.
-  The governing-law section is a placeholder and must be set to a real
-  jurisdiction, and the whole document reviewed, before launch.
-*/
+// Terms of Service. Load-bearing clause: "educational tools, not financial advice".
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import LegalLayout from '../marketing/LegalLayout'
 import { CONTACT_EMAIL } from '../marketing/links'
@@ -88,9 +81,8 @@ export default function TermsPage({ auth }) {
 
       <h2>Governing law</h2>
       <p>
-        These terms are governed by the laws of <strong>[jurisdiction to be confirmed]</strong>,
-        without regard to conflict-of-laws principles. This placeholder must be set before
-        launch.
+        These terms are governed by the laws of <strong>the Federal Republic of Germany</strong>,
+        without regard to conflict-of-laws principles.
       </p>
 
       <h2>Contact</h2>

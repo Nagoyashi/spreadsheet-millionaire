@@ -1,12 +1,5 @@
-/*
-  PLACEHOLDER IMPRINT — REQUIRES COMPLETION BEFORE LAUNCH. NOT LEGAL ADVICE.
-
-  PR note: An imprint / "Impressum" is legally required for commercial sites in
-  several EU jurisdictions (notably Germany, §5 DDG/TMG). The fields below are
-  bracketed placeholders — fill in the real operator details, and have the result
-  reviewed for the jurisdiction you operate in. The contact email comes from the
-  shared CONTACT_EMAIL placeholder in src/marketing/links.js.
-*/
+// Imprint / "Impressum" — operator disclosure required for commercial sites in
+// several EU jurisdictions (notably Germany, §5 DDG / §18 MStV).
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import LegalLayout from '../marketing/LegalLayout'
 import { CONTACT_EMAIL } from '../marketing/links'
@@ -18,40 +11,30 @@ export default function ImprintPage({ auth }) {
     <LegalLayout auth={auth} title="Imprint" updated="12 June 2026">
       <p>
         Information provided in accordance with applicable disclosure requirements
-        (e.g. §5 DDG / §18 MStV for operators based in Germany). The details below are
-        placeholders to be completed before launch.
+        (e.g. §5 DDG / §18 MStV for operators based in Germany).
       </p>
 
       <h2>Operator</h2>
       <p>
-        <strong>[Full legal name or company]</strong>
+        <strong>Robert Madocsa Kiss</strong>
         <br />
-        [Street address]
+        Dettelbacher Weg 19
         <br />
-        [Postcode, City]
+        13189, Berlin
         <br />
-        [Country]
+        Germany
       </p>
 
       <h2>Contact</h2>
       <p>
         Email: <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
         <br />
-        Phone: [optional — phone number]
+        Phone: +491636725914
       </p>
 
       <h2>Responsible for content</h2>
       <p>
-        [Name of the person responsible for content]
-        <br />
-        [Address, if different from the operator above]
-      </p>
-
-      <h2>VAT / registration</h2>
-      <p>
-        VAT identification number: [if applicable]
-        <br />
-        Commercial register / number: [if applicable]
+        Robert Madocsa Kiss
       </p>
 
       <h2>Disclaimer</h2>
