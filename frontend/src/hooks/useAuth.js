@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { authApi } from '../api/authApi'
+import { describeError } from '../api/httpClient'
 
 // Shared auth state across the app.
 // Usage: const { user, loading, isAuthenticated, login, logout, register, deleteAccount } = useAuth()
@@ -19,21 +20,23 @@ export function useAuth() {
   }, [])
 
   const login = useCallback(async (email, password) => {
-    const { ok, data } = await authApi.login(email, password)
-    if (ok) {
-      setUser(data.user)
+    const res = await authApi.login(email, password)
+    if (res.ok) {
+      setUser(res.data.user)
       return { success: true }
     }
-    return { success: false, error: data.error, errors: data.errors }
+    // data is null on a transport failure — guard the access and let
+    // describeError() turn the result into a message the form can show.
+    return { success: false, error: describeError(res), errors: res.data?.errors }
   }, [])
 
   const register = useCallback(async (email, password) => {
-    const { ok, data } = await authApi.register(email, password)
-    if (ok) {
-      setUser(data.user)
+    const res = await authApi.register(email, password)
+    if (res.ok) {
+      setUser(res.data.user)
       return { success: true }
     }
-    return { success: false, error: data.error, errors: data.errors }
+    return { success: false, error: describeError(res), errors: res.data?.errors }
   }, [])
 
   const logout = useCallback(async () => {
