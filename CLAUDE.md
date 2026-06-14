@@ -52,3 +52,25 @@ TypeScript, SQLAlchemy/any ORM, Redux/Zustand/Context-for-app-state, auth provid
 - Before any non-trivial change, state the plan: which files change, which are new, where each lives. Then write.
 - Complete, production-ready code. No `// add your logic here`, no truncated snippets.
 - When an error occurs, diagnose from the stack trace: exact file, exact line, exact fix.
+
+## Task tracking
+
+Non-trivial work is tracked as GitHub issues, which auto-flow into the GitHub
+Project "spreadsheetmillionaire.com" (Backlog column) via its Auto-add
+workflow — just create well-formed issues; don't add them to the board manually.
+
+- When to file: anything not finished this session; bugs, security concerns,
+  tech debt, or gaps you notice. Not for trivial fixes done immediately.
+- Before filing: `gh issue list --search "<keywords>"` to avoid duplicates.
+- Title: imperative ("Gate Sankey calculator export behind paid tier").
+  Body: **Context** (with file paths) / **Acceptance criteria** / **Notes**.
+- Labels (one of each): type `type:feature|bug|chore|refactor|docs|security`,
+  priority `prio:high|med|low`.
+- Create: `gh issue create -t "<title>" -b "<body>" -l "type:bug,prio:high"`
+
+## Project log
+
+Keep `docs/PROJECT_LOG.md` current: a dated entry (newest first) whenever a
+phase ships, a calculator is published, or an architectural decision is made.
+Short — what changed + why. For deeper rationale, `DECISIONS.md` stays the
+canonical source; the log just timestamps the milestone and points to it.
