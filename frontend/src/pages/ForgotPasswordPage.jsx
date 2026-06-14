@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { MailCheck } from 'lucide-react'
 import AuthCardShell from '../components/AuthCardShell'
 import { authApi } from '../api/authApi'
+import { describeError } from '../api/httpClient'
 
 // /forgot-password — request a reset link.
 //
@@ -14,14 +15,22 @@ export default function ForgotPasswordPage() {
   const [email, setEmail]           = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [sent, setSent]             = useState(false)
+  const [error, setError]           = useState(null)
 
   async function handleSubmit(e) {
     e.preventDefault()
     setSubmitting(true)
-    // We deliberately ignore the response shape: the backend is uniform, and we
-    // show the same neutral state regardless of outcome.
-    await authApi.forgotPassword(email)
+    setError(null)
+    const result = await authApi.forgotPassword(email)
     setSubmitting(false)
+    // The backend returns a uniform 200 for every reachable request (registered
+    // or not — no enumeration), so !ok only means a transport/5xx failure, never
+    // an account-existence signal. Show an error and let the user retry rather
+    // than claiming a link was sent when the request never landed.
+    if (!result.ok) {
+      setError(describeError(result))
+      return
+    }
     setSent(true)
   }
 
@@ -67,6 +76,12 @@ export default function ForgotPasswordPage() {
       }
     >
       <form onSubmit={handleSubmit} className="space-y-4">
+        {error && (
+          <div className="text-sm text-red-700 bg-red-50 border border-red-200 px-3 py-2 rounded-lg">
+            {error}
+          </div>
+        )}
+
         <div>
           <label className="block text-sm font-medium text-gray-600 mb-1">Email</label>
           <input
