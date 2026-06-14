@@ -10,7 +10,7 @@
 ```
 money-calculators/
 ├── .gitignore
-├── README.md                   # Quickstart, local dev, env vars, roadmap
+├── README.md                   # Quickstart, local dev, env vars
 ├── STATUS.md                   # Technical reference — stack, providers, architecture, data model, API docs
 ├── PROJECT_STRUCTURE.md        # This file — canonical tree, route map, conventions
 ├── DECISIONS.md                # The *why* behind every architectural choice

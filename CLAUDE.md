@@ -77,3 +77,22 @@ workflow — just create well-formed issues; don't add them to the board manuall
   Project board owns per-task execution status. They never track the same thing:
   update `project.md`'s Phase log when a phase ships; never restate per-task
   status there (link to the board instead). Deeper rationale → `DECISIONS.md`.
+
+## Release ritual
+
+A pointer/checklist, not the full procedure — see `project.md` and `docs/DEPLOYMENT.md` for the detail.
+
+- **Plan:** phases are planned by the owner in `project.md`. Don't invent phases.
+- **Promote:** turn only **current + next** phase tasks into issues. Never
+  materialize all future phases into issues up front.
+- **Execute:** move each card Todo → In Progress → Done on the board as you work.
+- **On phase completion:**
+  1. Tag the next semver `vX.Y.0` (per `DECISIONS.md` § "Git branching model").
+  2. Update `project.md` — add to Shipped, add a Phase-log entry, advance the
+     current-phase pointer.
+  3. Update `README.md`.
+  4. Write `docs/releases/vX.Y.Z.md`.
+- **Archiving:** closed cards **auto-archive** — do NOT create an "Archived"
+  status or move cards by hand. The `project.md` Phase log is the durable record.
+
+Roadmap/phase status lives in `project.md` (source of truth); task status lives on the board. Never duplicate the two.
