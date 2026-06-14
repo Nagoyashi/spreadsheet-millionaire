@@ -14,7 +14,7 @@ expanding from calculators into trackers and a freemium tier.
 
 ## Current phase
 
-**Launched** · `v0.8.0` live in production at www.spreadsheetmillionaire.com
+**Launched** · `v0.8.1` live in production at www.spreadsheetmillionaire.com
 (2026-06-14) · per-task status on the
 [GitHub Project board](https://github.com/users/Nagoyashi/projects) ↗
 
@@ -41,6 +41,12 @@ shipped two-environment (production / staging) setup — next candidates in
 > Phases 1–5 integrated on `develop` (2026-06-11/12) with **no individual
 > release tags**; they first reached production bundled in **`v0.6.0`**.
 
+**Patch releases** (post-launch build-in-public patches — not new phases):
+
+| Release | Shipped | Summary |
+|---------|---------|---------|
+| `v0.8.1` | 2026-06-14 | httpClient cold-start/network hardening (#17); finalized legal pages (Impressum/Terms/Privacy) with real operator + contact values; Phase 8 launch recorded in the docs. |
+
 ### ⬜ Future (prose only — not issues yet)
 
 - **Re-enable the 8 flag-gated calculators** one at a time as build-in-public
@@ -58,6 +64,17 @@ See `DECISIONS.md` § "Decisions still to make" for the open questions these car
 
 > Durable completion notes, newest first. Deeper rationale → `DECISIONS.md`
 > (linked per entry); per-task history lives on the board.
+
+### 2026-06-14 — `v0.8.1` — post-launch patch (cold-start hardening + legal finalization)
+- **httpClient hardened** against network failures, timeouts, and non-JSON
+  responses, so auth/reset forms no longer freeze on a Render cold-start 502:
+  a 30s `AbortController` timeout, a uniform error shape (`request()` never
+  rejects), and a shared `describeError()` (#17, PR #52).
+- **Legal pages finalized.** Real operator details in the Impressum, German
+  governing law in the Terms, the real published contact email — and the
+  pre-launch placeholder scaffolding removed (PR #53).
+- **Phase 8 launch recorded** in project.md / STATUS.md (PR #51).
+- First post-launch build-in-public patch — no new phase.
 
 ### 2026-06-14 — Phase 8 · `v0.8.0` — launch (two-environment cutover)
 - **Env-driven API proxy.** Replaced the hardcoded Vercel `/api/*` rewrite with a
