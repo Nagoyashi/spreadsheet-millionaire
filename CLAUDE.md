@@ -4,9 +4,11 @@ Personal-finance calculator web app. Flask API + React/Vite SPA. Anonymous users
 
 ## Read before structural work
 
+- `project.md` — canonical roadmap: current phase, scope + acceptance, phase log. Check what phase we're in before starting work.
 - `PROJECT_STRUCTURE.md` — canonical file tree, paths, conventions. Never guess at a path; check here.
 - `DECISIONS.md` — the *why* behind every architectural choice, with revisit conditions. Read the relevant section before changing or working around a pattern. If a decision is wrong, say so explicitly — don't silently route around it.
-- Update both files whenever a change warrants it, in the same PR as the change.
+- `STATUS.md` — technical/API reference: stack, providers, architecture, data model, API contracts, security posture.
+- Update these whenever a change warrants it, in the same PR as the change.
 
 ## Commands
 
@@ -68,9 +70,10 @@ workflow — just create well-formed issues; don't add them to the board manuall
   priority `prio:high|med|low`.
 - Create: `gh issue create -t "<title>" -b "<body>" -l "type:bug,prio:high"`
 
-## Project log
+## Roadmap & tasks
 
-Keep `docs/PROJECT_LOG.md` current: a dated entry (newest first) whenever a
-phase ships, a calculator is published, or an architectural decision is made.
-Short — what changed + why. For deeper rationale, `DECISIONS.md` stays the
-canonical source; the log just timestamps the milestone and points to it.
+- **`project.md` is the canonical roadmap** — the phase-level plan, current
+  phase, per-phase scope + acceptance criteria, and the Phase log. The GitHub
+  Project board owns per-task execution status. They never track the same thing:
+  update `project.md`'s Phase log when a phase ships; never restate per-task
+  status there (link to the board instead). Deeper rationale → `DECISIONS.md`.
