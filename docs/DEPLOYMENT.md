@@ -1,112 +1,128 @@
-# Deployment runbook — staging
+# Deployment runbook — production + staging
 
-> Click-by-click guide to deploying SpreadsheetMillionaire to **staging**.
+> The operator's source of truth for the **two-environment** setup.
 > Backend → **Render** (Flask under gunicorn). Frontend → **Vercel** (static
-> Vite build). They share one origin via a Vercel rewrite proxy — see
-> `DECISIONS.md` § "Single-origin deployment via Vercel rewrite proxy".
+> Vite build). They share one origin via a Vercel Edge Middleware proxy — see
+> `DECISIONS.md` §§ "Single-origin deployment via Vercel rewrite proxy" and
+> "API proxy target is environment-driven".
 >
-> Staging deploys from the **`develop`** branch and points at the Neon **dev**
-> branch + Upstash. The launch-day flip to production (`main` + Neon main
-> branch + custom domain) is the stub at the bottom — do not do it yet.
-
-This is an ops checklist. Account creation, dashboard clicks, and DNS are
-**human** tasks; the code is already in the repo. Follow it top to bottom.
+> This is an ops checklist. Account creation, dashboard clicks, env-var values,
+> and DNS are **human** tasks; the code is already in the repo. **Names only in
+> this file — never paste a secret value into a doc or a commit.**
 
 ---
 
-## Order of operations (the dependency chain)
+## 0. The shape of the world
 
-1. Create the **Render** web service → it gives you a URL like
-   `https://spreadsheetmillionaire-api.onrender.com`.
-2. Replace the `RENDER-URL-PLACEHOLDER` in `frontend/vercel.json` with that
-   URL, commit, push (§ "Post-creation: wire the real Render URL").
-3. Create the **Vercel** project → it gives you a URL like
-   `https://spreadsheetmillionaire.vercel.app`.
-4. Set `CORS_ORIGINS` on Render to that Vercel URL.
-5. Add the **keepalive** cron job.
-6. Run the **smoke test**.
+Two long-lived environments, each a full stack, isolated end to end:
 
-You can't fill in `CORS_ORIGINS` until Vercel exists, and you can't finish
-`vercel.json` until Render exists — hence the order. The placeholder commit in
-step 2 is the only code change after this PR merges.
+| Environment | Frontend (Vercel) | Backend (Render) | Database (Neon) | Redis (Upstash) | Branch |
+|---|---|---|---|---|---|
+| **Production** | Production deployment (custom domain) | production service | **main** branch | production instance | `main` |
+| **Staging** | Preview deployments | staging service | **dev** branch | staging instance | `develop` |
+
+The frontend is **one Vercel project**. The same build serves both environments;
+which backend it proxies to is decided at the edge by the `BACKEND_ORIGIN`
+environment variable, scoped per environment (§ 3). There is **no second Vercel
+project** — Production vs Preview scoping does the split.
+
+The backend is **two separate Render services** (§ 2) — they don't share a
+process, a database, Redis, or a secret key. Staging cannot touch production data.
+
+### Branch → environment → database (answer "which DB does this hit?")
+
+| You're looking at… | Frontend | `BACKEND_ORIGIN` resolves to | Backend service | Database |
+|---|---|---|---|---|
+| `www.spreadsheetmillionaire.com` (prod domain) | Vercel **Production** | production Render URL | production | Neon **main** branch |
+| a `develop` preview URL | Vercel **Preview** | staging Render URL | staging | Neon **dev** branch |
+| any feature-branch preview URL | Vercel **Preview** | staging Render URL | staging | Neon **dev** branch |
+| `localhost:5173` (dev) | Vite dev proxy (no middleware) | `localhost:5000` | local Flask | local / dev DB |
+
+> **Post-launch follow-up (known, accepted):** the Preview scope holds a single
+> value, so **every** preview — `develop` *and* every feature branch — proxies to
+> staging. That's intentional for now. If a feature branch ever needs its own
+> isolated backend, Preview scoping has to become per-branch (Vercel supports
+> branch-scoped env vars). Tracked, not a launch blocker.
 
 ---
 
-## 1. Render web service (backend)
+## 1. The crux — `BACKEND_ORIGIN` set twice in Vercel
 
-Render dashboard → **New** → **Web Service** → connect the GitHub repo.
+**This is the single most important step and the easiest to get wrong.** The
+frontend proxies `/api/*` to whatever `BACKEND_ORIGIN` says, read at the edge by
+`frontend/middleware.js`. It must be set **once per scope** in the Vercel project
+(**Settings → Environment Variables**):
 
-| Setting | Value |
-|---|---|
-| Branch | `develop` |
-| Root directory | `backend` |
-| Runtime | Python 3 |
-| Build command | `pip install -r requirements.txt` |
-| Start command | `gunicorn --workers 2 --bind 0.0.0.0:$PORT 'app:create_app()'` |
-| Health check path | `/api/health` |
-| Instance type | Free |
+| Variable | Vercel scope | Value (names only) |
+|---|---|---|
+| `BACKEND_ORIGIN` | **Production** | the **production** Render service origin, e.g. `https://<prod-service>.onrender.com` (no trailing `/api`, no path) |
+| `BACKEND_ORIGIN` | **Preview** | the **staging** Render service origin, e.g. `https://<staging-service>.onrender.com` |
 
-Notes:
-- The **start command runs from the root directory** (`backend/`), so the
-  `app:create_app()` target and all intra-backend imports resolve. Do not add a
+Rules:
+- **Origin only** — scheme + host. Not `…/api`, not a trailing slash-path. The
+  middleware appends the full `/api/...` path itself.
+- **Do NOT prefix it `VITE_`.** A `VITE_`-prefixed var is inlined into the client
+  bundle at build; this one must stay server/edge-side so the backend URL never
+  ships to the browser. (`DECISIONS.md` § "API proxy target is environment-driven".)
+- If it's **unset**, the middleware returns `502` with a logged error — by
+  design, so a misconfig fails loudly instead of proxying nowhere.
+- After changing either scope, **redeploy** that environment for the new value to
+  take effect (env vars are bound at deploy/runtime, not patched live).
+
+---
+
+## 2. Render — two web services
+
+Create **two** services from the same repo. Identical settings except the tracked
+branch; **separate** databases, Redis, and secret keys.
+
+Render dashboard → **New** → **Web Service** → connect the GitHub repo, once per
+service.
+
+| Setting | Production | Staging |
+|---|---|---|
+| Branch | `main` | `develop` |
+| Root directory | `backend` | `backend` |
+| Runtime | Python 3 | Python 3 |
+| Build command | `pip install -r requirements.txt` | same |
+| Start command | `gunicorn --workers 2 --bind 0.0.0.0:$PORT 'app:create_app()'` | same |
+| Health check path | `/api/health` | `/api/health` |
+| Instance type | **paid (always-on)** at launch | Free (keepalive, § 4) |
+
+Notes (apply to both):
+- The **start command runs from the root directory** (`backend/`), so
+  `app:create_app()` and all intra-backend imports resolve. Never add a
   `backend.` prefix anywhere — Flask and gunicorn both run from inside `backend/`.
 - `$PORT` is injected by Render; don't hardcode a port.
-- Two workers is deliberate (see `DECISIONS.md` § "gunicorn with 2 workers + ProxyFix").
+- Two workers is deliberate (`DECISIONS.md` § "gunicorn with 2 workers + ProxyFix").
 
-### Render environment variables
+### Environment variables — every var × both environments
 
-Set these under the service's **Environment** tab. **Names only below — never
-paste a value into this file or any commit.**
+Set under each service's **Environment** tab. **Names only — never paste values
+here.** The two services must **not** share the secret key, database, or Redis.
 
-| Variable | Notes |
-|---|---|
-| `FLASK_SECRET_KEY` | **Generate a NEW one for staging** — do not reuse the dev key. `python -c "import secrets; print(secrets.token_hex(32))"` |
-| `FLASK_ENV` | `production` |
-| `DATABASE_URL` | Neon **dev branch** pooled (PgBouncer) connection string. The Neon **main** branch is reserved for production at launch. |
-| `REDIS_URL` | Upstash `rediss://…` (mandatory in production — the app exits without it). |
-| `RESEND_API_KEY` | Resend API key. If omitted, email is disabled with a startup warning (registration still succeeds). |
-| `MAIL_FROM` | Sender address, e.g. `noreply@spreadsheetmillionaire.com`. |
-| `CORS_ORIGINS` | The Vercel URL — **fill this in after step 3.** Comma-separated; no wildcard. |
-| `SESSION_COOKIE_SECURE` | `True` (staging is HTTPS). |
+| Variable | Production | Staging | Notes |
+|---|---|---|---|
+| `FLASK_SECRET_KEY` | **own, unique** | **own, unique** | Generate a fresh one **per service** — never reuse across environments or from dev. `python -c "import secrets; print(secrets.token_hex(32))"` |
+| `FLASK_ENV` | `production` | `production` | Both run prod-style (gunicorn, HTTPS, Talisman). |
+| `DATABASE_URL` | Neon **main** branch pooled (PgBouncer) string | Neon **dev** branch pooled (PgBouncer) string | The whole point of the split — prod never points at the dev branch. |
+| `REDIS_URL` | production Upstash `rediss://…` | **separate** staging Upstash `rediss://…` | Mandatory in prod — the app exits without it. Separate instances so sessions/rate-limit counters don't bleed across environments. |
+| `RESEND_API_KEY` | Resend key | Resend key (may be the same account) | If omitted, email is a logged no-op (registration still succeeds). |
+| `MAIL_FROM` | `noreply@spreadsheetmillionaire.com` | sender address | Only delivers to the Resend account owner until the domain is verified (§ "Known caveats"). |
+| `CORS_ORIGINS` | the production frontend origin (custom domain) | the staging/preview frontend origin | Comma-separated, no wildcard. Defence-in-depth; the single-origin proxy means the happy path doesn't rely on it. |
+| `SESSION_COOKIE_SECURE` | `True` | `True` | Both are HTTPS. |
 
-Schema note: the Neon dev branch already has the schema from Phase 2. If you
-ever point at a fresh Neon branch, run `python db_init.py` from `backend/` once
-against it (idempotent) before the first real request.
-
----
-
-## 2. Post-creation: wire the real Render URL
-
-Once Render gives you the service URL, replace the placeholder in the rewrite
-config. There is exactly **one `RENDER-URL-PLACEHOLDER` to replace — in
-`frontend/vercel.json`** (the API-proxy `destination`). The other matches of
-that string live only in the docs (`docs/DEPLOYMENT.md`, the task prompt) and
-need no change:
-
-```jsonc
-// frontend/vercel.json — before
-{ "source": "/api/:path*", "destination": "https://RENDER-URL-PLACEHOLDER.onrender.com/api/:path*" }
-// after (example)
-{ "source": "/api/:path*", "destination": "https://spreadsheetmillionaire-api.onrender.com/api/:path*" }
-```
-
-Commit and push to `develop`:
-
-```bash
-git checkout develop && git pull
-# edit frontend/vercel.json
-git add frontend/vercel.json
-git commit -m "chore: point Vercel rewrite at the Render staging URL"
-git push
-```
-
-Vercel redeploys automatically on push (after the project exists in step 3).
+**Schema:** the Neon **dev** branch already has the schema (Phase 2). The Neon
+**main** branch is fresh for production — run `python db_init.py` from `backend/`
+**once** against the main-branch `DATABASE_URL` before the first real request
+(idempotent). See the launch runbook (§ 5).
 
 ---
 
-## 3. Vercel project (frontend)
+## 3. Vercel — one project, two scopes
 
-Vercel dashboard → **Add New** → **Project** → import the same repo.
+Vercel dashboard → the existing project (or **Add New → Project** → import the repo
+if it doesn't exist yet).
 
 | Setting | Value |
 |---|---|
@@ -114,56 +130,94 @@ Vercel dashboard → **Add New** → **Project** → import the same repo.
 | Framework preset | Vite (auto-detected) |
 | Build command | `npm run build` |
 | Output directory | `dist` |
-| Production branch | `develop` (staging-first) |
+| Production branch | `main` (after launch flip; was `develop` pre-launch) |
 
-`vercel.json` is picked up automatically from the `frontend/` root — no extra
-config in the dashboard. The SPA fallback rule in it is what makes hard-refresh
-on a client route (e.g. `/calculator/fire`) serve `index.html` instead of 404.
+How the proxy is wired (no dashboard rewrite config needed):
+- `frontend/vercel.json` is picked up automatically and contains **only the SPA
+  fallback** (`/(.*) → /index.html`) — that's what makes a hard refresh on a
+  client route (e.g. `/app/calculator/fire`) serve `index.html` instead of 404.
+- `frontend/middleware.js` is the Edge Middleware that intercepts `/api/*` and
+  rewrites it to `${BACKEND_ORIGIN}/api/...`. It runs before the SPA fallback, so
+  API calls never get rewritten to `index.html`.
+- Set `BACKEND_ORIGIN` for **both** scopes — this is § 1, the crux. Don't skip it.
 
-After the project exists, go back to **Render → Environment** and set
-`CORS_ORIGINS` to the Vercel production URL (e.g.
-`https://spreadsheetmillionaire.vercel.app`), then let Render redeploy.
+After the frontend origins are known, set each Render service's `CORS_ORIGINS`
+(§ 2) to the matching frontend origin and let Render redeploy.
 
 ---
 
-## 4. Keepalive (free-tier cold-start mitigation)
+## 4. Keepalive (free-tier cold-start mitigation — staging)
 
-Render's free instance **sleeps after 15 idle minutes**; the next request pays
-a multi-second cold start that can exceed the Vercel rewrite timeout. Keep it
-warm with an external pinger:
+Render's **free** instance sleeps after 15 idle minutes; the next request pays a
+multi-second cold start that can exceed the Vercel proxy timeout. Keep the
+**staging** service warm:
 
 - Create a job on **cron-job.org** (or any uptime pinger).
-- URL: `GET https://<your-render-url>.onrender.com/api/health`
+- URL: `GET https://<staging-render-url>.onrender.com/api/health`
 - Interval: **every 10 minutes**.
-- `/api/health` is rate-limit-exempt and does no DB/Redis work, so a pinger
-  every 10 min is free and safe.
+- `/api/health` is rate-limit-exempt and does no DB/Redis work — safe to ping.
 
-**Eventual fix:** the **$7/mo** Render paid instance never sleeps — switch to it
-at launch and the keepalive becomes optional.
+The **production** service runs on the paid always-on instance at launch, so it
+never sleeps and the keepalive is optional there.
 
 ---
 
-## 5. Smoke-test checklist
+## 5. Launch-flip runbook (ordered — the operator follows this)
+
+Run top to bottom. Each step depends on the ones above it. Do **not** reorder.
+
+1. **Create the staging Render service from `develop`** (§ 2) — set all its env
+   vars (own secret, dev-branch `DATABASE_URL`, staging Upstash). Confirm
+   `GET /api/health` → `200`.
+2. **Set Vercel `BACKEND_ORIGIN` for both scopes** (§ 1): Production → production
+   Render origin, Preview → staging Render origin.
+3. **Prepare the production database:** in Neon, create/confirm the production
+   role and the **main** branch. Run `python db_init.py` from `backend/` **once**
+   against the main-branch pooled `DATABASE_URL` (fresh prod schema; idempotent).
+4. **Point production Render `DATABASE_URL`** at the Neon **main** branch pooled
+   string (and confirm production Upstash + a fresh secret are set).
+5. **Generate a fresh production `FLASK_SECRET_KEY`** for the production Render
+   service — unique, never reused from staging/dev. Save it via Render's
+   environment UI only.
+6. **Flip Vercel Production Branch** `develop` → `main` (after merging `develop`
+   → `main` and tagging the release — `DECISIONS.md` § "Git branching model":
+   release is a **merge commit**, never a squash).
+7. **Flip the production Render service's tracked branch** → `main`. Let it
+   redeploy.
+8. **Smoke-test production** on `www.spreadsheetmillionaire.com` (§ 6), **then**
+   smoke-test a `develop` **preview** URL to confirm it hits **staging** and the
+   two are isolated.
+
+> Steps 2 and 5–7 are the ones that, done out of order or skipped, point the prod
+> frontend at the wrong backend or boot prod on a stale key. The
+> `BACKEND_ORIGIN` Production/Preview split (step 2) is the crux — re-read § 1.
+
+---
+
+## 6. Smoke-test checklist
+
+Run this for **each** environment (production on the custom domain; staging on a
+preview URL), pointed at that environment's backend.
 
 Backend, directly on Render (bypasses Vercel):
 
-- [x] `curl https://<render-url>.onrender.com/api/health` → `200 {"status":"ok"}`
+- [ ] `curl https://<render-url>.onrender.com/api/health` → `200 {"status":"ok"}`
 
-Then on the **Vercel URL** (exercises the full single-origin path):
+Then on the **frontend origin** (exercises the full single-origin path):
 
 - [ ] **Register** a new account → `201`; welcome-email attempt is logged
       (delivery only works to the Resend account owner until the domain is
-      verified — see § "Known caveats").
+      verified — § "Known caveats").
 - [ ] **Login** with the new account → `200`.
-- [ ] **Save** a calculation on a published calculator (e.g. `fire`) → it
-      appears in the saved list.
-- [ ] **Restart survives:** trigger a Render redeploy (or wait for a
-      sleep/wake), then reload the app — you're still logged in (session lives
-      in Redis). The **first mutating request after a restart may 403** with a
-      stale CSRF token — this is the known flake; a page refresh re-fetches the
-      token and fixes it. Don't chase it.
-- [ ] **Load on a second device** (or a different browser): log in, see the
-      saved calculation. Confirms the session/cookie path works first-party.
+- [ ] **Save** a calculation on a published calculator (e.g. `fire`) → it appears
+      in the saved list.
+- [ ] **Isolation check:** an account created on **staging** must **not** exist on
+      **production** (separate databases). Confirm by trying to log into prod with
+      the staging account — it should fail.
+- [ ] **Restart survives:** trigger a redeploy (or sleep/wake on staging), reload
+      — still logged in (session in Redis). The **first mutating request after a
+      restart may 403** with a stale CSRF token — known flake; a page refresh
+      re-fetches the token. Don't chase it.
 
 ---
 
@@ -172,24 +226,7 @@ Then on the **Vercel URL** (exercises the full single-origin path):
 - **Resend domain not yet verified.** Until `spreadsheetmillionaire.com` is
   verified in Resend (a DNS task), transactional email only reaches the Resend
   account owner's own address. Registration never fails on email errors.
-- **Stale CSRF after a restart.** First mutating request after a backend
-  restart can 403; refresh fixes it. Known, not a bug to fix here.
-
----
-
-## Launch-day section (stub — do NOT do this for staging)
-
-When staging is proven and it's time to go to production:
-
-1. **Promote the branch:** change the Vercel production branch to `main` (after
-   merging `develop` → `main` and tagging the release).
-2. **Point at the production database:** swap Render's `DATABASE_URL` to the
-   Neon **main branch** pooled string.
-3. **Custom domain + Resend DNS:** add the custom domain on Vercel
-   (`app.spreadsheetmillionaire.com` or apex), verify `spreadsheetmillionaire.com`
-   in Resend (DNS records), and update `MAIL_FROM`/`CORS_ORIGINS` accordingly.
-4. **Always-on instance:** upgrade Render to the paid instance so cold starts
-   (and the keepalive) go away.
-
-Each of these is its own short task — listed here so the path is visible, not
-to be executed during the staging deploy.
+- **Stale CSRF after a restart.** First mutating request after a backend restart
+  can 403; refresh fixes it. Known, not a bug to fix here.
+- **Preview scope is shared.** Every preview (not just `develop`) proxies to
+  staging — see § 0's follow-up note.
