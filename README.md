@@ -74,6 +74,7 @@ Create `backend/.env`. The app **will not start** if `FLASK_SECRET_KEY` is missi
 - **`PROJECT_STRUCTURE.md`** — full file tree, route map, conventions, and how-to recipes (adding a calculator, adding an API namespace, versioning saved data)
 - **`DECISIONS.md`** — the *why* behind every architectural choice, with conditions for when to revisit
 - **`docs/DEPLOYMENT.md`** — Render + Vercel deploy runbook (env tables, smoke test)
+- **`docs/releases/`** — per-release notes (`vX.Y.Z.md`); the durable record stays in `project.md`'s phase log
 - **`CLAUDE.md`** — context and hard rules for the AI assistant working on this codebase
 
 ---
