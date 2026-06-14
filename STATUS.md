@@ -71,8 +71,8 @@ deploy runbook · `CLAUDE.md` = agent rules).
 | Provider | Used for | Notes |
 |----------|----------|-------|
 | **Vercel** | Hosts the built frontend; an Edge Middleware proxies `/api/*` → Render | Single origin → first-party cookies, no CORS surface. SPA fallback serves all client routes. Proxy target is the `BACKEND_ORIGIN` env var read at the edge (scoped per environment), so prod and preview reach different backends — see `DECISIONS.md` § "API proxy target is environment-driven". |
-| **Render** | Runs the Flask backend (gunicorn) | Free tier sleeps after 15 min idle; keepalive pings `/api/health`. `$7/mo` always-on at launch. |
-| **Neon** | PostgreSQL database | Branch-per-env: **dev branch** backs local/staging, **main branch** backs prod. `DATABASE_URL` points at the **pooled (PgBouncer)** endpoint. |
+| **Render** | Runs the Flask backend (gunicorn) | **Two services** since launch: production tracks `main`; staging (`spreadsheetmillionaire-staging.onrender.com`) tracks `develop`. Each has its own `FLASK_SECRET_KEY`, DB, and Redis. Free tier sleeps after 15 min idle (keepalive pings `/api/health`); `$7/mo` always-on for production. |
+| **Neon** | PostgreSQL database | Branch-per-env: **dev branch** backs local/staging, **production branch** backs prod. `DATABASE_URL` points at the **pooled (PgBouncer)** endpoint. |
 | **Upstash** | Redis (sessions + rate-limit counters) | `rediss://` TLS. Required in prod; optional in dev (falls back to filesystem sessions + `memory://` limiting). |
 | **Resend** | Transactional email | Welcome + password-reset only. No marketing mail. Disabled (logged no-op) without `RESEND_API_KEY`. |
 

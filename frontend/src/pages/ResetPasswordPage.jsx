@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { CheckCircle2 } from 'lucide-react'
 import AuthCardShell from '../components/AuthCardShell'
 import { authApi } from '../api/authApi'
+import { describeError } from '../api/httpClient'
 
 // /reset-password/:token — choose a new password.
 //
@@ -34,7 +35,8 @@ export default function ResetPasswordPage() {
     }
 
     setSubmitting(true)
-    const { ok, status, data } = await authApi.resetPassword(token, password)
+    const result = await authApi.resetPassword(token, password)
+    const { ok, status, data } = result
     setSubmitting(false)
 
     if (ok) {
@@ -49,7 +51,9 @@ export default function ResetPasswordPage() {
       setFieldError(data.errors.password[0])
       return
     }
-    setError(data?.error || 'Something went wrong.')
+    // Anything else — incl. a network failure, timeout, or 502 cold-start page
+    // (data is null) — gets a clear message instead of a frozen button.
+    setError(describeError(result))
   }
 
   // Dead link — generic, no distinction between unknown / expired / used.
