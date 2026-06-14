@@ -1,30 +1,10 @@
 # SpreadsheetMillionaire
 
-A personal-finance web app. Use the calculators without an account; sign in to save your inputs. Net worth and income/expense trackers coming soon, with a freemium tier for advanced features.
+A personal-finance web app. Use the calculators without an account; sign in to save your inputs.
 
 **Public MVP calculators:** FIRE, Compound Interest, Emergency Fund, Debt Payoff.
 
 Every calculator is robust to extreme or invalid input: numeric fields are bounded and clamped at the shared input component, so out-of-range or pasted values can't produce `Infinity`/`NaN`, broken charts, or overflowing figures. See `DECISIONS.md` § "Numeric input is bounded and clamped at the shared component".
-
----
-
-## Roadmap
-
-Built in public — features land incrementally, and most of what's next already exists in the codebase waiting to be switched on.
-
-**More calculators (already written, behind a `published` flag).** Eight beyond the MVP — Cash Flow Sankey, Investment Fee Impact, Inflation, Dividend, Withdrawal Plan, Mortgage, Coast FIRE, and Barista FIRE — re-enable one at a time as build-in-public patches by flipping the flag in the calculator registry. Saved data for them is already valid server-side; only the public surface is gated.
-
-**Trackers — the next major surface.**
-- **Net Worth Tracker** — log what you own and owe, and watch your net worth trend over time.
-- **Income & Expense Tracker** — categorise what comes in and goes out, and see where your money actually goes each month.
-
-Each gets its own pages, API namespace, and database tables. Teasers already appear in the app (the "Coming soon" cards) and on the marketing page.
-
-**Accounts & platform.**
-- A freemium tier gating advanced features (the trackers' richer slices).
-- Settings expansion: currency preference, language / i18n, and email verification on change.
-
-The public marketing site lives at `/`; the app is namespaced under `/app/*`.
 
 ---
 
@@ -83,15 +63,17 @@ Create `backend/.env`. The app **will not start** if `FLASK_SECRET_KEY` is missi
 | `APP_BASE_URL` | `http://localhost:5173` | public frontend origin — used to build password-reset links |
 | `SESSION_COOKIE_SECURE` | `False` | `True` |
 
-> `DATABASE_URL` must point at Neon's **pooled** (PgBouncer) endpoint — pooling happens there, not in-process. In dev, leaving `REDIS_URL` unset runs with zero extra infrastructure (filesystem sessions + `memory://` rate limiting).
+> `DATABASE_URL` must point at Neon's **pooled** (PgBouncer) endpoint — pooling happens there, not in-process; `sslmode=require` is appended automatically if absent. In dev, leaving `REDIS_URL` unset runs with zero extra infrastructure (filesystem sessions + `memory://` rate limiting); the rate limiter derives its store from `REDIS_URL` (there is no separate `RATELIMIT_STORAGE_URI`).
 
 ---
 
 ## Where to learn more
 
+- **`project.md`** — the roadmap: current phase, scope + acceptance, and the phase log (canonical; the GitHub Project board holds per-task status)
 - **`STATUS.md`** — technical reference: tech stack, providers, architecture, data model, and the full API documentation
 - **`PROJECT_STRUCTURE.md`** — full file tree, route map, conventions, and how-to recipes (adding a calculator, adding an API namespace, versioning saved data)
 - **`DECISIONS.md`** — the *why* behind every architectural choice, with conditions for when to revisit
+- **`docs/DEPLOYMENT.md`** — Render + Vercel deploy runbook (env tables, smoke test)
 - **`CLAUDE.md`** — context and hard rules for the AI assistant working on this codebase
 
 ---
