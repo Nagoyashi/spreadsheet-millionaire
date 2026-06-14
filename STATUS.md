@@ -70,7 +70,7 @@ deploy runbook · `CLAUDE.md` = agent rules).
 
 | Provider | Used for | Notes |
 |----------|----------|-------|
-| **Vercel** | Hosts the built frontend; rewrites `/api/*` → Render | Single origin → first-party cookies, no CORS surface. SPA fallback serves all client routes. |
+| **Vercel** | Hosts the built frontend; an Edge Middleware proxies `/api/*` → Render | Single origin → first-party cookies, no CORS surface. SPA fallback serves all client routes. Proxy target is the `BACKEND_ORIGIN` env var read at the edge (scoped per environment), so prod and preview reach different backends — see `DECISIONS.md` § "API proxy target is environment-driven". |
 | **Render** | Runs the Flask backend (gunicorn) | Free tier sleeps after 15 min idle; keepalive pings `/api/health`. `$7/mo` always-on at launch. |
 | **Neon** | PostgreSQL database | Branch-per-env: **dev branch** backs local/staging, **main branch** backs prod. `DATABASE_URL` points at the **pooled (PgBouncer)** endpoint. |
 | **Upstash** | Redis (sessions + rate-limit counters) | `rediss://` TLS. Required in prod; optional in dev (falls back to filesystem sessions + `memory://` limiting). |
@@ -85,7 +85,10 @@ See `DECISIONS.md` § "Single-origin deployment via Vercel rewrite proxy".
 ## 5. Architecture
 
 - **SPA + JSON API, fully decoupled.** The React app calls relative `/api/...`
-  paths; Vercel proxies them to Render so the browser only ever sees one origin.
+  paths; a Vercel Edge Middleware rewrites them to Render so the browser only
+  ever sees one origin. The backend URL comes from the `BACKEND_ORIGIN` env var
+  read at the edge (never bundled into client JS) and is scoped per Vercel
+  environment, so production and preview deployments proxy to separate backends.
 - **Calculations are client-side.** No calculator math hits the server — it's
   free, instant, and works logged-out. The backend only persists *saved* inputs.
 - **Auth via server-side sessions.** Login sets a session cookie (Redis-backed);

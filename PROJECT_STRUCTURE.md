@@ -68,8 +68,9 @@ git-ignored — never commit it.
 frontend/
 ├── index.html
 ├── package.json
-├── vite.config.js              # Proxies /api/* → localhost:5000
-├── vercel.json                 # Single-origin deploy — rewrites /api/* to Render + SPA fallback
+├── vite.config.js              # Proxies /api/* → localhost:5000 (local dev only)
+├── vercel.json                 # SPA fallback only (/(.*) → /index.html). The /api/* proxy moved to middleware.js
+├── middleware.js               # Vercel Edge Middleware — env-driven /api/* proxy. Reads BACKEND_ORIGIN at the edge, rewrites to ${BACKEND_ORIGIN}/api/*. NOT in the client bundle
 ├── tailwind.config.js
 ├── postcss.config.js
 └── src/
@@ -144,6 +145,15 @@ frontend/
         ├── ResetPasswordPage.jsx  # /reset-password/:token — new password + confirm; success / generic-invalid-link / weak-password states
         └── SettingsPage.jsx       # /app/settings (auth-guarded) — account email + change password + change email + danger zone (DeleteAccountModal)
 ```
+
+### Frontend environment variables (Vercel)
+
+The frontend ships **no `VITE_`-prefixed variables** — nothing about the backend
+is baked into the client bundle. The one deploy-time variable is read at the edge:
+
+| Variable | Read by | Scope | Notes |
+|----------|---------|-------|-------|
+| `BACKEND_ORIGIN` | `middleware.js` (Vercel Edge, at request time) | Set **twice** — Production → prod Render URL, Preview → staging Render URL | Server/edge-only (unprefixed), so it never reaches client JS. Unset → middleware returns `502`. See `docs/DEPLOYMENT.md` + `DECISIONS.md` § "API proxy target is environment-driven". |
 
 ---
 
