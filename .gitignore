@@ -25,6 +25,16 @@ frontend/.env
 frontend/.env.local
 frontend/.env.*.local
 
+# ── Secrets / credential dumps (backstop — never commit) ──
+.env
+*.env
+archive.md
+*.creds
+*.secrets
+*.db
+*.db-shm
+*.db-wal
+
 # ── OS & Editor ───────────────────────────────────────────
 .DS_Store
 Thumbs.db

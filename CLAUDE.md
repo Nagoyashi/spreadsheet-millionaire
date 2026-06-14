@@ -4,9 +4,11 @@ Personal-finance calculator web app. Flask API + React/Vite SPA. Anonymous users
 
 ## Read before structural work
 
+- `project.md` — canonical roadmap: current phase, scope + acceptance, phase log. Check what phase we're in before starting work.
 - `PROJECT_STRUCTURE.md` — canonical file tree, paths, conventions. Never guess at a path; check here.
 - `DECISIONS.md` — the *why* behind every architectural choice, with revisit conditions. Read the relevant section before changing or working around a pattern. If a decision is wrong, say so explicitly — don't silently route around it.
-- Update both files whenever a change warrants it, in the same PR as the change.
+- `STATUS.md` — technical/API reference: stack, providers, architecture, data model, API contracts, security posture.
+- Update these whenever a change warrants it, in the same PR as the change.
 
 ## Commands
 
@@ -52,3 +54,26 @@ TypeScript, SQLAlchemy/any ORM, Redux/Zustand/Context-for-app-state, auth provid
 - Before any non-trivial change, state the plan: which files change, which are new, where each lives. Then write.
 - Complete, production-ready code. No `// add your logic here`, no truncated snippets.
 - When an error occurs, diagnose from the stack trace: exact file, exact line, exact fix.
+
+## Task tracking
+
+Non-trivial work is tracked as GitHub issues, which auto-flow into the GitHub
+Project "spreadsheetmillionaire.com" (Backlog column) via its Auto-add
+workflow — just create well-formed issues; don't add them to the board manually.
+
+- When to file: anything not finished this session; bugs, security concerns,
+  tech debt, or gaps you notice. Not for trivial fixes done immediately.
+- Before filing: `gh issue list --search "<keywords>"` to avoid duplicates.
+- Title: imperative ("Gate Sankey calculator export behind paid tier").
+  Body: **Context** (with file paths) / **Acceptance criteria** / **Notes**.
+- Labels (one of each): type `type:feature|bug|chore|refactor|docs|security`,
+  priority `prio:high|med|low`.
+- Create: `gh issue create -t "<title>" -b "<body>" -l "type:bug,prio:high"`
+
+## Roadmap & tasks
+
+- **`project.md` is the canonical roadmap** — the phase-level plan, current
+  phase, per-phase scope + acceptance criteria, and the Phase log. The GitHub
+  Project board owns per-task execution status. They never track the same thing:
+  update `project.md`'s Phase log when a phase ships; never restate per-task
+  status there (link to the board instead). Deeper rationale → `DECISIONS.md`.

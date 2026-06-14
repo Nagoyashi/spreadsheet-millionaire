@@ -56,22 +56,9 @@ backend/
 
 ### Backend .env variables
 
-| Variable | Dev value | Prod value |
-|----------|-----------|------------|
-| `FLASK_SECRET_KEY` | generate with `secrets.token_hex(32)` | same — app exits if missing/placeholder |
-| `FLASK_ENV` | `development` | `production` |
-| `CORS_ORIGINS` | `http://localhost:5173` | your deployed frontend URL |
-| `DATABASE_URL` | Neon **dev branch** pooled URL (`postgres://…`) | Neon **main branch** pooled URL — app exits if missing / not Postgres |
-| `REDIS_URL` | Upstash `rediss://…` (optional in dev — unset falls back to filesystem sessions) | Upstash `rediss://…` — app exits if missing |
-| `RESEND_API_KEY` | Resend key (optional — unset disables email) | Resend key (email disabled with a warning if unset) |
-| `MAIL_FROM` | sender address, e.g. `noreply@spreadsheetmillionaire.com` | same |
-| `APP_BASE_URL` | `http://localhost:5173` | public frontend origin (e.g. `https://app.spreadsheetmillionaire.com`) — used to build password-reset links; warns at startup if left on localhost in prod |
-| `SESSION_COOKIE_SECURE` | `False` | `True` |
-
-> `DATABASE_URL` must point at Neon's **pooled** (PgBouncer) endpoint — connection
-> pooling happens there, not in-process. `sslmode=require` is appended automatically
-> if absent. `RATELIMIT_STORAGE_URI` is no longer set directly: the limiter uses
-> `REDIS_URL` when present, else `memory://` (dev fallback only).
+The canonical env-var reference (dev vs prod values, generation, and config
+nuances) lives in `README.md` § "Environment variables". `backend/.env` is
+git-ignored — never commit it.
 
 ---
 
@@ -81,8 +68,9 @@ backend/
 frontend/
 ├── index.html
 ├── package.json
-├── vite.config.js              # Proxies /api/* → localhost:5000
-├── vercel.json                 # Single-origin deploy — rewrites /api/* to Render + SPA fallback
+├── vite.config.js              # Proxies /api/* → localhost:5000 (local dev only)
+├── vercel.json                 # SPA fallback only (/(.*) → /index.html). The /api/* proxy moved to middleware.js
+├── middleware.js               # Vercel Edge Middleware — env-driven /api/* proxy. Reads BACKEND_ORIGIN at the edge, rewrites to ${BACKEND_ORIGIN}/api/*. NOT in the client bundle
 ├── tailwind.config.js
 ├── postcss.config.js
 └── src/
@@ -157,6 +145,15 @@ frontend/
         ├── ResetPasswordPage.jsx  # /reset-password/:token — new password + confirm; success / generic-invalid-link / weak-password states
         └── SettingsPage.jsx       # /app/settings (auth-guarded) — account email + change password + change email + danger zone (DeleteAccountModal)
 ```
+
+### Frontend environment variables (Vercel)
+
+The frontend ships **no `VITE_`-prefixed variables** — nothing about the backend
+is baked into the client bundle. The one deploy-time variable is read at the edge:
+
+| Variable | Read by | Scope | Notes |
+|----------|---------|-------|-------|
+| `BACKEND_ORIGIN` | `middleware.js` (Vercel Edge, at request time) | Set **twice** — Production → prod Render URL, Preview → staging Render URL | Server/edge-only (unprefixed), so it never reaches client JS. Unset → middleware returns `502`. See `docs/DEPLOYMENT.md` + `DECISIONS.md` § "API proxy target is environment-driven". |
 
 ---
 
@@ -327,13 +324,9 @@ When you change a saved-data shape (rename a field, change units, restructure):
 
 ---
 
-## Upcoming structural changes (placeholder)
+## Upcoming structural changes
 
-These will be added as their work begins. Listed here so the file tree above is understood to be the *current* state, not the *final* state.
-
-- **Marketing landing page** — shipped (Phase 6): marketing at `/`, app moved under `/app/*`, legal pages at `/privacy` + `/terms`. See "Route map" above and `src/marketing/`
-- **Net worth tracker** — new pages, new API namespace, new DB tables (entries + optionally accounts)
-- **Income/expense tracker** — new pages, new API namespace, new DB tables (transactions + categories)
-- **Settings page** — account-management slice shipped (`/settings`: change password, change email, delete account; reuses `authApi`, no new namespace). Still upcoming: language preference, currency, tier display, email verification — see `DECISIONS.md` § "Settings as a single stacked page"
-- **Tier / entitlement system** — `tier` field on users table, decorator on routes, gate component on UI, see `DECISIONS.md` § "Decisions still to make"
-- **i18n** — `react-i18next` integration, `fmt()` localisation, message catalogues
+The tree above is the *current* state, not the final one. Planned surfaces that
+will add new files/tables — the Net Worth and Income/Expense trackers, the
+tier/entitlement system, and i18n — are tracked in `project.md` § "Future"; their
+rationale and open questions live in `DECISIONS.md` § "Decisions still to make".

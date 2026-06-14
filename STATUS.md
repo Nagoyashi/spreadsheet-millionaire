@@ -4,8 +4,8 @@
 > runs it, and how its API behaves. For deeper *why*, see `DECISIONS.md`; for
 > *where things live*, see `PROJECT_STRUCTURE.md`.
 >
-> **Last updated:** 12 June 2026 · **Phase:** 6 merged to `develop` (marketing
-> landing, `/app` restructure, legal pages) · **Release target:** `v0.6.0`.
+> Roadmap, current phase, and shipped history live in `project.md` — this file is
+> the technical reference, not a status doc.
 
 ---
 
@@ -23,14 +23,10 @@ build-in-public patches.
 
 ## 2. Documentation map
 
-| File | What it covers |
-|------|----------------|
-| `README.md` | Quickstart, local dev, env vars, roadmap |
-| `STATUS.md` (this file) | Technical reference: stack, providers, architecture, data model, API |
-| `PROJECT_STRUCTURE.md` | Canonical file tree, route map, conventions, how-to recipes |
-| `DECISIONS.md` | The *why* behind every architectural choice, with revisit triggers |
-| `CLAUDE.md` | Hard rules + working style for AI assistants on this codebase |
-| `docs/DEPLOYMENT.md` | Staging deploy runbook (Render + Vercel) |
+The canonical documentation map lives in `README.md` § "Where to learn more"
+(`project.md` = roadmap · this file = technical reference · `PROJECT_STRUCTURE.md`
+= file tree/conventions · `DECISIONS.md` = rationale · `docs/DEPLOYMENT.md` =
+deploy runbook · `CLAUDE.md` = agent rules).
 
 ---
 
@@ -74,7 +70,7 @@ build-in-public patches.
 
 | Provider | Used for | Notes |
 |----------|----------|-------|
-| **Vercel** | Hosts the built frontend; rewrites `/api/*` → Render | Single origin → first-party cookies, no CORS surface. SPA fallback serves all client routes. |
+| **Vercel** | Hosts the built frontend; an Edge Middleware proxies `/api/*` → Render | Single origin → first-party cookies, no CORS surface. SPA fallback serves all client routes. Proxy target is the `BACKEND_ORIGIN` env var read at the edge (scoped per environment), so prod and preview reach different backends — see `DECISIONS.md` § "API proxy target is environment-driven". |
 | **Render** | Runs the Flask backend (gunicorn) | Free tier sleeps after 15 min idle; keepalive pings `/api/health`. `$7/mo` always-on at launch. |
 | **Neon** | PostgreSQL database | Branch-per-env: **dev branch** backs local/staging, **main branch** backs prod. `DATABASE_URL` points at the **pooled (PgBouncer)** endpoint. |
 | **Upstash** | Redis (sessions + rate-limit counters) | `rediss://` TLS. Required in prod; optional in dev (falls back to filesystem sessions + `memory://` limiting). |
@@ -89,7 +85,10 @@ See `DECISIONS.md` § "Single-origin deployment via Vercel rewrite proxy".
 ## 5. Architecture
 
 - **SPA + JSON API, fully decoupled.** The React app calls relative `/api/...`
-  paths; Vercel proxies them to Render so the browser only ever sees one origin.
+  paths; a Vercel Edge Middleware rewrites them to Render so the browser only
+  ever sees one origin. The backend URL comes from the `BACKEND_ORIGIN` env var
+  read at the edge (never bundled into client JS) and is scoped per Vercel
+  environment, so production and preview deployments proxy to separate backends.
 - **Calculations are client-side.** No calculator math hits the server — it's
   free, instant, and works logged-out. The backend only persists *saved* inputs.
 - **Auth via server-side sessions.** Login sets a session cookie (Redis-backed);
@@ -248,42 +247,23 @@ liveness probe for Render + the keepalive pinger.
 
 ## 10. Decisions index
 
-`DECISIONS.md` holds the full rationale. Highlights:
-
-- State via local hooks, not a global store · auth prop-drilled, not Context
-- Registry-driven calculators · MVP narrowing via `published` flag
-- Raw SQL via psycopg, no ORM · Postgres on Neon (one conn/request, no in-process pool)
-- Redis sessions + rate limiting via Upstash · CSRF on session, header-verified
-- Single-origin Vercel rewrite proxy · gunicorn 2 workers + ProxyFix
-- Password reset via hashed single-use tokens · transactional email via Resend
-- Marketing = same Vite app at `/` · SPA SEO limitation accepted · marketing invents nothing
-- Numeric input bounded + clamped at the shared component (robustness only; model depth is post-launch)
-
-**Open (not yet decided):** tier/entitlement model, three-layer paid-feature gating,
-tracker architecture, i18n depth, design-system primitive extraction.
+Architectural decisions — with rationale and revisit conditions — live in
+`DECISIONS.md` (the canonical source). Open questions not yet decided
+(tier/entitlement model, three-layer paid-feature gating, tracker architecture,
+i18n depth, design-system extraction) are tracked there under "Decisions still
+to make".
 
 ---
 
 ## 11. Roadmap
 
-Tracked in `README.md` § "Roadmap": the 8 flag-gated calculators re-enabling one at
-a time; the Net Worth and Income/Expense trackers (own pages, API namespaces, DB
-tables); a freemium tier; settings expansion (currency, i18n, email verification).
+The roadmap and phase plan are canonical in `project.md`; per-task status lives on
+the GitHub Project board.
 
 ---
 
 ## 12. Local development
 
-```bash
-# Backend (from backend/)
-python -m app                # Flask on :5000
-
-# Frontend (from frontend/)
-npm run dev                  # Vite on :5173, proxies /api/* → :5000
-
-# DB schema (idempotent)
-python db_init.py
-```
-
-Full env-var tables and the deployment checklist live in `README.md`. Branch model:
-`main` ← `develop` ← `feature/*`, conventional commits, squash-merge (see `CLAUDE.md`).
+Setup, run/build commands, env-var tables, and the deployment checklist live in
+`README.md`; a terse command reference is in `CLAUDE.md` § "Commands". Branch
+model: `main` ← `develop` ← `feature/*`, conventional commits, squash-merge.

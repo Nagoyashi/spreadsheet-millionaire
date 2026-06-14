@@ -297,6 +297,26 @@
 
 **When to revisit:** At launch, custom domains make `app.spreadsheetmillionaire.com` and `api.spreadsheetmillionaire.com` **same-site** (shared registrable domain), so first-party cookies survive a direct call. If proxy latency ever measurably matters then, direct API calls become viable — but only after the domains are same-site, never before.
 
+## API proxy target is environment-driven
+
+**TL;DR:** The `/api/*` proxy destination comes from a `BACKEND_ORIGIN` environment variable, read by a Vercel **Edge Middleware** at request time — not from a hardcoded URL in `vercel.json`. Vercel scopes the variable per environment, so the **same code** proxies to the production backend on `main` and to the staging backend on previews.
+
+**Decision:** A zero-dependency Vercel Edge Middleware (`frontend/middleware.js`, matcher `/api/:path*`) reads `process.env.BACKEND_ORIGIN` and rewrites each API request to `${BACKEND_ORIGIN}/api/...`. `vercel.json` keeps only the SPA fallback (`/(.*) → /index.html`); its old static `/api/*` rewrite is gone. The operator sets `BACKEND_ORIGIN` twice in the Vercel project — **Production** scope → the production Render URL, **Preview** scope → the staging Render URL.
+
+**Why the static `vercel.json` rewrite couldn't do it:** A `vercel.json` rewrite `destination` is a literal string baked into the committed config — it **cannot interpolate environment variables**. Because that file travels with the branch, a Preview (staging) deployment and the Production deployment would proxy to the *same* hardcoded backend. With two backends (production on `main`, staging on `develop`), that's wrong by construction: staging frontend would hit the production database, or vice versa. The proxy target has to be resolved per-environment, and only code at the edge can read a per-environment variable.
+
+**Why middleware, not a fetch reverse-proxy edge function:** Both can read `BACKEND_ORIGIN` at the edge and keep it out of the client bundle. The deciding factor is the first-party-cookie path that the single-origin design is built on (see § "Single-origin deployment via Vercel rewrite proxy"). A middleware **rewrite** (setting the `x-middleware-rewrite` header) hands the actual proxying to Vercel's own edge layer — the exact mechanism the old static rewrite used, just with a dynamic destination. Method, body, request headers, and `Set-Cookie` round-trip identically; nothing is hand-rolled. A fetch-based reverse proxy would instead require manually forwarding the request body, fixing the `Host` header, and folding/unfolding multiple `Set-Cookie` headers — the fragile surface single-origin exists to avoid. So middleware preserves proven behaviour; a fetch proxy would re-implement it.
+
+**Why zero-dependency:** `@vercel/edge`'s `rewrite(dest)` helper is a three-line wrapper that sets `x-middleware-rewrite` on an empty `Response`. The middleware sets that header directly, so it needs no new dependency — consistent with the project's deliberately-boring stance (`CLAUDE.md` § "Don't add without explicit approval").
+
+**Why `BACKEND_ORIGIN`, not `VITE_BACKEND_ORIGIN`:** `VITE_`-prefixed variables are inlined into the client bundle at build time. The proxy is server/edge-side — the browser only ever talks to the Vercel origin — so the backend URL must **never** enter client JS. An unprefixed variable is read only by the middleware at request time and stays out of `dist/`.
+
+**How production/preview isolation works now:** Production deployments (`main`) run the middleware with the Production-scoped `BACKEND_ORIGIN` → production Render → Neon main branch. Preview deployments (`develop` and feature branches) run the *same* middleware with the Preview-scoped `BACKEND_ORIGIN` → staging Render → Neon dev branch. Local dev never runs the middleware at all — Vite's dev proxy (`vite.config.js`) still sends `/api` to `localhost:5000`. One codebase, three correct targets, decided entirely by where it's deployed.
+
+**Fail-loud posture:** If `BACKEND_ORIGIN` is unset, the middleware logs an error and returns `502` rather than silently proxying nowhere — matching `config.py` exiting on a missing secret (§ "Config from `.env`, app exits on missing/invalid secret").
+
+**When to revisit:** Same trigger as the single-origin decision — once `app.` and `api.` subdomains are same-site, direct cross-origin API calls become viable and the proxy (and this variable) could be retired. Until then, the env-driven rewrite is how one codebase serves two environments. The current accepted follow-up: the Preview scope is a single value, so *all* previews (every feature branch, not just `develop`) share whatever it points at — staging. Fine for now; if a branch ever needs its own isolated backend, Preview scoping would need to become per-branch.
+
 ## gunicorn with 2 workers + ProxyFix
 
 **TL;DR:** Render runs the app under `gunicorn -w 2`, and the WSGI app is wrapped in `ProxyFix` so Flask trusts Render's forwarding headers.
