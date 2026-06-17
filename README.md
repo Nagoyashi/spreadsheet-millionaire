@@ -68,8 +68,9 @@ Create `backend/.env`. The app **will not start** if `FLASK_SECRET_KEY` is missi
 ---
 
 ## Where to learn more
+This is the **canonical documentation map** — every other file links here rather than restating it.
 
-- **`project.md`** — the roadmap: current phase, scope + acceptance, and the phase log (canonical; the GitHub Project board holds per-task status)
+- **`project.md`** — the roadmap: vision, phase plan, and the durable phase log. Live cycle state lives on GitHub Milestones; per-task status on the Project board.
 - **`STATUS.md`** — technical reference: tech stack, providers, architecture, data model, and the full API documentation
 - **`PROJECT_STRUCTURE.md`** — full file tree, route map, conventions, and how-to recipes (adding a calculator, adding an API namespace, versioning saved data)
 - **`DECISIONS.md`** — the *why* behind every architectural choice, with conditions for when to revisit
