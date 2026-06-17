@@ -53,6 +53,8 @@ issues are the cycle's scope. Patches (`vX.Y.Z`, Z > 0) skip milestones.
 | Release | Shipped | Summary |
 |---------|---------|---------|
 | `v0.8.1` | 2026-06-14 | httpClient cold-start/network hardening (#17); finalized legal pages (Impressum/Terms/Privacy) with real operator + contact values; Phase 8 launch recorded in the docs. |
+| `v0.8.2` | 2026-06-14 | Established `docs/releases/` per-release notes convention + the Release ritual checklist; backfilled v0.6.0–v0.8.1 notes. → [v0.8.2](docs/releases/v0.8.2.md) |
+| `v0.8.3` | 2026-06-17 | Tag-triggered release workflow; Session protocol + milestone-based cycles; doc-ownership map. → [v0.8.3](docs/releases/v0.8.3.md) |
 
 ### ⬜ Future (prose only — not issues yet)
 
