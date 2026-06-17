@@ -23,10 +23,9 @@ build-in-public patches.
 
 ## 2. Documentation map
 
-The canonical documentation map lives in `README.md` § "Where to learn more"
-(`project.md` = roadmap · this file = technical reference · `PROJECT_STRUCTURE.md`
-= file tree/conventions · `DECISIONS.md` = rationale · `docs/DEPLOYMENT.md` =
-deploy runbook · `CLAUDE.md` = agent rules).
+The canonical map of every doc and what it owns is in `README.md` § "Where to
+learn more". This file owns the technical reference only — stack, providers,
+architecture, data model, API contracts, and security posture.
 
 ---
 

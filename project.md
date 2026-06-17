@@ -5,6 +5,8 @@
 > level. They never track the same thing — this file records phase-level status
 > only and links to the board for per-task state. Rationale for *how* things are
 > built lives in `DECISIONS.md`; this file links to it rather than repeating it.
+> The **open Milestone** owns live cycle scope/progress; this file owns the
+> phase-level *plan* and the durable log. The board owns per-task status.
 
 ## Vision
 
@@ -14,13 +16,18 @@ expanding from calculators into trackers and a freemium tier.
 
 ## Current phase
 
-**Launched** · `v0.8.1` live in production at www.spreadsheetmillionaire.com
-(2026-06-14) · per-task status on the
-[GitHub Project board](https://github.com/users/Nagoyashi/projects) ↗
+## Current cycle
 
-No single active phase. Work now continues as build-in-public patches on the
-shipped two-environment (production / staging) setup — next candidates in
-§ "Future" (re-enabling the flag-gated calculators, then the trackers).
+> Canonical cycle state = the single **open GitHub Milestone**. This line mirrors
+> it for at-a-glance reading in the editor; if they disagree, the milestone wins.
+
+**Between cycles** · `v0.8.1` live in production at www.spreadsheetmillionaire.com
+(2026-06-14) · next candidates in § "Future" (re-enable the flag-gated
+calculators, then the trackers) · backlog on the
+[Project board](https://github.com/users/Nagoyashi/projects) ↗
+
+Each release cycle is a Milestone named for its target version (`v0.9.0`); its
+issues are the cycle's scope. Patches (`vX.Y.Z`, Z > 0) skip milestones.
 
 ## Roadmap
 
@@ -46,6 +53,8 @@ shipped two-environment (production / staging) setup — next candidates in
 | Release | Shipped | Summary |
 |---------|---------|---------|
 | `v0.8.1` | 2026-06-14 | httpClient cold-start/network hardening (#17); finalized legal pages (Impressum/Terms/Privacy) with real operator + contact values; Phase 8 launch recorded in the docs. |
+| `v0.8.2` | 2026-06-14 | Established `docs/releases/` per-release notes convention + the Release ritual checklist; backfilled v0.6.0–v0.8.1 notes. → [v0.8.2](docs/releases/v0.8.2.md) |
+| `v0.8.3` | 2026-06-17 | Tag-triggered release workflow; Session protocol + milestone-based cycles; doc-ownership map. → [v0.8.3](docs/releases/v0.8.3.md) |
 
 ### ⬜ Future (prose only — not issues yet)
 
@@ -57,6 +66,10 @@ shipped two-environment (production / staging) setup — next candidates in
 - **Freemium tier** — tier/entitlement model + three-layer gating (UI / route / DB).
 - **Settings expansion** — currency preference, i18n, email-verification-on-change.
 - **Design-system refresh** — extract shared primitives once the visual language settles.
+
+> Format going forward: one line per release — `<date> · vX.Y.Z · <summary>` →
+> link to `docs/releases/`. Detail lives in the release file, not here. (Entries
+> below predate this convention and are kept as the existing durable record.)
 
 See `DECISIONS.md` § "Decisions still to make" for the open questions these carry.
 
