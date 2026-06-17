@@ -3,7 +3,7 @@ flask-cors==5.0.0
 flask-session==0.8.0
 flask-limiter==3.9.0
 flask-talisman==1.1.0
-bcrypt==4.2.1
+bcrypt==5.0.0
 marshmallow==3.23.1
 python-dotenv==1.0.1
 psycopg[binary]==3.3.4
