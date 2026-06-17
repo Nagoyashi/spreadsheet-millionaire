@@ -1,0 +1,39 @@
+version: 2
+
+# Weekly dependency-update PRs for all three surfaces. PRs target `develop`
+# (your integration branch) and use a conventional-commit `chore:` prefix, so
+# they ride your normal develop -> main release flow and your squash titles stay
+# consistent. Security updates are opened regardless of the weekly schedule.
+
+updates:
+  - package-ecosystem: npm
+    directory: /frontend
+    target-branch: develop
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore
+    groups:                      # one PR for routine bumps instead of many
+      frontend-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: pip
+    directory: /backend
+    target-branch: develop
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore
+    groups:
+      backend-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
