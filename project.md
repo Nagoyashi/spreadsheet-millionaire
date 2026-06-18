@@ -21,9 +21,11 @@ expanding from calculators into trackers and a freemium tier.
 > Canonical cycle state = the single **open GitHub Milestone**. This line mirrors
 > it for at-a-glance reading in the editor; if they disagree, the milestone wins.
 
-**Between cycles** · `v0.8.1` live in production at www.spreadsheetmillionaire.com
-(2026-06-14) · next candidates in § "Future" (re-enable the flag-gated
-calculators, then the trackers) · backlog on the
+**Cycle `v0.9.0` — Test & CI foundation** (open milestone) · pytest + vitest
+harnesses, highest-risk coverage (auth flows, IDOR isolation, saved-data
+migration), ESLint/Prettier, a CI build+test+lint gate, and rotating the leaked
+prod credentials (#16). `v0.8.1` live in production at
+www.spreadsheetmillionaire.com (2026-06-14) · backlog on the
 [Project board](https://github.com/users/Nagoyashi/projects) ↗
 
 Each release cycle is a Milestone named for its target version (`v0.9.0`); its
