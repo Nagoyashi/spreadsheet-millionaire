@@ -38,7 +38,8 @@ archive.md
 # ── OS & Editor ───────────────────────────────────────────
 .DS_Store
 Thumbs.db
-.vscode/
+.vscode/*
+!.vscode/settings.json
 .idea/
 *.swp
 *.swo
