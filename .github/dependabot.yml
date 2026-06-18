@@ -14,6 +14,9 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: chore
+    ignore:                      # never propose major bumps (they need migration)
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:                      # one PR for routine bumps instead of many
       frontend-minor-patch:
         update-types: [minor, patch]
@@ -26,6 +29,9 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: chore
+    ignore:                      # never propose major bumps (they need migration)
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       backend-minor-patch:
         update-types: [minor, patch]
@@ -37,3 +43,6 @@ updates:
       interval: weekly
     commit-message:
       prefix: chore
+    ignore:                      # never propose major bumps (they need migration)
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
