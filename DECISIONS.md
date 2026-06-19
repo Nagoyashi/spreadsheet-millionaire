@@ -387,6 +387,21 @@
 **Decision:** All sensitive values in `.env`. `config.py` reads them via `python-dotenv`. App exits at startup if `FLASK_SECRET_KEY` is missing, under 32 chars, or still the placeholder.
 **Why:** Loud failure beats silent fragility. A misconfigured production server should refuse to boot rather than run with a weak key.
 
+## Test harnesses — pytest (backend) + vitest (frontend)
+
+**TL;DR:** pytest via the `create_app()` factory with a *forced* hermetic env; vitest via a `test` block in `vite.config.js`. DB-backed tests use a throwaway Postgres + TRUNCATE between tests, gated on `TEST_DATABASE_URL`.
+
+**Decision:**
+- **Backend:** plain `pytest` (no `pytest-flask`), building the app from the real `app:create_app()` factory. Test deps live in `backend/requirements-dev.txt` (`-r requirements.txt` + pytest); config in `backend/pytest.ini` (`testpaths = tests`). Fixtures in `backend/tests/conftest.py`: `app` (TESTING + `RATELIMIT_ENABLED=False`), `client` (anonymous), `get_csrf_token` helper, and `db`/`auth_client` for DB-backed tests.
+- **Frontend:** `vitest` + `jsdom`, configured in the `test` block of `vite.config.js` (no separate `vitest.config.js`). `npm test` → `vitest run`.
+
+**Why these specifics:**
+- **conftest *forces* the test env before importing the app (not `setdefault`).** `config.py` validates `FLASK_SECRET_KEY`/`DATABASE_URL` at import time and `sys.exit(1)`s without them, so the env must be set before the first app import. Forcing (overwriting) the infra vars — dummy `DATABASE_URL`, blank `REDIS_URL`/`RESEND_API_KEY`, `FLASK_ENV=development` — guarantees a test run can **never** reach the production database, Redis, or email provider even if a real `.env`/shell env is present. `development` also disables Talisman's HTTPS redirect and makes Redis optional (filesystem sessions).
+- **DB isolation is TRUNCATE-between-tests against a throwaway Postgres, not transactional rollback.** The models do `from db import get_db` and each request opens its own connection (no in-process pool — see § "No ORM — raw SQL via psycopg" and § "Postgres on Neon"). A rollback held on a separate test connection would never see the app's writes, and monkeypatching `db.get_db` wouldn't reach the names already bound in the model modules. Truncating `users`, `saved_calculators`, `password_reset_tokens` after each test is import-style-independent and obviously correct.
+- **DB tests skip without `TEST_DATABASE_URL`.** The DB-free majority (incl. the `/api/health` smoke test) needs no infrastructure, so a bare `cd backend && pytest` is green on any checkout. DB-backed suites (auth, IDOR, saved-data) opt in by pointing `TEST_DATABASE_URL` at a disposable database — wired into CI by the CI workflow.
+
+**When to revisit:** if test count/runtime grows enough to want per-test transactional isolation, switch the app to a request-scoped connection that tests can inject (then rollback becomes viable). Add `@testing-library/react` + component tests when UI logic needs coverage beyond pure utils.
+
 ## Git branching model
 
 **TL;DR:** `main` ← `develop` ← `feature/*`, conventional commits, squash merge, tags on releases.

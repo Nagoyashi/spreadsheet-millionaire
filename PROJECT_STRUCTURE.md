@@ -30,6 +30,8 @@ money-calculators/
 backend/
 ├── .env                        # Secret key + Neon/Upstash/Resend config — never committed
 ├── requirements.txt            # flask, flask-cors, flask-session, flask-limiter, flask-talisman, bcrypt, marshmallow, python-dotenv, psycopg, redis, resend, gunicorn
+├── requirements-dev.txt        # Test deps (pytest) — pulls in requirements.txt; never installed in prod
+├── pytest.ini                  # pytest config — testpaths=tests; run as `cd backend && pytest`
 ├── app.py                      # Flask app factory — ProxyFix, db teardown, limiter + Talisman, startup warnings
 ├── config.py                   # All config read from .env — exits if SECRET_KEY/DATABASE_URL invalid (and REDIS_URL in prod)
 ├── calc_types.py               # Single source of truth for VALID_CALC_TYPES (imported by schema + db_init)
@@ -50,8 +52,11 @@ backend/
 │   └── calculator_schema.py    # Imports VALID_CALC_TYPES from calc_types.py
 ├── services/
 │   └── email.py                # Resend wrapper — send_email + send_welcome_email + send_password_reset_email; disabled (no-op) without RESEND_API_KEY
-└── utils/
-    └── auth_helpers.py         # login_required, csrf_protect, set/clear session, generate_csrf_token
+├── utils/
+│   └── auth_helpers.py         # login_required, csrf_protect, set/clear session, generate_csrf_token
+└── tests/
+    ├── conftest.py             # Hermetic test env (forced before import) + app/client/get_csrf_token fixtures; db/auth_client skip without TEST_DATABASE_URL
+    └── test_health.py          # GET /api/health smoke test (no DB)
 ```
 
 ### Backend .env variables
@@ -68,7 +73,7 @@ git-ignored — never commit it.
 frontend/
 ├── index.html
 ├── package.json
-├── vite.config.js              # Proxies /api/* → localhost:5000 (local dev only)
+├── vite.config.js              # Proxies /api/* → localhost:5000 (local dev only); `test` block sets the vitest jsdom env. `npm test` = vitest run
 ├── vercel.json                 # SPA fallback only (/(.*) → /index.html). The /api/* proxy moved to middleware.js
 ├── middleware.js               # Vercel Edge Middleware — env-driven /api/* proxy. Reads BACKEND_ORIGIN at the edge, rewrites to ${BACKEND_ORIGIN}/api/*. NOT in the client bundle
 ├── tailwind.config.js
@@ -85,6 +90,7 @@ frontend/
     │   └── calculatorApi.js    # getAll / create / update / remove
     ├── utils/
     │   ├── format.js           # Shared fmt() — replaces 12 local copies, supports custom currency
+    │   ├── format.test.js      # vitest unit tests for fmt() (compact ladder, currency, display ceiling)
     │   └── migrateCalcData.js  # migrate() / stripVersion() / injectVersion() — saved-data versioning
     ├── calculators/
     │   ├── registry.js                     # ← ONLY file to touch when adding a calculator
