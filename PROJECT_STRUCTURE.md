@@ -78,6 +78,9 @@ frontend/
 ├── middleware.js               # Vercel Edge Middleware — env-driven /api/* proxy. Reads BACKEND_ORIGIN at the edge, rewrites to ${BACKEND_ORIGIN}/api/*. NOT in the client bundle
 ├── tailwind.config.js
 ├── postcss.config.js
+├── eslint.config.js            # ESLint 9 flat config — React + hooks rules; bans raw fetch outside src/api/ (Hard Rule #4). `npm run lint`
+├── .prettierrc.json            # Prettier formatting (single quotes, no semicolons, 100 cols). `npm run format`
+├── .prettierignore             # dist, node_modules, package-lock.json
 └── src/
     ├── App.jsx                 # BrowserRouter + full route map. Marketing at / (+ /privacy, /terms); app namespaced under /app/*; RequireGuest (login/register) + RequireAuth (/app/settings) wrappers; param-preserving redirects from old top-level app paths. See "Route map" below
     ├── main.jsx                # React root mount

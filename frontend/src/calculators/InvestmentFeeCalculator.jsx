@@ -2,7 +2,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer,
 } from 'recharts'
-import { DollarSign, TrendingDown, Percent, AlertTriangle } from 'lucide-react'
+import { TrendingDown, Percent, AlertTriangle } from 'lucide-react'
 import StatCard from '../components/ui/StatCard'
 import NumInput from '../components/ui/NumInput'
 import ChartTooltip from '../components/ui/ChartTooltip'

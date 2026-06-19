@@ -22,13 +22,16 @@ export default function CalculatorPage({ auth }) {
   const navigate = useNavigate()
 
   // A type that is unknown OR exists but is unpublished redirects to the landing
-  // page. PUBLISHED_TYPES is the public surface; CALC_MAP still holds all 12 so
-  // saved rows for unpublished types remain loadable on develop.
-  if (!PUBLISHED_TYPES.includes(type)) return <Navigate to="/app" replace />
+  // page — but the redirect is returned only AFTER every hook below has run (see
+  // the guard further down), so the hook order is identical on every render
+  // (React's rules-of-hooks). PUBLISHED_TYPES is the public surface; CALC_MAP
+  // still holds all 12 so saved rows for unpublished types remain loadable on
+  // develop. CALC_MAP[type] is undefined for genuinely unknown types, hence ?? {}.
+  const isPublished = PUBLISHED_TYPES.includes(type)
+  const { component: CalcComponent, label, Icon, color, gradient, explainer } =
+    CALC_MAP[type] ?? {}
 
-  const { component: CalcComponent, label, Icon, color, gradient, explainer } = CALC_MAP[type]
-
-  useDocumentTitle(`${label} — SpreadsheetMillionaire`)
+  useDocumentTitle(label ? `${label} — SpreadsheetMillionaire` : 'SpreadsheetMillionaire')
 
   const {
     savedCalcs,
@@ -47,7 +50,7 @@ export default function CalculatorPage({ auth }) {
   useEffect(() => {
     const stored = sessionStorage.getItem(CALC_STORAGE_KEY(type))
     if (stored) {
-      try { setInitialData(JSON.parse(stored)) } catch {}
+      try { setInitialData(JSON.parse(stored)) } catch { /* ignore malformed stored payload */ }
       sessionStorage.removeItem(CALC_STORAGE_KEY(type))
     }
   }, [type])
@@ -92,9 +95,17 @@ export default function CalculatorPage({ auth }) {
     ? (activeSavedCalcId ? 'Update' : 'Save')
     : 'Save (sign in)'
 
-  const calculator = useMemo(() => (
-    <CalcComponent initialData={initialData} onDataChange={handleDataChange} />
-  ), [CalcComponent, initialData, handleDataChange])
+  const calculator = useMemo(
+    () =>
+      CalcComponent ? (
+        <CalcComponent initialData={initialData} onDataChange={handleDataChange} />
+      ) : null,
+    [CalcComponent, initialData, handleDataChange]
+  )
+
+  // Every hook above runs unconditionally; only now is it safe to bail out for an
+  // unknown/unpublished type without changing hook order between renders.
+  if (!isPublished) return <Navigate to="/app" replace />
 
   const sidebarProps = {
     activeType: type,

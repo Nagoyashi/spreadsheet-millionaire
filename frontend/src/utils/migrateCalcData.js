@@ -98,7 +98,6 @@ export function migrate(calcType, data, currentVersion) {
  */
 export function stripVersion(data) {
   if (!data || typeof data !== 'object') return data
-  // eslint-disable-next-line no-unused-vars
   const { [VERSION_KEY]: _v, ...rest } = data
   return rest
 }
