@@ -402,6 +402,22 @@
 
 **When to revisit:** if test count/runtime grows enough to want per-test transactional isolation, switch the app to a request-scoped connection that tests can inject (then rollback becomes viable). Add `@testing-library/react` + component tests when UI logic needs coverage beyond pure utils.
 
+## Linting & formatting — ESLint 9 (flat) + Prettier
+
+**TL;DR:** ESLint 9 flat config (`frontend/eslint.config.js`) with React + hooks rules and a custom no-raw-fetch guard; Prettier for formatting. `npm run lint` runs in CI via the existing `--if-present` step.
+
+**Decision:**
+- **ESLint 9 flat config** (`eslint.config.js`), pinned to the **9.x** line — `eslint-plugin-react` doesn't yet support ESLint 10. Rules: `@eslint/js` recommended + `eslint-plugin-react` (flat recommended + jsx-runtime, so no `React` import needed) + `react-hooks` (`rules-of-hooks: error`, `exhaustive-deps: warn`) + `react-refresh`.
+- **Custom guard for CLAUDE.md Hard Rule #4:** `no-restricted-globals` bans `fetch` in `src/**` except `src/api/**`, so raw HTTP outside the `httpClient` layer fails lint (CSRF injection lives there).
+- **`react/no-unescaped-entities` is off** — it only flags apostrophes/quotes in prose (legal + marketing pages), which render fine; escaping dozens of them hurts readability. Cosmetic, not correctness.
+- **`no-unused-vars` uses `ignoreRestSiblings: true`** so the `const { omit, ...rest } = obj` field-strip idiom (migrateCalcData) isn't a false positive.
+- **Prettier** config (`.prettierrc.json`): single quotes, no semicolons, 100 cols — matches the existing style. Available via `npm run format`; **not** wired into CI as a gate (would force a repo-wide reformat) — `eslint-config-prettier` just disables ESLint's stylistic rules so the two don't fight.
+- **Lint is not `--max-warnings 0`:** `eslint .` exits 0 on warnings, so the two intentional `exhaustive-deps` omissions in `useSave.js` don't block CI while staying visible.
+
+**Notable catch:** turning on `rules-of-hooks` surfaced a real latent bug in `CalculatorPage.jsx` — an early `return <Navigate>` for unpublished/unknown types sat *before* 10 hooks, so a same-instance re-render into that state would crash React ("rendered fewer hooks than expected"). Fixed by running every hook unconditionally and returning the redirect afterward (with a `CALC_MAP[type] ?? {}` guard for unknown types). Exactly the class of bug the lint baseline exists to prevent.
+
+**When to revisit:** add `--max-warnings 0` once the `exhaustive-deps` warnings are resolved; wire `format:check` into CI once the codebase is fully Prettier-formatted.
+
 ## Git branching model
 
 **TL;DR:** `main` ← `develop` ← `feature/*`, conventional commits, squash merge, tags on releases.

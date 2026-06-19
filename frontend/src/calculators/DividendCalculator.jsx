@@ -22,7 +22,6 @@ const DEFAULTS = {
 function calculate(inputs) {
   const portfolio     = parseFloat(inputs.portfolio_value) || 0
   const yieldRate     = parseFloat(inputs.dividend_yield) / 100 || 0
-  const growthRate    = parseFloat(inputs.dividend_growth) / 100 || 0
   const contribution  = parseFloat(inputs.annual_contribution) || 0
   const years         = parseFloat(inputs.years) || 0
   const taxRate       = parseFloat(inputs.tax_rate) / 100 || 0
