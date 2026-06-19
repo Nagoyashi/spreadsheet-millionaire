@@ -10,6 +10,10 @@
 ```
 money-calculators/
 ├── .gitignore
+├── .github/
+│   └── workflows/
+│       ├── ci.yml              # CI on PRs/pushes to develop+main: frontend (lint/test/build) + backend (compile/pytest w/ Postgres service/rule-1)
+│       └── release.yml         # Tag-triggered GitHub Release publisher (docs/releases/vX.Y.Z.md → Release; closes the milestone)
 ├── README.md                   # Quickstart, local dev, env vars
 ├── STATUS.md                   # Technical reference — stack, providers, architecture, data model, API docs
 ├── PROJECT_STRUCTURE.md        # This file — canonical tree, route map, conventions
@@ -56,7 +60,8 @@ backend/
 │   └── auth_helpers.py         # login_required, csrf_protect, set/clear session, generate_csrf_token
 └── tests/
     ├── conftest.py             # Hermetic test env (forced before import) + app/client/get_csrf_token fixtures; db/auth_client skip without TEST_DATABASE_URL
-    └── test_health.py          # GET /api/health smoke test (no DB)
+    ├── test_health.py          # GET /api/health smoke test (no DB)
+    └── test_db_smoke.py        # DB-path wiring proof (register + truncation isolation); skips without TEST_DATABASE_URL, runs in CI
 ```
 
 ### Backend .env variables
