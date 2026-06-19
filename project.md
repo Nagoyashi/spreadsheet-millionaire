@@ -63,11 +63,25 @@ issues are the cycle's scope. Patches (`vX.Y.Z`, Z > 0) skip milestones.
 - **Re-enable the 8 flag-gated calculators** one at a time as build-in-public
   patches: Cash Flow Sankey, Investment Fee Impact, Inflation, Dividend,
   Withdrawal Plan, Mortgage, Coast FIRE, Barista FIRE.
-- **Net Worth Tracker** — own pages, API namespace, DB tables.
-- **Income & Expense Tracker** — own pages, API namespace, DB tables.
+- **Referral engine** *(next cycle — targeted at `v0.10.0`)* — referral codes/links,
+  attribution + reward tracking, abuse/fraud guards, three-layer gating (UI / route /
+  DB), and its own DB tables + API namespace. Likely interplays with the Freemium
+  tier (rewards as entitlement grants). Promote to a milestone with issues when
+  v0.9.0 ships; design decisions to be recorded in `DECISIONS.md` first.
+- **Net Worth Tracker** *(targeted at `v0.11.0`)* — own pages, API namespace, DB tables.
+- **Income & Expense Tracker** *(targeted at `v0.12.0`)* — own pages, API namespace, DB tables.
+- **Backlog cleanup release** *(targeted at `v0.13.0`)* — sweep accumulated board
+  backlog (tech debt, bugs, small gaps) into one consolidation cycle after the
+  trackers land. Scope drawn from the board at the time, not pre-listed here.
 - **Freemium tier** — tier/entitlement model + three-layer gating (UI / route / DB).
 - **Settings expansion** — currency preference, i18n, email-verification-on-change.
 - **Design-system refresh** — extract shared primitives once the visual language settles.
+
+> **Planned cycle sequence** (prose intent, not yet milestones — open one at a time
+> per the Session protocol): `v0.9.0` Test & CI (current) → `v0.10.0` Referral engine
+> → `v0.11.0` Net Worth Tracker → `v0.12.0` Income & Expense Tracker → `v0.13.0`
+> Backlog cleanup. The Freemium tier slots in wherever entitlement/rewards work
+> forces it (likely alongside the referral engine).
 
 > Format going forward: one line per release — `<date> · vX.Y.Z · <summary>` →
 > link to `docs/releases/`. Detail lives in the release file, not here. (Entries
