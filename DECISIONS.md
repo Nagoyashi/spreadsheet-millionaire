@@ -64,6 +64,22 @@
 
 **When to revisit:** When the first real tracker is built. At that point the teaser entry for it is replaced by whatever the tracker architecture decision lands on, and this module either grows into that pattern or is retired alongside the last teaser.
 
+## Net Worth Tracker — data model, API, and architecture
+
+**TL;DR:** The first real tracker. A `net_worth_snapshots` table mirroring `saved_calculators` (one row per snapshot, a `version: 1` JSONB blob of assets/liabilities), a `/api/net-worth` blueprint, and ad-hoc pages — **no tracker registry yet**. Ships **auth-gated, not tier-gated**.
+
+**Decision (promoted from "Decisions still to make → Tracker architecture" — final as of the v0.10.0 cycle):**
+
+- **Storage — JSONB blob, not normalised tables.** A single `net_worth_snapshots` table mirrors the `saved_calculators` shape: `id`, `user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE`, `name TEXT`, `data JSONB NOT NULL`, `created_at`/`updated_at TIMESTAMPTZ DEFAULT now()`, plus an `idx_net_worth_snapshots_user_id` index. Each row is one snapshot in time; `data` holds `{ version: 1, assets: [...], liabilities: [...] }`. No separate `assets`/`liabilities` relational tables — premature for a single tracker, and the blob keeps the save flow identical to calculators.
+- **API namespace — `/api/net-worth`.** A new `backend/routes/net_worth.py` blueprint registered in `app.py`, with a model + schema split mirroring `calculators`. REST CRUD over snapshots. Every route is `@login_required`; write routes are rate-limited via the shared limiter; **every query carries `AND user_id = %s`** (hard rule #6). Parameterised SQL only (hard rule #7). Follows `PROJECT_STRUCTURE.md` § "Adding a New API Namespace".
+- **Frontend — ad-hoc pages, outside the calculator registry.** Own pages under `/app` + a `src/api/netWorthApi.js` built on `createApi()` (hard rule #4). Reuses shared primitives (`NumInput`, `StatCard`, `fmt()`) and the save-flow *shape* (versioning + IDOR), but has its own page-level orchestration and a distinct sidebar section — consistent with § "Tracker teasers outside the calculator registry". The teaser entry in `upcomingFeatures.js` is retired when it ships.
+- **No tracker registry yet.** One tracker doesn't justify the abstraction. The first tracker deliberately defines the pattern ad-hoc; whether to extract a tracker registry is decided when the **second** tracker (Income & Expense, `v0.11.0`) lands — see § "Decisions still to make → Tracker architecture" (now resolved for tracker #1 only).
+- **Versioning — a parallel tracker migrator, not `migrateCalcData.js`.** Net-worth saved-data carries `version: 1` as its first field with a stub migration entry (hard rule #5), but in a parallel module (e.g. `migrateNetWorthData.js`) keyed by nothing — `migrateCalcData.js` is keyed by `calc_type`, and trackers are not calc types. This keeps tracker shapes out of the calculator migrator, mirroring the registry separation.
+
+**Entitlement — ships free (auth-gated), not tier-gated.** The earlier note (§ "Decisions still to make → Three-layer entitlement enforcement") assumed *"net worth is the first feature with a paid-tier slice."* That predated the 2026-06-21 roadmap resequence, which moved the freemium/tier decision to the **`v0.13.0` product review**, *after* both trackers ship. So Net Worth launches as a free, logged-in-only feature with **no tier gate**. If the product review adopts freemium, a tier slice is retrofitted then via the (still-deferred) `@requires_tier` / `<EntitlementGate>` pattern — the three-layer-entitlement decision is now decoupled from this cycle.
+
+**Why this shape:** It is the most boring choice that satisfies every hard rule. Reusing the `saved_calculators` storage/versioning/IDOR machinery means no new persistence patterns to review; the only genuinely new surface is the time-series page-level UI. Normalised tables and a tracker registry are both real options — they're just deferred to the point where a second tracker proves they're needed, exactly as the open question framed it.
+
 ## Single source of truth for calc types (backend)
 
 **TL;DR:** `calc_types.py` is the only place `VALID_CALC_TYPES` is defined.
@@ -498,13 +514,11 @@ These are explicitly open and need to be settled before or during the work that 
 
 **The question:** Gating a paid feature at the UI alone is a bug — a curl request can bypass it. Where the checks live needs to be conventional, not ad-hoc per feature.
 **Likely answer:** A small `@requires_tier('paid')` decorator on the route side (analogous to `@login_required` and `@csrf_protect`), an `<EntitlementGate tier="paid">` component on the UI side, and the `AND user_id = ?` rule already handles the DB side because tier-gated features will live in tier-specific tables or tier-gated rows.
-**Decide before:** Net worth tracker ships, since net worth is the first feature with a paid-tier slice.
+**Decide before:** The first tier-gated feature ships. ~~Net worth tracker~~ — the 2026-06-21 resequence moved the freemium/tier decision to the `v0.13.0` product review, *after* both trackers ship, so Net Worth (`v0.10.0`) launches free/auth-gated and is no longer the forcing function. See § "Net Worth Tracker — data model, API, and architecture" → Entitlement.
 
 ### Tracker architecture — reuse calculator patterns, or new pattern?
 
-**The question:** Trackers have lists, history, and time-series. Calculators have a single input set. Whether trackers ride on the calculator registry / save flow, or sit on their own pattern, is open.
-**Initial leaning:** Shared primitives (NumInput, StatCard, the save flow's *shape* via versioning + IDOR), but distinct page-level orchestration and likely a distinct sidebar section. Probably their own registry if they share enough structure with each other.
-**Decide before:** Writing the second tracker. The first tracker will accidentally define the pattern; the second is where you find out whether the accident was a good one.
+**Resolved for tracker #1** in the `v0.10.0` cycle — see § "Net Worth Tracker — data model, API, and architecture": shared primitives + save-flow shape, ad-hoc pages, no tracker registry, outside the calculator registry. **Still open for tracker #2:** whether the second tracker (Income & Expense, `v0.11.0`) justifies extracting a shared tracker registry, or stays ad-hoc. The first tracker has now defined the pattern; the second is where we find out whether the accident was a good one.
 
 ### i18n — when, how, and how deeply
 
