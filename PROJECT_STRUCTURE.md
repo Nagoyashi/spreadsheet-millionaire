@@ -99,7 +99,8 @@ frontend/
     ├── utils/
     │   ├── format.js           # Shared fmt() — replaces 12 local copies, supports custom currency
     │   ├── format.test.js      # vitest unit tests for fmt() (compact ladder, currency, display ceiling)
-    │   └── migrateCalcData.js  # migrate() / stripVersion() / injectVersion() — saved-data versioning
+    │   ├── migrateCalcData.js  # migrate() / stripVersion() / injectVersion() — saved-data versioning
+    │   └── migrateCalcData.test.js # vitest unit tests for the migration engine (sankey v1→v2, idempotency, version guards)
     ├── calculators/
     │   ├── registry.js                     # ← ONLY file to touch when adding a calculator
     │   ├── FIRECalculator.jsx
