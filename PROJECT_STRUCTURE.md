@@ -101,7 +101,9 @@ frontend/
     ├── api/
     │   ├── httpClient.js       # Shared fetch wrapper. createApi(baseUrl) factory + central CSRF injection
     │   ├── authApi.js          # register / login / logout / deleteAccount / getStatus / fetchCsrfToken / forgotPassword / resetPassword / changePassword / changeEmail
-    │   └── calculatorApi.js    # getAll / create / update / remove
+    │   ├── calculatorApi.js    # getAll / create / update / remove
+    │   ├── netWorthApi.js      # /api/net-worth/* — assets/liabilities/investments/realEstate CRUD + getSummary + snapshots
+    │   └── netWorthApi.test.js # vitest — asserts each endpoint's verb + path + body wiring
     ├── utils/
     │   ├── format.js           # Shared fmt() — replaces 12 local copies, supports custom currency
     │   ├── format.test.js      # vitest unit tests for fmt() (compact ladder, currency, display ceiling)
@@ -139,6 +141,7 @@ frontend/
     ├── hooks/
     │   ├── useAuth.js                 # login / logout / register / deleteAccount + session rehydration
     │   ├── useCalculatorData.js       # Saved-calculations CRUD via API
+    │   ├── useNetWorthData.js         # Net Worth data layer — fetches resources + summary + snapshots; CRUD methods that refetch on success
     │   ├── useCalculatorInputs.js     # Input state plumbing (state + sync + onChange + version migration)
     │   ├── useSave.js                 # Save flow + status states. Strips version key before sending. Resets on type change.
     │   ├── useFavourites.js           # Per-user favourites via localStorage
@@ -160,6 +163,7 @@ frontend/
         ├── CalculatorPage.jsx     # /app/calculator/:type — orchestrator; renders explainer + lazy calc inside Suspense
         ├── LandingPage.jsx        # /app — the *in-app* landing: calculator grid + filter tabs + favourites + coming-soon teaser cards. Collapsible sidebar drawer below lg (local mobileSidebarOpen state)
         ├── ComingSoonPage.jsx     # /app/coming-soon/:slug — build-in-public teaser page for an upcoming tracker; unknown slug redirects to /app like an unknown calc type
+        ├── WealthPage.jsx         # /app/net-worth (auth-guarded) — Net Worth tracker: sticky NW/assets/liabilities bar + tabs + Overview summary (category panels #106, dashboard #107)
         ├── LoginPage.jsx          # Thin wrapper around AuthForm (+ "Forgot password?" link)
         ├── RegisterPage.jsx       # Thin wrapper around AuthForm
         ├── ForgotPasswordPage.jsx # /forgot-password — email field; always shows the same neutral "check your inbox" state
