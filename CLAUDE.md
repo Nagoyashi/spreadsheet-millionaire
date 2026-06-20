@@ -50,6 +50,8 @@ The full map of *what each doc owns* is in `README.md` § "Where to learn more" 
 - Frontend: `cd frontend && npm run dev` (Vite on :5173, proxies `/api/*` to :5000)
 - DB schema/migrations: `cd backend && python db_init.py` (idempotent)
 - Frontend build check: `cd frontend && npm run build`
+- Frontend lint / format: `cd frontend && npm run lint` (ESLint) · `npm run format` (Prettier write) · `npm run format:check`
+- Frontend tests: `cd frontend && npm test` (vitest). Backend tests: `cd backend && pytest` (DB-backed tests need `TEST_DATABASE_URL`, else they skip)
 
 ## Hard rules — violating any of these is a bug
 

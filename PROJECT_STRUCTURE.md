@@ -10,6 +10,10 @@
 ```
 money-calculators/
 ├── .gitignore
+├── .github/
+│   └── workflows/
+│       ├── ci.yml              # CI on PRs/pushes to develop+main: frontend (lint/test/build) + backend (compile/pytest w/ Postgres service/rule-1)
+│       └── release.yml         # Tag-triggered GitHub Release publisher (docs/releases/vX.Y.Z.md → Release; closes the milestone)
 ├── README.md                   # Quickstart, local dev, env vars
 ├── STATUS.md                   # Technical reference — stack, providers, architecture, data model, API docs
 ├── PROJECT_STRUCTURE.md        # This file — canonical tree, route map, conventions
@@ -30,6 +34,8 @@ money-calculators/
 backend/
 ├── .env                        # Secret key + Neon/Upstash/Resend config — never committed
 ├── requirements.txt            # flask, flask-cors, flask-session, flask-limiter, flask-talisman, bcrypt, marshmallow, python-dotenv, psycopg, redis, resend, gunicorn
+├── requirements-dev.txt        # Test deps (pytest) — pulls in requirements.txt; never installed in prod
+├── pytest.ini                  # pytest config — testpaths=tests; run as `cd backend && pytest`
 ├── app.py                      # Flask app factory — ProxyFix, db teardown, limiter + Talisman, startup warnings
 ├── config.py                   # All config read from .env — exits if SECRET_KEY/DATABASE_URL invalid (and REDIS_URL in prod)
 ├── calc_types.py               # Single source of truth for VALID_CALC_TYPES (imported by schema + db_init)
@@ -50,8 +56,14 @@ backend/
 │   └── calculator_schema.py    # Imports VALID_CALC_TYPES from calc_types.py
 ├── services/
 │   └── email.py                # Resend wrapper — send_email + send_welcome_email + send_password_reset_email; disabled (no-op) without RESEND_API_KEY
-└── utils/
-    └── auth_helpers.py         # login_required, csrf_protect, set/clear session, generate_csrf_token
+├── utils/
+│   └── auth_helpers.py         # login_required, csrf_protect, set/clear session, generate_csrf_token
+└── tests/
+    ├── conftest.py             # Hermetic test env (forced before import) + app/client/get_csrf_token fixtures; db/auth_client skip without TEST_DATABASE_URL
+    ├── test_health.py          # GET /api/health smoke test (no DB)
+    ├── test_db_smoke.py        # DB-path wiring proof (register + truncation isolation); skips without TEST_DATABASE_URL, runs in CI
+    ├── test_auth.py            # End-to-end auth-flow tests (register/login/logout/forgot+reset/delete/change-pw/change-email); email mocked, DB-backed
+    └── test_idor.py            # Tenant-isolation tests for saved_calculators (Hard Rule #6) — route + model layer, two users, unauth 401
 ```
 
 ### Backend .env variables
@@ -68,11 +80,14 @@ git-ignored — never commit it.
 frontend/
 ├── index.html
 ├── package.json
-├── vite.config.js              # Proxies /api/* → localhost:5000 (local dev only)
+├── vite.config.js              # Proxies /api/* → localhost:5000 (local dev only); `test` block sets the vitest jsdom env. `npm test` = vitest run
 ├── vercel.json                 # SPA fallback only (/(.*) → /index.html). The /api/* proxy moved to middleware.js
 ├── middleware.js               # Vercel Edge Middleware — env-driven /api/* proxy. Reads BACKEND_ORIGIN at the edge, rewrites to ${BACKEND_ORIGIN}/api/*. NOT in the client bundle
 ├── tailwind.config.js
 ├── postcss.config.js
+├── eslint.config.js            # ESLint 9 flat config — React + hooks rules; bans raw fetch outside src/api/ (Hard Rule #4). `npm run lint`
+├── .prettierrc.json            # Prettier formatting (single quotes, no semicolons, 100 cols). `npm run format`
+├── .prettierignore             # dist, node_modules, package-lock.json
 └── src/
     ├── App.jsx                 # BrowserRouter + full route map. Marketing at / (+ /privacy, /terms); app namespaced under /app/*; RequireGuest (login/register) + RequireAuth (/app/settings) wrappers; param-preserving redirects from old top-level app paths. See "Route map" below
     ├── main.jsx                # React root mount
@@ -85,7 +100,9 @@ frontend/
     │   └── calculatorApi.js    # getAll / create / update / remove
     ├── utils/
     │   ├── format.js           # Shared fmt() — replaces 12 local copies, supports custom currency
-    │   └── migrateCalcData.js  # migrate() / stripVersion() / injectVersion() — saved-data versioning
+    │   ├── format.test.js      # vitest unit tests for fmt() (compact ladder, currency, display ceiling)
+    │   ├── migrateCalcData.js  # migrate() / stripVersion() / injectVersion() — saved-data versioning
+    │   └── migrateCalcData.test.js # vitest unit tests for the migration engine (sankey v1→v2, idempotency, version guards)
     ├── calculators/
     │   ├── registry.js                     # ← ONLY file to touch when adding a calculator
     │   ├── FIRECalculator.jsx

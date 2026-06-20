@@ -387,6 +387,37 @@
 **Decision:** All sensitive values in `.env`. `config.py` reads them via `python-dotenv`. App exits at startup if `FLASK_SECRET_KEY` is missing, under 32 chars, or still the placeholder.
 **Why:** Loud failure beats silent fragility. A misconfigured production server should refuse to boot rather than run with a weak key.
 
+## Test harnesses — pytest (backend) + vitest (frontend)
+
+**TL;DR:** pytest via the `create_app()` factory with a *forced* hermetic env; vitest via a `test` block in `vite.config.js`. DB-backed tests use a throwaway Postgres + TRUNCATE between tests, gated on `TEST_DATABASE_URL`.
+
+**Decision:**
+- **Backend:** plain `pytest` (no `pytest-flask`), building the app from the real `app:create_app()` factory. Test deps live in `backend/requirements-dev.txt` (`-r requirements.txt` + pytest); config in `backend/pytest.ini` (`testpaths = tests`). Fixtures in `backend/tests/conftest.py`: `app` (TESTING + `RATELIMIT_ENABLED=False`), `client` (anonymous), `get_csrf_token` helper, and `db`/`auth_client` for DB-backed tests.
+- **Frontend:** `vitest` + `jsdom`, configured in the `test` block of `vite.config.js` (no separate `vitest.config.js`). `npm test` → `vitest run`.
+
+**Why these specifics:**
+- **conftest *forces* the test env before importing the app (not `setdefault`).** `config.py` validates `FLASK_SECRET_KEY`/`DATABASE_URL` at import time and `sys.exit(1)`s without them, so the env must be set before the first app import. Forcing (overwriting) the infra vars — dummy `DATABASE_URL`, blank `REDIS_URL`/`RESEND_API_KEY`, `FLASK_ENV=development` — guarantees a test run can **never** reach the production database, Redis, or email provider even if a real `.env`/shell env is present. `development` also disables Talisman's HTTPS redirect and makes Redis optional (filesystem sessions).
+- **DB isolation is TRUNCATE-between-tests against a throwaway Postgres, not transactional rollback.** The models do `from db import get_db` and each request opens its own connection (no in-process pool — see § "No ORM — raw SQL via psycopg" and § "Postgres on Neon"). A rollback held on a separate test connection would never see the app's writes, and monkeypatching `db.get_db` wouldn't reach the names already bound in the model modules. Truncating `users`, `saved_calculators`, `password_reset_tokens` after each test is import-style-independent and obviously correct.
+- **DB tests skip without `TEST_DATABASE_URL`.** The DB-free majority (incl. the `/api/health` smoke test) needs no infrastructure, so a bare `cd backend && pytest` is green on any checkout. DB-backed suites (auth, IDOR, saved-data) opt in by pointing `TEST_DATABASE_URL` at a disposable database — wired into CI by the CI workflow.
+
+**When to revisit:** if test count/runtime grows enough to want per-test transactional isolation, switch the app to a request-scoped connection that tests can inject (then rollback becomes viable). Add `@testing-library/react` + component tests when UI logic needs coverage beyond pure utils.
+
+## Linting & formatting — ESLint 9 (flat) + Prettier
+
+**TL;DR:** ESLint 9 flat config (`frontend/eslint.config.js`) with React + hooks rules and a custom no-raw-fetch guard; Prettier for formatting. `npm run lint` runs in CI via the existing `--if-present` step.
+
+**Decision:**
+- **ESLint 9 flat config** (`eslint.config.js`), pinned to the **9.x** line — `eslint-plugin-react` doesn't yet support ESLint 10. Rules: `@eslint/js` recommended + `eslint-plugin-react` (flat recommended + jsx-runtime, so no `React` import needed) + `react-hooks` (`rules-of-hooks: error`, `exhaustive-deps: warn`) + `react-refresh`.
+- **Custom guard for CLAUDE.md Hard Rule #4:** `no-restricted-globals` bans `fetch` in `src/**` except `src/api/**`, so raw HTTP outside the `httpClient` layer fails lint (CSRF injection lives there).
+- **`react/no-unescaped-entities` is off** — it only flags apostrophes/quotes in prose (legal + marketing pages), which render fine; escaping dozens of them hurts readability. Cosmetic, not correctness.
+- **`no-unused-vars` uses `ignoreRestSiblings: true`** so the `const { omit, ...rest } = obj` field-strip idiom (migrateCalcData) isn't a false positive.
+- **Prettier** config (`.prettierrc.json`): single quotes, no semicolons, 100 cols — matches the existing style. Available via `npm run format`; **not** wired into CI as a gate (would force a repo-wide reformat) — `eslint-config-prettier` just disables ESLint's stylistic rules so the two don't fight.
+- **Lint is not `--max-warnings 0`:** `eslint .` exits 0 on warnings, so the two intentional `exhaustive-deps` omissions in `useSave.js` don't block CI while staying visible.
+
+**Notable catch:** turning on `rules-of-hooks` surfaced a real latent bug in `CalculatorPage.jsx` — an early `return <Navigate>` for unpublished/unknown types sat *before* 10 hooks, so a same-instance re-render into that state would crash React ("rendered fewer hooks than expected"). Fixed by running every hook unconditionally and returning the redirect afterward (with a `CALC_MAP[type] ?? {}` guard for unknown types). Exactly the class of bug the lint baseline exists to prevent.
+
+**When to revisit:** add `--max-warnings 0` once the `exhaustive-deps` warnings are resolved; wire `format:check` into CI once the codebase is fully Prettier-formatted.
+
 ## Git branching model
 
 **TL;DR:** `main` ← `develop` ← `feature/*`, conventional commits, squash merge, tags on releases.

@@ -14,7 +14,7 @@ on:
 # Least privilege: only what's needed to create a Release and close a milestone.
 permissions:
   contents: write
-  issues: write
+  issues: write   # milestones live under the Issues API; needed to close the cycle milestone
 
 jobs:
   publish:
@@ -25,7 +25,7 @@ jobs:
       TAG: ${{ github.ref_name }}
     steps:
       - name: Check out the tagged commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Publish the GitHub Release from its notes file
         run: |

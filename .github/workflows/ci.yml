@@ -27,48 +27,70 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: "20"            # >= the README's Node 18 floor; bump to match Vercel if needed
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci                      # reproducible install; requires frontend/package-lock.json committed
-      - run: npm run lint --if-present   # runs the lint script only if you have one; no-op otherwise
+      - run: npm run lint                # ESLint (flat config) — #41
+      - run: npm test                    # vitest run — #26
       - run: npm run build               # the build check from CLAUDE.md § Commands
 
   backend:
     name: Backend checks
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend       # CLAUDE.md Hard Rule #1: the app + tests run from inside backend/
+    services:
+      # Throwaway Postgres for the DB-backed tests (auth, IDOR, saved-data). The
+      # pytest harness skips those without TEST_DATABASE_URL; here we provide one
+      # so they actually run — no reliance on Neon (#27 acceptance criterion).
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      # conftest forces a hermetic env (dummy DATABASE_URL, blank REDIS_URL, etc.)
+      # but reads TEST_DATABASE_URL to enable the db/auth_client fixtures and point
+      # the app at the service above. sslmode=disable is REQUIRED: config.py's
+      # _ensure_sslmode() would otherwise append sslmode=require, and the plain
+      # postgres:16 service has no SSL — every connection would fail.
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db?sslmode=disable
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"         # the README's documented floor; bump to match Render if needed
           cache: pip
-          cache-dependency-path: backend/requirements.txt
-      - run: pip install -r backend/requirements.txt
+          cache-dependency-path: backend/requirements-dev.txt
+      - run: pip install -r requirements-dev.txt   # pulls in requirements.txt + pytest
 
-      # We deliberately do NOT boot the app: create_app() exits without a real
-      # FLASK_SECRET_KEY / DATABASE_URL (your fail-loud config), so a boot check
-      # would always fail in CI. Compile-checking catches syntax errors instead.
+      # We deliberately do NOT boot the app via gunicorn; pytest builds it through
+      # the create_app() factory with the harness's test config. Compile-checking
+      # additionally catches syntax errors across every module.
       - name: Compile-check the backend
-        run: python -m compileall -q backend
+        run: python -m compileall -q .
 
-      - name: Run tests if present
-        run: |
-          if ls backend/tests/ backend/test_*.py >/dev/null 2>&1; then
-            pip install pytest
-            python -m pytest backend -q
-          else
-            echo "No tests found — skipping (add backend/tests/ or backend/test_*.py to enable)."
-          fi
+      - name: Run pytest
+        run: pytest -q
 
       # CLAUDE.md hard rule #1: intra-backend imports must be bare (Flask runs from
       # inside backend/, so a 'backend.' prefix breaks at runtime). Enforce it.
       - name: Enforce rule #1 — no 'backend.' import prefix
         run: |
-          if grep -rnE '^[[:space:]]*(from|import)[[:space:]]+backend\.' backend --include='*.py'; then
+          if grep -rnE '^[[:space:]]*(from|import)[[:space:]]+backend\.' . --include='*.py'; then
             echo "::error::Found a 'backend.' import prefix — breaks at runtime (CLAUDE.md hard rule #1). Use bare module names."
             exit 1
           fi
