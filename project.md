@@ -16,19 +16,21 @@ expanding from calculators into trackers and a freemium tier.
 
 ## Current phase
 
+**Phase 9 — Test & CI foundation** shipped as `v0.9.0` (2026-06-20). Next up:
+Phase 10 — Referral engine (`v0.10.0`), not yet opened as a milestone.
+
 ## Current cycle
 
 > Canonical cycle state = the single **open GitHub Milestone**. This line mirrors
 > it for at-a-glance reading in the editor; if they disagree, the milestone wins.
 
-**Cycle `v0.9.0` — Test & CI foundation** (open milestone) · pytest + vitest
-harnesses, highest-risk coverage (auth flows, IDOR isolation, saved-data
-migration), ESLint/Prettier, a CI build+test+lint gate, and rotating the leaked
-prod credentials (#16). `v0.8.1` live in production at
-www.spreadsheetmillionaire.com (2026-06-14) · backlog on the
+**Between cycles.** `v0.9.0` — Test & CI foundation shipped (2026-06-20); no
+milestone is currently open. The next cycle is `v0.10.0` — Referral engine (see
+§ Future) — open its milestone and promote its issues when starting it. `v0.8.1`
+live in production at www.spreadsheetmillionaire.com · backlog on the
 [Project board](https://github.com/users/Nagoyashi/projects) ↗
 
-Each release cycle is a Milestone named for its target version (`v0.9.0`); its
+Each release cycle is a Milestone named for its target version (`v0.10.0`); its
 issues are the cycle's scope. Patches (`vX.Y.Z`, Z > 0) skip milestones.
 
 ## Roadmap
@@ -46,6 +48,7 @@ issues are the cycle's scope. Patches (`vX.Y.Z`, Z > 0) skip milestones.
 | **Phase 6 — Marketing landing + `/app` restructure + legal** | `v0.6.0` · 2026-06-13 | First production release. |
 | **Phase 7 — Numeric input hardening** | `v0.7.0` · 2026-06-13 | Bounded/clamped inputs; `fmt()` ceiling; `finiteOr`. |
 | **Phase 8 — Launch** | `v0.8.0` · 2026-06-14 | Two-environment cutover: env-driven `BACKEND_ORIGIN` proxy (edge middleware); prod on `main` + Neon production branch; staging service on `develop`. |
+| **Phase 9 — Test & CI foundation** | `v0.9.0` · 2026-06-20 | pytest + vitest harnesses; auth/IDOR/migration coverage; ESLint + Prettier; CI gate with a Postgres service. → [v0.9.0](docs/releases/v0.9.0.md) |
 
 > Phases 1–5 integrated on `develop` (2026-06-11/12) with **no individual
 > release tags**; they first reached production bundled in **`v0.6.0`**.
@@ -78,10 +81,10 @@ issues are the cycle's scope. Patches (`vX.Y.Z`, Z > 0) skip milestones.
 - **Design-system refresh** — extract shared primitives once the visual language settles.
 
 > **Planned cycle sequence** (prose intent, not yet milestones — open one at a time
-> per the Session protocol): `v0.9.0` Test & CI (current) → `v0.10.0` Referral engine
-> → `v0.11.0` Net Worth Tracker → `v0.12.0` Income & Expense Tracker → `v0.13.0`
-> Backlog cleanup. The Freemium tier slots in wherever entitlement/rewards work
-> forces it (likely alongside the referral engine).
+> per the Session protocol): `v0.9.0` Test & CI ✅ shipped → `v0.10.0` Referral
+> engine (next) → `v0.11.0` Net Worth Tracker → `v0.12.0` Income & Expense Tracker
+> → `v0.13.0` Backlog cleanup. The Freemium tier slots in wherever
+> entitlement/rewards work forces it (likely alongside the referral engine).
 
 > Format going forward: one line per release — `<date> · vX.Y.Z · <summary>` →
 > link to `docs/releases/`. Detail lives in the release file, not here. (Entries
@@ -93,6 +96,11 @@ See `DECISIONS.md` § "Decisions still to make" for the open questions these car
 
 > Durable completion notes, newest first. Deeper rationale → `DECISIONS.md`
 > (linked per entry); per-task history lives on the board.
+
+### 2026-06-20 — Phase 9 · `v0.9.0` — Test & CI foundation
+- pytest + vitest harnesses, high-risk coverage (auth #29, IDOR #28, migration
+  #30), ESLint + Prettier (#41), a CI gate with a Postgres service (#27), and
+  leaked-credential rotation (#16). → [v0.9.0](docs/releases/v0.9.0.md).
 
 ### 2026-06-14 — `v0.8.1` — post-launch patch (cold-start hardening + legal finalization)
 - **httpClient hardened** against network failures, timeouts, and non-JSON
