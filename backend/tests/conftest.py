@@ -42,7 +42,19 @@ from app import create_app  # noqa: E402
 import db_init  # noqa: E402
 
 # User-scoped tables wiped between DB tests so rows never leak across tests.
-_USER_TABLES = ("password_reset_tokens", "saved_calculators", "users")
+# (TRUNCATE ... CASCADE on users already reaches the nw_* tables via their FK,
+# but listing them explicitly keeps RESTART IDENTITY deterministic and the
+# intent obvious.)
+_USER_TABLES = (
+    "password_reset_tokens",
+    "saved_calculators",
+    "nw_assets",
+    "nw_liabilities",
+    "nw_investment_holdings",
+    "nw_real_estate",
+    "nw_snapshots",
+    "users",
+)
 
 
 @pytest.fixture
