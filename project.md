@@ -17,7 +17,9 @@ expanding from calculators into trackers and a freemium tier.
 ## Current phase
 
 **Phase 9 — Test & CI foundation** shipped as `v0.9.0` (2026-06-20). Next up:
-Phase 10 — Referral engine (`v0.10.0`), not yet opened as a milestone.
+Phase 10 — Net Worth Tracker (`v0.10.0`), not yet opened as a milestone. (Roadmap
+resequenced 2026-06-21 — trackers and a go-live review now come before the referral
+engine; see § Future.)
 
 ## Current cycle
 
@@ -25,7 +27,7 @@ Phase 10 — Referral engine (`v0.10.0`), not yet opened as a milestone.
 > it for at-a-glance reading in the editor; if they disagree, the milestone wins.
 
 **Between cycles.** `v0.9.0` — Test & CI foundation shipped (2026-06-20); no
-milestone is currently open. The next cycle is `v0.10.0` — Referral engine (see
+milestone is currently open. The next cycle is `v0.10.0` — Net Worth Tracker (see
 § Future) — open its milestone and promote its issues when starting it. `v0.8.1`
 live in production at www.spreadsheetmillionaire.com · backlog on the
 [Project board](https://github.com/users/Nagoyashi/projects) ↗
@@ -63,28 +65,49 @@ issues are the cycle's scope. Patches (`vX.Y.Z`, Z > 0) skip milestones.
 
 ### ⬜ Future (prose only — not issues yet)
 
-- **Re-enable the 8 flag-gated calculators** one at a time as build-in-public
-  patches: Cash Flow Sankey, Investment Fee Impact, Inflation, Dividend,
-  Withdrawal Plan, Mortgage, Coast FIRE, Barista FIRE.
-- **Referral engine** *(next cycle — targeted at `v0.10.0`)* — referral codes/links,
-  attribution + reward tracking, abuse/fraud guards, three-layer gating (UI / route /
-  DB), and its own DB tables + API namespace. Likely interplays with the Freemium
-  tier (rewards as entitlement grants). Promote to a milestone with issues when
-  v0.9.0 ships; design decisions to be recorded in `DECISIONS.md` first.
-- **Net Worth Tracker** *(targeted at `v0.11.0`)* — own pages, API namespace, DB tables.
-- **Income & Expense Tracker** *(targeted at `v0.12.0`)* — own pages, API namespace, DB tables.
-- **Backlog cleanup release** *(targeted at `v0.13.0`)* — sweep accumulated board
-  backlog (tech debt, bugs, small gaps) into one consolidation cycle after the
-  trackers land. Scope drawn from the board at the time, not pre-listed here.
+> Resequenced 2026-06-21 (proposal triage): ship the two trackers and a go-live
+> review **before** the referral engine, and consolidate cleanup + security into a
+> single phase. Trackers establish patterns and real user value first; the referral
+> engine lands last so its rewards/fraud shape fits the launch posture decided in
+> the product review.
+
+- **Net Worth Tracker** *(next cycle — targeted at `v0.10.0`)* — first of two
+  trackers (teased in Phase 4). Own pages, API namespace, DB tables; every saved
+  shape carries `version: 1` + a migration path. Patterns set here inform the
+  Income & Expense Tracker. Promote to a milestone with issues when starting it.
+- **Income & Expense Tracker** *(targeted at `v0.11.0`)* — second tracker, reusing
+  the Net Worth patterns. Own pages, API namespace, DB tables.
+- **Backlog cleanup + Security hardening** *(targeted at `v0.12.0`)* — one
+  consolidation cycle after the trackers land: sweep accumulated board backlog
+  (tech debt, bugs, small gaps) **and** harden security for finance-app credibility
+  (input-validation hardening, API auth tightening, data-handling review). Scope
+  drawn from the board at the time, not pre-listed here.
+- **Product review & go-live readiness** *(targeted at `v0.13.0`)* — full product
+  audit before committing to a launch shape: what's working/missing, feedback
+  synthesis, competitive landscape, and the launch-posture decision (freemium vs.
+  free-only, positioning). Output: clarity on go-live + the v0.14.0+ roadmap.
+- **Referral engine** *(targeted at `v0.14.0`)* — referral codes/links, attribution
+  + reward tracking, abuse/fraud guards, three-layer gating (UI / route / DB), and
+  its own DB tables + API namespace. Shape depends on the product-review outcome
+  (rewards as Freemium entitlement grants); design decisions recorded in
+  `DECISIONS.md` first.
+- **Re-enable the 8 flag-gated calculators** *(un-slotted backlog — [#91](https://github.com/Nagoyashi/spreadsheet-millionaire/issues/91))*
+  one at a time as build-in-public patches: Cash Flow Sankey, Investment Fee Impact,
+  Inflation, Dividend, Withdrawal Plan, Mortgage, Coast FIRE, Barista FIRE. Slot
+  into a cycle when launch sequencing is decided.
+- **Discovery, analytics & support tooling** *(un-slotted backlog — [#89](https://github.com/Nagoyashi/spreadsheet-millionaire/issues/89))*
+  — usage analytics, bug-reporting UI, customer feedback loop, incident-log tooling,
+  marketing funnel. Likely informs / overlaps the product review (`v0.13.0`).
 - **Freemium tier** — tier/entitlement model + three-layer gating (UI / route / DB).
 - **Settings expansion** — currency preference, i18n, email-verification-on-change.
 - **Design-system refresh** — extract shared primitives once the visual language settles.
 
 > **Planned cycle sequence** (prose intent, not yet milestones — open one at a time
-> per the Session protocol): `v0.9.0` Test & CI ✅ shipped → `v0.10.0` Referral
-> engine (next) → `v0.11.0` Net Worth Tracker → `v0.12.0` Income & Expense Tracker
-> → `v0.13.0` Backlog cleanup. The Freemium tier slots in wherever
-> entitlement/rewards work forces it (likely alongside the referral engine).
+> per the Session protocol): `v0.9.0` Test & CI ✅ shipped → `v0.10.0` Net Worth
+> Tracker (next) → `v0.11.0` Income & Expense Tracker → `v0.12.0` Backlog cleanup +
+> Security hardening → `v0.13.0` Product review & go-live readiness → `v0.14.0`
+> Referral engine. The Freemium tier slots in wherever entitlement/rewards work
+> forces it (likely alongside the referral engine, after the product review).
 
 > Format going forward: one line per release — `<date> · vX.Y.Z · <summary>` →
 > link to `docs/releases/`. Detail lives in the release file, not here. (Entries
