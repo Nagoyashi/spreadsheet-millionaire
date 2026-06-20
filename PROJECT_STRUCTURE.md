@@ -61,7 +61,8 @@ backend/
 └── tests/
     ├── conftest.py             # Hermetic test env (forced before import) + app/client/get_csrf_token fixtures; db/auth_client skip without TEST_DATABASE_URL
     ├── test_health.py          # GET /api/health smoke test (no DB)
-    └── test_db_smoke.py        # DB-path wiring proof (register + truncation isolation); skips without TEST_DATABASE_URL, runs in CI
+    ├── test_db_smoke.py        # DB-path wiring proof (register + truncation isolation); skips without TEST_DATABASE_URL, runs in CI
+    └── test_auth.py            # End-to-end auth-flow tests (register/login/logout/forgot+reset/delete/change-pw/change-email); email mocked, DB-backed
 ```
 
 ### Backend .env variables
