@@ -47,14 +47,17 @@ backend/
 ├── models/
 │   ├── user.py                 # User model — bcrypt hashing, create/get/delete, update_password/update_email
 │   ├── calculator.py           # SavedCalculator model — all queries include AND user_id = %s
+│   ├── net_worth.py            # Net Worth data-access — generic NetWorthTable CRUD (assets/liabilities/investments/real-estate) + SQL summary + snapshots; all queries filter user_id
 │   └── password_reset.py       # PasswordResetToken model — stores only the SHA-256 hash; create/find-valid-by-hash/mark-used/invalidate-all-for-user/delete-expired
 ├── routes/
 │   ├── auth.py                 # /api/auth/* — register (+welcome email), login, logout, status, delete account, csrf-token, forgot-password, reset-password, change-password, change-email
 │   ├── calculators.py          # /api/calculators/* — CRUD for saved calculations
+│   ├── net_worth.py            # /api/net-worth/* — CRUD for assets/liabilities/investments/real-estate + /summary + /snapshots (login_required, CSRF, rate-limited writes)
 │   └── health.py               # GET /api/health — liveness probe, rate-limit exempt, no DB/Redis
 ├── schemas/
 │   ├── user_schema.py          # Shared validate_password (8+ chars, 1 letter, 1 number) + Register/Login/ResetPassword/ChangePassword/ChangeEmail schemas
-│   └── calculator_schema.py    # Imports VALID_CALC_TYPES from calc_types.py
+│   ├── calculator_schema.py    # Imports VALID_CALC_TYPES from calc_types.py
+│   └── net_worth_schema.py     # Asset/Liability/Investment/RealEstate/Snapshot schemas — enums from net_worth_types.py
 ├── services/
 │   └── email.py                # Resend wrapper — send_email + send_welcome_email + send_password_reset_email; disabled (no-op) without RESEND_API_KEY
 ├── utils/

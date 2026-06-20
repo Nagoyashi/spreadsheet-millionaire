@@ -73,10 +73,12 @@ def create_app() -> Flask:
     from routes.auth        import bp as auth_bp
     from routes.calculators import bp as calculators_bp
     from routes.health      import bp as health_bp
+    from routes.net_worth   import bp as net_worth_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(calculators_bp)
     app.register_blueprint(health_bp)
+    app.register_blueprint(net_worth_bp)
 
     # ── Global error handlers ─────────────────────────────────────────────────
     @app.errorhandler(404)
