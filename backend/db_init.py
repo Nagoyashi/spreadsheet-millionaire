@@ -34,6 +34,7 @@ from net_worth_types import (
     ASSET_CLASSES,
     PROPERTY_TYPES,
 )
+from income_expense_types import TRANSACTION_TYPES, ALL_CATEGORIES
 
 
 _CONSTRAINT_NAME = "saved_calculators_calc_type_check"
@@ -339,6 +340,46 @@ def init_db() -> None:
                 "nw_real_estate",
             ):
                 _attach_updated_at_trigger(cur, _table)
+
+            # ================================================================ #
+            # Income & Expense tracker — one normalised ie_transactions stream.
+            #   See DECISIONS.md § "Income & Expense Tracker". Sign is carried by
+            #   `type` (amount > 0). `category` CHECK accepts the income∪expense
+            #   union; the schema validates per-type. User-scoped (FK + indexes);
+            #   the (user_id, occurred_on) index serves the month/year filters
+            #   and the summary aggregation.
+            # ================================================================ #
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS ie_transactions (
+                    id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                    user_id     BIGINT        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    type        TEXT          NOT NULL,
+                    category    TEXT          NOT NULL,
+                    amount      NUMERIC(14,2) NOT NULL CHECK (amount > 0),
+                    occurred_on DATE          NOT NULL,
+                    note        TEXT,
+                    created_at  TIMESTAMPTZ   NOT NULL DEFAULT now(),
+                    updated_at  TIMESTAMPTZ   NOT NULL DEFAULT now()
+                )
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_ie_transactions_user_id
+                ON ie_transactions(user_id)
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_ie_transactions_user_date
+                ON ie_transactions(user_id, occurred_on)
+            """)
+
+            _rebuild_check(
+                cur, "ie_transactions", "ie_transactions_type_check",
+                _in_check("type", TRANSACTION_TYPES),
+            )
+            _rebuild_check(
+                cur, "ie_transactions", "ie_transactions_category_check",
+                _in_check("category", ALL_CATEGORIES),
+            )
+            _attach_updated_at_trigger(cur, "ie_transactions")
 
         conn.commit()
 
