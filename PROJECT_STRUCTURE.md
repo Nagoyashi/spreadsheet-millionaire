@@ -98,6 +98,7 @@ frontend/
     ├── index.css               # Tailwind directives + base styles
     ├── constants.js            # Shared storage key generators (CALC_STORAGE_KEY, FAVOURITES_KEY)
     ├── upcomingFeatures.js     # UPCOMING_FEATURES tracker teasers (Net Worth, Income/Expense) — deliberately NOT in the calculator registry; raw source for trackers.js
+    ├── setupTests.js           # vitest setup — jest-dom matchers + a ResizeObserver stub (for recharts in jsdom); wired via vite.config test.setupFiles
     ├── featureFlags.js         # Build-time flags. NET_WORTH_ENABLED (env VITE_NETWORTH_ENABLED, default import.meta.env.DEV) — tracker ships dark in prod
     ├── trackers.js             # Published-tracker surface: LIVE_TRACKERS + VISIBLE_UPCOMING (derived from the flag); every nav/grid consumer derives from these, never re-filters UPCOMING_FEATURES
     ├── api/
@@ -138,7 +139,9 @@ frontend/
     │   │   ├── CategoryManager.jsx        # Generic add/edit form + table for one category; driven by a categories.js config
     │   │   ├── Dashboard.jsx              # Overview tab — recharts allocation pie + category bar + category cards + net-worth-over-time line + "take snapshot"
     │   │   ├── managerHelpers.js          # Pure helpers (buildPayload/canSubmit/initialForm/formFromRow/formatCell)
-    │   │   └── managerHelpers.test.js     # vitest unit tests for the helpers
+    │   │   ├── managerHelpers.test.js     # vitest unit tests for the helpers
+    │   │   ├── CategoryManager.test.jsx   # RTL — render/add/edit/delete/validation
+    │   │   └── Dashboard.test.jsx         # RTL — summary figures, chart sections, snapshot action
     │   ├── CalculatorSidebar.jsx          # Grouped collapsible nav + Trackers (Net Worth) + saved calcs + UserFooter
     │   ├── CalculatorHeader.jsx           # Header: title, save button, status pill, mobile menu, "New" button
     │   ├── CalculatorExplainer.jsx        # ← "What is X?" gradient banner, driven by registry data
@@ -171,7 +174,8 @@ frontend/
         ├── CalculatorPage.jsx     # /app/calculator/:type — orchestrator; renders explainer + lazy calc inside Suspense
         ├── LandingPage.jsx        # /app — the *in-app* landing: calculator grid + filter tabs + favourites + coming-soon teaser cards. Collapsible sidebar drawer below lg (local mobileSidebarOpen state)
         ├── ComingSoonPage.jsx     # /app/coming-soon/:slug — build-in-public teaser page for an upcoming tracker; unknown slug redirects to /app like an unknown calc type
-        ├── WealthPage.jsx         # /app/net-worth (auth-guarded) — Net Worth tracker: sticky NW/assets/liabilities bar + tabs + Overview summary (category panels #106, dashboard #107)
+        ├── WealthPage.jsx         # /app/net-worth (auth-guarded) — Net Worth tracker: sticky NW/assets/liabilities bar + tabs + Overview dashboard + category panels
+        ├── WealthPage.test.jsx    # RTL — sticky summary, default Overview, tab switch renders the category manager
         ├── LoginPage.jsx          # Thin wrapper around AuthForm (+ "Forgot password?" link)
         ├── RegisterPage.jsx       # Thin wrapper around AuthForm
         ├── ForgotPasswordPage.jsx # /forgot-password — email field; always shows the same neutral "check your inbox" state
