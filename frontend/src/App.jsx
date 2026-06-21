@@ -15,6 +15,7 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import SettingsPage from './pages/SettingsPage'
 import WealthPage from './pages/WealthPage'
+import { NET_WORTH_ENABLED } from './featureFlags'
 
 // Authenticated users hitting a guest-only door (login/register) bounce into the
 // app, not the marketing page — they're already past the front door.
@@ -86,9 +87,16 @@ export default function App() {
         <Route
           path="/app/net-worth"
           element={
-            <RequireAuth isAuthenticated={auth.isAuthenticated}>
-              <WealthPage auth={auth} />
-            </RequireAuth>
+            // Ships dark: when the flag is off (production), the tracker is not
+            // reachable — fall back to its "coming soon" teaser. Enabled in
+            // dev/staging. See featureFlags.js / DECISIONS.md.
+            NET_WORTH_ENABLED ? (
+              <RequireAuth isAuthenticated={auth.isAuthenticated}>
+                <WealthPage auth={auth} />
+              </RequireAuth>
+            ) : (
+              <Navigate to="/app/coming-soon/net-worth" replace />
+            )
           }
         />
         <Route

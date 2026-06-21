@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Home, X, ChevronDown, Wallet } from 'lucide-react'
+import { Home, X, ChevronDown } from 'lucide-react'
 import { PUBLISHED_CALCULATORS, CATEGORIES } from '../calculators/registry'
-import { UPCOMING_FEATURES } from '../upcomingFeatures'
+import { LIVE_TRACKERS, VISIBLE_UPCOMING } from '../trackers'
 import SavedCalculationsSidebar from './SavedCalculationsSidebar'
 import UserFooter from './UserFooter'
 
@@ -102,32 +102,36 @@ export default function CalculatorSidebar({
           )
         })}
 
-        {/* Trackers — shipped tracker features (distinct from calculators and
-            from the still-upcoming teasers below). Net Worth is auth-gated; the
-            route bounces anonymous users to login. */}
-        <div className="mt-3 pt-3 border-t border-white/10">
-          <p className="px-3 mb-1 text-xs font-semibold uppercase tracking-wider text-gray-600">
-            Trackers
-          </p>
-          <Link
-            to="/app/net-worth"
-            className="flex items-center gap-2.5 px-3 py-2.5 sm:py-2 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-white/10 transition"
-          >
-            <Wallet className="w-4 h-4 shrink-0" />
-            <span className="truncate">Net Worth</span>
-          </Link>
-        </div>
+        {/* Trackers — live (revealed) tracker features, from trackers.js.
+            Empty in production while Net Worth ships dark, so the section hides
+            itself entirely. */}
+        {LIVE_TRACKERS.length > 0 && (
+          <div className="mt-3 pt-3 border-t border-white/10">
+            <p className="px-3 mb-1 text-xs font-semibold uppercase tracking-wider text-gray-600">
+              Trackers
+            </p>
+            {LIVE_TRACKERS.map(({ slug, label, Icon, to }) => (
+              <Link
+                key={slug}
+                to={to}
+                className="flex items-center gap-2.5 px-3 py-2.5 sm:py-2 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-white/10 transition"
+              >
+                <Icon className="w-4 h-4 shrink-0" />
+                <span className="truncate">{label}</span>
+              </Link>
+            ))}
+          </div>
+        )}
 
-        {/* Coming soon — teasers for upcoming trackers. Deliberately muted and
-            badged so they don't read as working calculators. Sourced from
-            upcomingFeatures.js, NOT the calculator registry. Net Worth has
-            shipped (see Trackers above), so it's filtered out here. */}
-        <div className="mt-3 pt-3 border-t border-white/10">
-          <p className="px-3 mb-1 text-xs font-semibold uppercase tracking-wider text-gray-600">
-            Coming soon
-          </p>
-          {UPCOMING_FEATURES.filter(({ slug }) => slug !== 'net-worth').map(
-            ({ slug, label, Icon }) => (
+        {/* Coming soon — teasers for not-yet-live trackers (VISIBLE_UPCOMING
+            already excludes anything in LIVE_TRACKERS). Deliberately muted and
+            badged so they don't read as working calculators. */}
+        {VISIBLE_UPCOMING.length > 0 && (
+          <div className="mt-3 pt-3 border-t border-white/10">
+            <p className="px-3 mb-1 text-xs font-semibold uppercase tracking-wider text-gray-600">
+              Coming soon
+            </p>
+            {VISIBLE_UPCOMING.map(({ slug, label, Icon }) => (
               <Link
                 key={slug}
                 to={`/app/coming-soon/${slug}`}
@@ -141,9 +145,9 @@ export default function CalculatorSidebar({
                   Soon
                 </span>
               </Link>
-            )
-          )}
-        </div>
+            ))}
+          </div>
+        )}
       </nav>
 
       {/* Saved calculations */}
