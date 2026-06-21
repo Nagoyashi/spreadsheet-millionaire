@@ -1,6 +1,6 @@
-import { Wallet } from 'lucide-react'
+import { Wallet, ArrowRightLeft } from 'lucide-react'
 import { UPCOMING_FEATURES } from './upcomingFeatures'
-import { NET_WORTH_ENABLED } from './featureFlags'
+import { NET_WORTH_ENABLED, INCOME_EXPENSE_ENABLED } from './featureFlags'
 
 // The published-tracker surface. Mirrors the calculator registry's
 // published/coming-soon split (hard rule #3 spirit): every consumer derives
@@ -15,6 +15,16 @@ import { NET_WORTH_ENABLED } from './featureFlags'
 export const LIVE_TRACKERS = [
   ...(NET_WORTH_ENABLED
     ? [{ slug: 'net-worth', label: 'Net Worth', Icon: Wallet, to: '/app/net-worth' }]
+    : []),
+  ...(INCOME_EXPENSE_ENABLED
+    ? [
+        {
+          slug: 'income-expenses',
+          label: 'Income & Expenses',
+          Icon: ArrowRightLeft,
+          to: '/app/income-expenses',
+        },
+      ]
     : []),
 ]
 
