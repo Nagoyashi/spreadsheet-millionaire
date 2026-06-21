@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { BarChart2, ArrowRight, Star, Menu, X } from 'lucide-react'
 import { PUBLISHED_CALCULATORS, CATEGORIES } from '../calculators/registry'
 import { LIVE_TRACKERS, VISIBLE_UPCOMING } from '../trackers'
 import { useFavourites } from '../hooks/useFavourites'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import UserFooter from '../components/UserFooter'
+import AppFooter from '../components/AppFooter'
 
 // ─── Small toast for unauthenticated star attempt ─────────────────────────────
 function AuthToast({ visible }) {
@@ -28,9 +29,9 @@ function LandingSidebar({ auth, navigate, onClose }) {
   return (
     <aside className="w-64 shrink-0 bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 flex flex-col h-full">
       <div className="px-6 py-5 border-b border-white/10 flex items-center justify-between">
-        <span className="text-xl font-bold text-white tracking-tight">
+        <Link to="/" className="text-xl font-bold text-white tracking-tight">
           Spreadsheet<span className="text-amber-400">Millionaire</span>
-        </span>
+        </Link>
         {onClose && (
           <button
             className="lg:hidden text-gray-400 hover:text-white"
@@ -423,6 +424,8 @@ export default function LandingPage({ auth }) {
             </div>
           )}
         </main>
+
+        <AppFooter />
       </div>
 
       <AuthToast visible={showAuthToast} />

@@ -151,6 +151,7 @@ frontend/
     │   │   ├── incomeExpenseOptions.js    # TYPE_OPTIONS + per-type CATEGORY_OPTIONS (values mirror backend income_expense_types.py)
     │   │   ├── TransactionsPanel.jsx      # Year/month/type filters + table + add/edit form (category options depend on type)
     │   │   └── CashflowDashboard.jsx      # Overview tab — recharts: summary cards + savings rate, monthly income-vs-expense bar, spending-by-category pie, year selector
+    │   ├── AppFooter.jsx                  # Light-theme legal footer (Privacy/Terms/Imprint/Source) for the in-app surface — brand links to marketing home
     │   ├── CalculatorSidebar.jsx          # Grouped collapsible nav + Trackers (live, flag-gated) + saved calcs + UserFooter
     │   ├── CalculatorHeader.jsx           # Header: title, save button, status pill, mobile menu, "New" button
     │   ├── CalculatorExplainer.jsx        # ← "What is X?" gradient banner, driven by registry data
