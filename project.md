@@ -75,9 +75,13 @@ issues are the cycle's scope. Patches (`vX.Y.Z`, Z > 0) skip milestones.
 
 - **Income & Expense Tracker** *(next cycle — targeted at `v0.11.0`)* — second
   tracker, reusing the Net Worth patterns (normalised `*_` tables, generic CRUD
-  manager, recharts). Decide here whether the two trackers justify a shared
-  tracker registry. Own pages, API namespace, DB tables. Promote to a milestone
-  with issues when starting it.
+  manager, recharts). Own pages, API namespace, DB tables. Scope decided at
+  design (#119): one `ie_transactions` stream + monthly/yearly summary +
+  dashboard; **no shared tracker framework** (trackers stay ad-hoc, reusing
+  primitives). Promote to a milestone with issues when starting it.
+- **Recurring transactions & budgets** *(un-slotted backlog)* — deferred from the
+  Income & Expense cycle (`fintrackr_dev` had both); substantial enough for their
+  own cycle once the transaction tracker ships.
 - **Backlog cleanup + Security hardening** *(targeted at `v0.12.0`)* — one
   consolidation cycle after the trackers land: sweep accumulated board backlog
   (tech debt, bugs, small gaps) **and** harden security for finance-app credibility

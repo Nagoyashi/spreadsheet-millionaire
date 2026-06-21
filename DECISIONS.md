@@ -93,6 +93,23 @@
 
 **Why this shape:** It is the most boring choice that satisfies every hard rule. Reusing the `saved_calculators` storage/versioning/IDOR machinery means no new persistence patterns to review; the only genuinely new surface is the time-series page-level UI. Normalised tables and a tracker registry are both real options — they're just deferred to the point where a second tracker proves they're needed, exactly as the open question framed it.
 
+## Income & Expense Tracker — data model, API, and the tracker-registry decision
+
+**TL;DR:** The second tracker. A single normalised `ie_transactions` table (income/expense rows with a typed category), a `/api/income-expense/*` blueprint with a SQL-aggregated monthly/yearly summary, and a page that reuses the Net Worth UI primitives. **No shared "tracker framework" is extracted** — `trackers.js` stays the only shared abstraction. Ships dark behind its own flag. Recurring rules and budgets are **deferred**.
+
+**Decision (the v0.11.0 cycle; resolves the open "tracker architecture for tracker #2" question):**
+
+- **Tracker registry — keep it light; do NOT build a tracker framework.** With two trackers now real, the genuinely shared surface is small and already centralised in `frontend/src/trackers.js` (the published-tracker registry: `LIVE_TRACKERS` / `VISIBLE_UPCOMING`, flag-gated). Everything else the trackers "share" is *primitives*, not a framework: `httpClient.createApi`, the `use*Data` hook shape, `CategoryManager` (config-driven form+table), recharts, `NumInput`, `fmt()`. Their **data models and aggregations differ materially** (Net Worth = five resource tables + point-in-time snapshots; Income & Expense = one transaction stream + time-bucketed sums), so a forced shared registry/abstraction over pages, APIs, or hooks would over-couple two things that are only superficially alike. So: each tracker keeps its own page, `api/` module, and hook; they reuse primitives; `trackers.js` remains the single source for nav + routing-gate + ship-dark. **Revisit only if a third tracker appears** and the per-tracker boilerplate actually hurts.
+- **Storage — one normalised `ie_transactions` table.** `user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE` (+ index), `type TEXT CHECK IN ('income','expense')`, `category TEXT` (CHECK against a curated set), `amount NUMERIC(14,2) CHECK (amount > 0)` (sign is carried by `type`, not the number), `occurred_on DATE NOT NULL`, `note TEXT`, `created_at`/`updated_at TIMESTAMPTZ`. One row per transaction; a unified income+expense stream keeps the summary queries simple. (DDL-migrated, not a `version:1` blob — hard rule #5 is scoped to client blobs, as established for Net Worth.)
+- **Categories — curated enums, single-sourced.** `backend/income_expense_types.py` holds `TRANSACTION_TYPES`, `EXPENSE_CATEGORIES`, and `INCOME_CATEGORIES`, imported by the Marshmallow schema (`OneOf`) and the `db_init.py` CHECK — the `calc_types.py` / `net_worth_types.py` pattern. Curated (not free-text) so the by-category breakdown aggregates cleanly. Adding a category is one Python edit + `db_init.py`.
+- **API — `/api/income-expense/*`.** Transactions CRUD (list accepts `?year=&month=` filters pushed into SQL, user-scoped), plus `GET /summary` aggregating monthly + yearly income vs expense and spend-by-category in SQL (`SUM(...) ... GROUP BY ...`). All routes `@login_required`; writes CSRF-protected + rate-limited; **every query filters `user_id`** (hard rule #6); parameterised SQL only (#7).
+- **Frontend — own page at `/app/income-expenses`** (slug matches the existing teaser, so the coming-soon redirect keeps working when the flag is off): `src/api/incomeExpenseApi.js` + `useIncomeExpenseData`, tabs (Overview / Transactions), a transactions table with month/year + category filters and income-vs-expense styling, and a recharts dashboard (monthly/yearly cashflow + category breakdown). `CategoryManager` backs the add/edit *form*; the filtered list view is tracker-specific.
+- **Ships dark.** A second flag, `INCOME_EXPENSE_ENABLED` (`featureFlags.js`, env `VITE_INCOME_EXPENSE_ENABLED`, default `import.meta.env.DEV`), adds the tracker to `trackers.js` `LIVE_TRACKERS` behind the flag — production keeps the "Coming soon" teaser, exactly as Net Worth.
+
+**Deferred — recurring rules & budgets.** `fintrackr_dev`'s cashflow module had `recurring_rules` and `budgets`. They're **out of scope for v0.11.0**: a transaction stream + monthly/yearly summary + dashboard is a complete, useful tracker, and recurring/budgets are substantial features that deserve their own cycle (and depend on how this one's summary shapes up). Noted in `project.md` § Future. Revisit after the second tracker ships.
+
+**Credit & adaptation.** Modelled on the `fintrackr_dev` `cashflow/` module (`MonthlyView`/`YearlyView`/`TransactionForm`/`TransactionTable`/`TransactionFilters`/`SummaryCards`), adapted to this repo's rules exactly as Net Worth was — Postgres types, `httpClient`, centralised enums, `user_id`-on-every-query.
+
 ## Single source of truth for calc types (backend)
 
 **TL;DR:** `calc_types.py` is the only place `VALID_CALC_TYPES` is defined.
@@ -531,7 +548,7 @@ These are explicitly open and need to be settled before or during the work that 
 
 ### Tracker architecture — reuse calculator patterns, or new pattern?
 
-**Resolved for tracker #1** in the `v0.10.0` cycle — see § "Net Worth Tracker — data model, API, and architecture": shared primitives + save-flow shape, ad-hoc pages, no tracker registry, outside the calculator registry. **Still open for tracker #2:** whether the second tracker (Income & Expense, `v0.11.0`) justifies extracting a shared tracker registry, or stays ad-hoc. The first tracker has now defined the pattern; the second is where we find out whether the accident was a good one.
+**Resolved.** Tracker #1 (`v0.10.0`, see § "Net Worth Tracker"): shared primitives, ad-hoc pages, outside the calculator registry. Tracker #2 (`v0.11.0`, see § "Income & Expense Tracker — data model, API, and the tracker-registry decision"): **no shared tracker framework is extracted** — the trackers reuse UI primitives and keep `trackers.js` as the only shared abstraction (the published-tracker registry); per-tracker page/api/hook stay separate because their data models differ materially. Revisit only if a third tracker makes the per-tracker boilerplate hurt.
 
 ### i18n — when, how, and how deeply
 
