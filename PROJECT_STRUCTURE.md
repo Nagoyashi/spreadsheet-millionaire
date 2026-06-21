@@ -39,21 +39,25 @@ backend/
 ├── app.py                      # Flask app factory — ProxyFix, db teardown, limiter + Talisman, startup warnings
 ├── config.py                   # All config read from .env — exits if SECRET_KEY/DATABASE_URL invalid (and REDIS_URL in prod)
 ├── calc_types.py               # Single source of truth for VALID_CALC_TYPES (imported by schema + db_init)
+├── net_worth_types.py          # Single source of truth for Net Worth enum sets (ASSET_TYPES/LIABILITY_TYPES/ASSET_CLASSES/PROPERTY_TYPES) — imported by nw schema + db_init
 ├── db.py                       # Per-request psycopg connection on Flask g, closed on teardown (no in-process pool)
-├── db_init.py                  # Postgres schema creation + idempotent CHECK-constraint rebuild (users, saved_calculators, password_reset_tokens)
+├── db_init.py                  # Postgres schema creation + idempotent CHECK-constraint rebuild (users, saved_calculators, password_reset_tokens, nw_* Net Worth tables)
 ├── __pycache__/
 ├── venv/                       # Python virtual environment — never committed
 ├── models/
 │   ├── user.py                 # User model — bcrypt hashing, create/get/delete, update_password/update_email
 │   ├── calculator.py           # SavedCalculator model — all queries include AND user_id = %s
+│   ├── net_worth.py            # Net Worth data-access — generic NetWorthTable CRUD (assets/liabilities/investments/real-estate) + SQL summary + snapshots; all queries filter user_id
 │   └── password_reset.py       # PasswordResetToken model — stores only the SHA-256 hash; create/find-valid-by-hash/mark-used/invalidate-all-for-user/delete-expired
 ├── routes/
 │   ├── auth.py                 # /api/auth/* — register (+welcome email), login, logout, status, delete account, csrf-token, forgot-password, reset-password, change-password, change-email
 │   ├── calculators.py          # /api/calculators/* — CRUD for saved calculations
+│   ├── net_worth.py            # /api/net-worth/* — CRUD for assets/liabilities/investments/real-estate + /summary + /snapshots (login_required, CSRF, rate-limited writes)
 │   └── health.py               # GET /api/health — liveness probe, rate-limit exempt, no DB/Redis
 ├── schemas/
 │   ├── user_schema.py          # Shared validate_password (8+ chars, 1 letter, 1 number) + Register/Login/ResetPassword/ChangePassword/ChangeEmail schemas
-│   └── calculator_schema.py    # Imports VALID_CALC_TYPES from calc_types.py
+│   ├── calculator_schema.py    # Imports VALID_CALC_TYPES from calc_types.py
+│   └── net_worth_schema.py     # Asset/Liability/Investment/RealEstate/Snapshot schemas — enums from net_worth_types.py
 ├── services/
 │   └── email.py                # Resend wrapper — send_email + send_welcome_email + send_password_reset_email; disabled (no-op) without RESEND_API_KEY
 ├── utils/
@@ -93,11 +97,16 @@ frontend/
     ├── main.jsx                # React root mount
     ├── index.css               # Tailwind directives + base styles
     ├── constants.js            # Shared storage key generators (CALC_STORAGE_KEY, FAVOURITES_KEY)
-    ├── upcomingFeatures.js     # UPCOMING_FEATURES tracker teasers (Net Worth, Income/Expense) — deliberately NOT in the calculator registry; consumed only by the LandingPage grid + CalculatorSidebar "Coming soon" section
+    ├── upcomingFeatures.js     # UPCOMING_FEATURES tracker teasers (Net Worth, Income/Expense) — deliberately NOT in the calculator registry; raw source for trackers.js
+    ├── setupTests.js           # vitest setup — jest-dom matchers + a ResizeObserver stub (for recharts in jsdom); wired via vite.config test.setupFiles
+    ├── featureFlags.js         # Build-time flags. NET_WORTH_ENABLED (env VITE_NETWORTH_ENABLED, default import.meta.env.DEV) — tracker ships dark in prod
+    ├── trackers.js             # Published-tracker surface: LIVE_TRACKERS + VISIBLE_UPCOMING (derived from the flag); every nav/grid consumer derives from these, never re-filters UPCOMING_FEATURES
     ├── api/
     │   ├── httpClient.js       # Shared fetch wrapper. createApi(baseUrl) factory + central CSRF injection
     │   ├── authApi.js          # register / login / logout / deleteAccount / getStatus / fetchCsrfToken / forgotPassword / resetPassword / changePassword / changeEmail
-    │   └── calculatorApi.js    # getAll / create / update / remove
+    │   ├── calculatorApi.js    # getAll / create / update / remove
+    │   ├── netWorthApi.js      # /api/net-worth/* — assets/liabilities/investments/realEstate CRUD + getSummary + snapshots
+    │   └── netWorthApi.test.js # vitest — asserts each endpoint's verb + path + body wiring
     ├── utils/
     │   ├── format.js           # Shared fmt() — replaces 12 local copies, supports custom currency
     │   ├── format.test.js      # vitest unit tests for fmt() (compact ladder, currency, display ceiling)
@@ -125,7 +134,15 @@ frontend/
     │   │   ├── SaveNameModal.jsx
     │   │   ├── DeleteAccountModal.jsx     # Password-confirmed account deletion modal
     │   │   └── CalculatorSkeleton.jsx     # Loading skeleton for lazy calculator chunks
-    │   ├── CalculatorSidebar.jsx          # Grouped collapsible nav + saved calcs + UserFooter
+    │   ├── wealth/                        # Net Worth tracker components (consumed by WealthPage)
+    │   │   ├── categories.js              # Per-tab field/column configs + enum options (values mirror backend net_worth_types.py)
+    │   │   ├── CategoryManager.jsx        # Generic add/edit form + table for one category; driven by a categories.js config
+    │   │   ├── Dashboard.jsx              # Overview tab — recharts allocation pie + category bar + category cards + net-worth-over-time line + "take snapshot"
+    │   │   ├── managerHelpers.js          # Pure helpers (buildPayload/canSubmit/initialForm/formFromRow/formatCell)
+    │   │   ├── managerHelpers.test.js     # vitest unit tests for the helpers
+    │   │   ├── CategoryManager.test.jsx   # RTL — render/add/edit/delete/validation
+    │   │   └── Dashboard.test.jsx         # RTL — summary figures, chart sections, snapshot action
+    │   ├── CalculatorSidebar.jsx          # Grouped collapsible nav + Trackers (Net Worth) + saved calcs + UserFooter
     │   ├── CalculatorHeader.jsx           # Header: title, save button, status pill, mobile menu, "New" button
     │   ├── CalculatorExplainer.jsx        # ← "What is X?" gradient banner, driven by registry data
     │   ├── SavedCalculationsSidebar.jsx   # List of saved calcs with click-to-deselect on active item
@@ -135,6 +152,7 @@ frontend/
     ├── hooks/
     │   ├── useAuth.js                 # login / logout / register / deleteAccount + session rehydration
     │   ├── useCalculatorData.js       # Saved-calculations CRUD via API
+    │   ├── useNetWorthData.js         # Net Worth data layer — fetches resources + summary + snapshots; CRUD methods that refetch on success
     │   ├── useCalculatorInputs.js     # Input state plumbing (state + sync + onChange + version migration)
     │   ├── useSave.js                 # Save flow + status states. Strips version key before sending. Resets on type change.
     │   ├── useFavourites.js           # Per-user favourites via localStorage
@@ -156,6 +174,8 @@ frontend/
         ├── CalculatorPage.jsx     # /app/calculator/:type — orchestrator; renders explainer + lazy calc inside Suspense
         ├── LandingPage.jsx        # /app — the *in-app* landing: calculator grid + filter tabs + favourites + coming-soon teaser cards. Collapsible sidebar drawer below lg (local mobileSidebarOpen state)
         ├── ComingSoonPage.jsx     # /app/coming-soon/:slug — build-in-public teaser page for an upcoming tracker; unknown slug redirects to /app like an unknown calc type
+        ├── WealthPage.jsx         # /app/net-worth (auth-guarded) — Net Worth tracker: sticky NW/assets/liabilities bar + tabs + Overview dashboard + category panels
+        ├── WealthPage.test.jsx    # RTL — sticky summary, default Overview, tab switch renders the category manager
         ├── LoginPage.jsx          # Thin wrapper around AuthForm (+ "Forgot password?" link)
         ├── RegisterPage.jsx       # Thin wrapper around AuthForm
         ├── ForgotPasswordPage.jsx # /forgot-password — email field; always shows the same neutral "check your inbox" state

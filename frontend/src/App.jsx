@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth'
 import { authApi } from './api/authApi'
 import MarketingLandingPage from './pages/MarketingLandingPage'
@@ -14,6 +14,8 @@ import RegisterPage from './pages/RegisterPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import SettingsPage from './pages/SettingsPage'
+import WealthPage from './pages/WealthPage'
+import { NET_WORTH_ENABLED } from './featureFlags'
 
 // Authenticated users hitting a guest-only door (login/register) bounce into the
 // app, not the marketing page — they're already past the front door.
@@ -23,7 +25,12 @@ function RequireGuest({ isAuthenticated, children }) {
 }
 
 function RequireAuth({ isAuthenticated, children }) {
-  if (!isAuthenticated) return <Navigate to="/login" replace state={{ from: '/app/settings' }} />
+  // Capture the actual path so login can bounce the user back where they were
+  // headed (settings, the net-worth tracker, …), not a hardcoded destination.
+  const location = useLocation()
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace state={{ from: location.pathname }} />
+  }
   return children
 }
 
@@ -77,6 +84,21 @@ export default function App() {
         <Route path="/app" element={<LandingPage auth={auth} />} />
         <Route path="/app/calculator/:type" element={<CalculatorPage auth={auth} />} />
         <Route path="/app/coming-soon/:slug" element={<ComingSoonPage />} />
+        <Route
+          path="/app/net-worth"
+          element={
+            // Ships dark: when the flag is off (production), the tracker is not
+            // reachable — fall back to its "coming soon" teaser. Enabled in
+            // dev/staging. See featureFlags.js / DECISIONS.md.
+            NET_WORTH_ENABLED ? (
+              <RequireAuth isAuthenticated={auth.isAuthenticated}>
+                <WealthPage auth={auth} />
+              </RequireAuth>
+            ) : (
+              <Navigate to="/app/coming-soon/net-worth" replace />
+            )
+          }
+        />
         <Route
           path="/app/settings"
           element={

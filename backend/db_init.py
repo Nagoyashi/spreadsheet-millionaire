@@ -28,6 +28,12 @@ from psycopg import sql
 
 from config import Config
 from calc_types import VALID_CALC_TYPES
+from net_worth_types import (
+    ASSET_TYPES,
+    LIABILITY_TYPES,
+    ASSET_CLASSES,
+    PROPERTY_TYPES,
+)
 
 
 _CONSTRAINT_NAME = "saved_calculators_calc_type_check"
@@ -37,6 +43,51 @@ _CONSTRAINT_NAME = "saved_calculators_calc_type_check"
 _CALC_TYPE_CHECK = sql.SQL("calc_type IN ({})").format(
     sql.SQL(", ").join(sql.Literal(t) for t in VALID_CALC_TYPES)
 )
+
+
+def _in_check(column: str, values) -> sql.Composed:
+    """Build an injection-safe `column IN ('a', 'b', ...)` CHECK expression.
+
+    Values come from net_worth_types.py and are composed with sql.Literal —
+    DDL can't take %s bind params, and sql.Literal is the injection-safe
+    equivalent (same approach as _CALC_TYPE_CHECK).
+    """
+    return sql.SQL("{} IN ({})").format(
+        sql.Identifier(column),
+        sql.SQL(", ").join(sql.Literal(v) for v in values),
+    )
+
+
+def _rebuild_check(cur, table: str, constraint: str, check_expr: sql.Composed) -> None:
+    """Drop-and-recreate a named CHECK so the allowed set always matches the
+    Python source. Idempotent and ALTER-in-place — no table rebuild."""
+    cur.execute(
+        sql.SQL("ALTER TABLE {} DROP CONSTRAINT IF EXISTS {}").format(
+            sql.Identifier(table), sql.Identifier(constraint)
+        )
+    )
+    cur.execute(
+        sql.SQL("ALTER TABLE {} ADD CONSTRAINT {} CHECK ({})").format(
+            sql.Identifier(table), sql.Identifier(constraint), check_expr
+        )
+    )
+
+
+def _attach_updated_at_trigger(cur, table: str) -> None:
+    """Attach the shared set_updated_at() BEFORE UPDATE trigger to a table.
+    Assumes set_updated_at() already exists. Idempotent (DROP IF EXISTS + CREATE)."""
+    trigger = f"trg_{table}_updated_at"
+    cur.execute(
+        sql.SQL("DROP TRIGGER IF EXISTS {} ON {}").format(
+            sql.Identifier(trigger), sql.Identifier(table)
+        )
+    )
+    cur.execute(
+        sql.SQL(
+            "CREATE TRIGGER {} BEFORE UPDATE ON {} "
+            "FOR EACH ROW EXECUTE FUNCTION set_updated_at()"
+        ).format(sql.Identifier(trigger), sql.Identifier(table))
+    )
 
 
 def init_db() -> None:
@@ -145,6 +196,149 @@ def init_db() -> None:
                 FOR EACH ROW
                 EXECUTE FUNCTION set_updated_at()
             """)
+
+            # ================================================================ #
+            # Net Worth tracker — normalised nw_* tables.
+            #   See DECISIONS.md § "Net Worth Tracker". Money is NUMERIC(14,2)
+            #   (never float); rates NUMERIC(6,3); investment quantity
+            #   NUMERIC(20,8) for fractional crypto. Every table is user-scoped
+            #   (user_id FK ON DELETE CASCADE + an index); type enums come from
+            #   net_worth_types.py and are enforced by named CHECK constraints
+            #   rebuilt below. updated_at is maintained by the shared trigger.
+            # ================================================================ #
+
+            # ---- nw_assets (liquid assets + 'custom' collectibles) ---------- #
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS nw_assets (
+                    id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                    user_id       BIGINT        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    asset_type    TEXT          NOT NULL,
+                    name          TEXT          NOT NULL,
+                    current_value NUMERIC(14,2) NOT NULL CHECK (current_value >= 0),
+                    cost_basis    NUMERIC(14,2) NOT NULL DEFAULT 0 CHECK (cost_basis >= 0),
+                    notes         TEXT,
+                    created_at    TIMESTAMPTZ   NOT NULL DEFAULT now(),
+                    updated_at    TIMESTAMPTZ   NOT NULL DEFAULT now()
+                )
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_nw_assets_user_id
+                ON nw_assets(user_id)
+            """)
+
+            # ---- nw_liabilities (non-mortgage debts) ------------------------ #
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS nw_liabilities (
+                    id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                    user_id         BIGINT        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    liability_type  TEXT          NOT NULL,
+                    name            TEXT          NOT NULL,
+                    current_balance NUMERIC(14,2) NOT NULL CHECK (current_balance >= 0),
+                    interest_rate   NUMERIC(6,3)  NOT NULL DEFAULT 0 CHECK (interest_rate >= 0),
+                    minimum_payment NUMERIC(14,2) NOT NULL DEFAULT 0 CHECK (minimum_payment >= 0),
+                    due_date        DATE,
+                    notes           TEXT,
+                    created_at      TIMESTAMPTZ   NOT NULL DEFAULT now(),
+                    updated_at      TIMESTAMPTZ   NOT NULL DEFAULT now()
+                )
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_nw_liabilities_user_id
+                ON nw_liabilities(user_id)
+            """)
+
+            # ---- nw_investment_holdings ------------------------------------- #
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS nw_investment_holdings (
+                    id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                    user_id       BIGINT        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    ticker        TEXT          NOT NULL,
+                    quantity      NUMERIC(20,8) NOT NULL CHECK (quantity > 0),
+                    cost_basis    NUMERIC(14,2) NOT NULL CHECK (cost_basis >= 0),
+                    current_value NUMERIC(14,2) NOT NULL DEFAULT 0 CHECK (current_value >= 0),
+                    asset_class   TEXT          NOT NULL,
+                    region        TEXT,
+                    purchase_date DATE,
+                    notes         TEXT,
+                    created_at    TIMESTAMPTZ   NOT NULL DEFAULT now(),
+                    updated_at    TIMESTAMPTZ   NOT NULL DEFAULT now()
+                )
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_nw_investment_holdings_user_id
+                ON nw_investment_holdings(user_id)
+            """)
+
+            # ---- nw_real_estate (mortgages roll up to liabilities in /summary) #
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS nw_real_estate (
+                    id                     BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                    user_id                BIGINT        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    property_name          TEXT          NOT NULL,
+                    property_type          TEXT          NOT NULL,
+                    current_value          NUMERIC(14,2) NOT NULL CHECK (current_value >= 0),
+                    purchase_price         NUMERIC(14,2) NOT NULL DEFAULT 0 CHECK (purchase_price >= 0),
+                    purchase_date          DATE,
+                    mortgage_balance       NUMERIC(14,2) NOT NULL DEFAULT 0 CHECK (mortgage_balance >= 0),
+                    mortgage_interest_rate NUMERIC(6,3)  NOT NULL DEFAULT 0 CHECK (mortgage_interest_rate >= 0),
+                    mortgage_payment       NUMERIC(14,2) NOT NULL DEFAULT 0 CHECK (mortgage_payment >= 0),
+                    mortgage_term_years    INTEGER       CHECK (mortgage_term_years IS NULL OR mortgage_term_years >= 0),
+                    monthly_rent           NUMERIC(14,2) NOT NULL DEFAULT 0 CHECK (monthly_rent >= 0),
+                    address                TEXT,
+                    notes                  TEXT,
+                    created_at             TIMESTAMPTZ   NOT NULL DEFAULT now(),
+                    updated_at             TIMESTAMPTZ   NOT NULL DEFAULT now()
+                )
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_nw_real_estate_user_id
+                ON nw_real_estate(user_id)
+            """)
+
+            # ---- nw_snapshots (point-in-time history; no updated_at) --------- #
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS nw_snapshots (
+                    id                BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                    user_id           BIGINT        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    snapshot_date     DATE          NOT NULL,
+                    total_assets      NUMERIC(14,2) NOT NULL,
+                    total_liabilities NUMERIC(14,2) NOT NULL,
+                    net_worth         NUMERIC(14,2) NOT NULL,
+                    notes             TEXT,
+                    created_at        TIMESTAMPTZ   NOT NULL DEFAULT now()
+                )
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_nw_snapshots_user_id
+                ON nw_snapshots(user_id)
+            """)
+
+            # ---- type-enum CHECK constraints (rebuilt from net_worth_types) -- #
+            _rebuild_check(
+                cur, "nw_assets", "nw_assets_asset_type_check",
+                _in_check("asset_type", ASSET_TYPES),
+            )
+            _rebuild_check(
+                cur, "nw_liabilities", "nw_liabilities_liability_type_check",
+                _in_check("liability_type", LIABILITY_TYPES),
+            )
+            _rebuild_check(
+                cur, "nw_investment_holdings", "nw_investment_holdings_asset_class_check",
+                _in_check("asset_class", ASSET_CLASSES),
+            )
+            _rebuild_check(
+                cur, "nw_real_estate", "nw_real_estate_property_type_check",
+                _in_check("property_type", PROPERTY_TYPES),
+            )
+
+            # ---- updated_at triggers (snapshots are append-only, excluded) --- #
+            for _table in (
+                "nw_assets",
+                "nw_liabilities",
+                "nw_investment_holdings",
+                "nw_real_estate",
+            ):
+                _attach_updated_at_trigger(cur, _table)
 
         conn.commit()
 

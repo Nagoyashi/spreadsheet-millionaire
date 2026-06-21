@@ -56,6 +56,12 @@ def create_app() -> Flask:
         app,
         force_https=is_production,
         strict_transport_security=is_production,
+        # Talisman defaults this to True, which marks the session cookie Secure
+        # even in development. Browsers that don't treat http://localhost as a
+        # secure context (e.g. Safari) then refuse to store it, so the session —
+        # and CSRF token — never persists and login silently fails. Tie it to the
+        # environment: Secure in production (https), not in local http dev.
+        session_cookie_secure=is_production,
         content_security_policy=False,  # CSP managed separately if needed
         referrer_policy="strict-origin-when-cross-origin",
         frame_options="DENY",           # X-Frame-Options: DENY (clickjacking)
@@ -73,10 +79,12 @@ def create_app() -> Flask:
     from routes.auth        import bp as auth_bp
     from routes.calculators import bp as calculators_bp
     from routes.health      import bp as health_bp
+    from routes.net_worth   import bp as net_worth_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(calculators_bp)
     app.register_blueprint(health_bp)
+    app.register_blueprint(net_worth_bp)
 
     # ── Global error handlers ─────────────────────────────────────────────────
     @app.errorhandler(404)

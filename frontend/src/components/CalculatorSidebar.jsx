@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Home, X, ChevronDown } from 'lucide-react'
 import { PUBLISHED_CALCULATORS, CATEGORIES } from '../calculators/registry'
-import { UPCOMING_FEATURES } from '../upcomingFeatures'
+import { LIVE_TRACKERS, VISIBLE_UPCOMING } from '../trackers'
 import SavedCalculationsSidebar from './SavedCalculationsSidebar'
 import UserFooter from './UserFooter'
 
@@ -20,15 +20,15 @@ export default function CalculatorSidebar({
   onClose,
   onNavigateLogin,
 }) {
-  const activeCategory = PUBLISHED_CALCULATORS.find(c => c.type === activeType)?.category ?? null
-  const navCategories  = CATEGORIES.filter(c => c !== 'All')
+  const activeCategory = PUBLISHED_CALCULATORS.find((c) => c.type === activeType)?.category ?? null
+  const navCategories = CATEGORIES.filter((c) => c !== 'All')
 
   const [openCategories, setOpenCategories] = useState(
     () => new Set(activeCategory ? [activeCategory] : [])
   )
 
   function toggleCategory(cat) {
-    setOpenCategories(prev => {
+    setOpenCategories((prev) => {
       const next = new Set(prev)
       next.has(cat) ? next.delete(cat) : next.add(cat)
       return next
@@ -37,13 +37,16 @@ export default function CalculatorSidebar({
 
   return (
     <aside className="w-64 shrink-0 bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 flex flex-col h-full">
-
       {/* Brand */}
       <div className="px-6 py-5 border-b border-white/10 flex items-center justify-between">
         <Link to="/app" className="text-xl font-bold text-white tracking-tight">
           Spreadsheet<span className="text-amber-400">Millionaire</span>
         </Link>
-        <button className="lg:hidden text-gray-400 hover:text-white" onClick={onClose} aria-label="Close sidebar">
+        <button
+          className="lg:hidden text-gray-400 hover:text-white"
+          onClick={onClose}
+          aria-label="Close sidebar"
+        >
           <X className="w-5 h-5" />
         </button>
       </div>
@@ -58,10 +61,10 @@ export default function CalculatorSidebar({
           All Calculators
         </Link>
 
-        {navCategories.map(cat => {
-          const calcsInCategory = PUBLISHED_CALCULATORS.filter(c => c.category === cat)
-          const isOpen          = openCategories.has(cat)
-          const hasActive       = calcsInCategory.some(c => c.type === activeType)
+        {navCategories.map((cat) => {
+          const calcsInCategory = PUBLISHED_CALCULATORS.filter((c) => c.category === cat)
+          const isOpen = openCategories.has(cat)
+          const hasActive = calcsInCategory.some((c) => c.type === activeType)
 
           return (
             <div key={cat} className="mb-1">
@@ -72,7 +75,9 @@ export default function CalculatorSidebar({
                 }`}
               >
                 {cat}
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-150 ${isOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown
+                  className={`w-3.5 h-3.5 transition-transform duration-150 ${isOpen ? 'rotate-180' : ''}`}
+                />
               </button>
 
               {isOpen && (
@@ -97,27 +102,52 @@ export default function CalculatorSidebar({
           )
         })}
 
-        {/* Coming soon — teasers for upcoming trackers. Deliberately muted and
-            badged so they don't read as working calculators. Sourced from
-            upcomingFeatures.js, NOT the calculator registry. */}
-        <div className="mt-3 pt-3 border-t border-white/10">
-          <p className="px-3 mb-1 text-xs font-semibold uppercase tracking-wider text-gray-600">Coming soon</p>
-          {UPCOMING_FEATURES.map(({ slug, label, Icon }) => (
-            <Link
-              key={slug}
-              to={`/app/coming-soon/${slug}`}
-              className="flex items-center justify-between gap-2.5 px-3 py-2.5 sm:py-2 rounded-lg text-sm text-gray-500 hover:text-gray-300 hover:bg-white/5 transition"
-            >
-              <span className="flex items-center gap-2.5 min-w-0">
-                <Icon className="w-4 h-4 shrink-0 opacity-60" />
+        {/* Trackers — live (revealed) tracker features, from trackers.js.
+            Empty in production while Net Worth ships dark, so the section hides
+            itself entirely. */}
+        {LIVE_TRACKERS.length > 0 && (
+          <div className="mt-3 pt-3 border-t border-white/10">
+            <p className="px-3 mb-1 text-xs font-semibold uppercase tracking-wider text-gray-600">
+              Trackers
+            </p>
+            {LIVE_TRACKERS.map(({ slug, label, Icon, to }) => (
+              <Link
+                key={slug}
+                to={to}
+                className="flex items-center gap-2.5 px-3 py-2.5 sm:py-2 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-white/10 transition"
+              >
+                <Icon className="w-4 h-4 shrink-0" />
                 <span className="truncate">{label}</span>
-              </span>
-              <span className="shrink-0 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-full bg-white/10 text-gray-400">
-                Soon
-              </span>
-            </Link>
-          ))}
-        </div>
+              </Link>
+            ))}
+          </div>
+        )}
+
+        {/* Coming soon — teasers for not-yet-live trackers (VISIBLE_UPCOMING
+            already excludes anything in LIVE_TRACKERS). Deliberately muted and
+            badged so they don't read as working calculators. */}
+        {VISIBLE_UPCOMING.length > 0 && (
+          <div className="mt-3 pt-3 border-t border-white/10">
+            <p className="px-3 mb-1 text-xs font-semibold uppercase tracking-wider text-gray-600">
+              Coming soon
+            </p>
+            {VISIBLE_UPCOMING.map(({ slug, label, Icon }) => (
+              <Link
+                key={slug}
+                to={`/app/coming-soon/${slug}`}
+                className="flex items-center justify-between gap-2.5 px-3 py-2.5 sm:py-2 rounded-lg text-sm text-gray-500 hover:text-gray-300 hover:bg-white/5 transition"
+              >
+                <span className="flex items-center gap-2.5 min-w-0">
+                  <Icon className="w-4 h-4 shrink-0 opacity-60" />
+                  <span className="truncate">{label}</span>
+                </span>
+                <span className="shrink-0 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-full bg-white/10 text-gray-400">
+                  Soon
+                </span>
+              </Link>
+            ))}
+          </div>
+        )}
       </nav>
 
       {/* Saved calculations */}
@@ -155,7 +185,6 @@ export default function CalculatorSidebar({
           </button>
         )}
       </div>
-
     </aside>
   )
 }
