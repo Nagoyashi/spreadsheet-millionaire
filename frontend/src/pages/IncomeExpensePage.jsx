@@ -4,6 +4,7 @@ import { LayoutDashboard, ListOrdered, ArrowLeft } from 'lucide-react'
 import { useIncomeExpenseData } from '../hooks/useIncomeExpenseData'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { fmt } from '../utils/format'
+import TransactionsPanel from '../components/income/TransactionsPanel'
 
 // Income & Expense tracker page. Auth-gated (the route wraps it in RequireAuth).
 // Foundation (#122): header, sticky Income / Expense / Net bar, tabs. The
@@ -29,7 +30,18 @@ export default function IncomeExpensePage({ auth }) {
   useDocumentTitle('Income & Expense Tracker — SpreadsheetMillionaire')
   const [activeTab, setActiveTab] = useState('overview')
 
-  const { summary, loading, error, setError } = useIncomeExpenseData(auth.isAuthenticated)
+  const {
+    transactions,
+    summary,
+    filters,
+    setFilters,
+    loading,
+    error,
+    setError,
+    addTransaction,
+    updateTransaction,
+    deleteTransaction,
+  } = useIncomeExpenseData(auth.isAuthenticated)
   const totals = summary?.totals
 
   return (
@@ -122,7 +134,17 @@ export default function IncomeExpensePage({ auth }) {
           ) : (
             <div className="min-h-[400px]">
               {activeTab === 'overview' && <Placeholder title="Cashflow dashboard" />}
-              {activeTab === 'transactions' && <Placeholder title="Transactions" />}
+              {activeTab === 'transactions' && (
+                <TransactionsPanel
+                  transactions={transactions}
+                  filters={filters}
+                  setFilters={setFilters}
+                  availableYears={summary?.available_years}
+                  onAdd={addTransaction}
+                  onUpdate={updateTransaction}
+                  onDelete={deleteTransaction}
+                />
+              )}
             </div>
           )}
         </div>

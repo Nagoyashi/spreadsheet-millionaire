@@ -147,7 +147,10 @@ frontend/
     │   │   ├── managerHelpers.test.js     # vitest unit tests for the helpers
     │   │   ├── CategoryManager.test.jsx   # RTL — render/add/edit/delete/validation
     │   │   └── Dashboard.test.jsx         # RTL — summary figures, chart sections, snapshot action
-    │   ├── CalculatorSidebar.jsx          # Grouped collapsible nav + Trackers (Net Worth) + saved calcs + UserFooter
+    │   ├── income/                        # Income & Expense tracker components (consumed by IncomeExpensePage)
+    │   │   ├── incomeExpenseOptions.js    # TYPE_OPTIONS + per-type CATEGORY_OPTIONS (values mirror backend income_expense_types.py)
+    │   │   └── TransactionsPanel.jsx      # Year/month/type filters + table + add/edit form (category options depend on type)
+    │   ├── CalculatorSidebar.jsx          # Grouped collapsible nav + Trackers (live, flag-gated) + saved calcs + UserFooter
     │   ├── CalculatorHeader.jsx           # Header: title, save button, status pill, mobile menu, "New" button
     │   ├── CalculatorExplainer.jsx        # ← "What is X?" gradient banner, driven by registry data
     │   ├── SavedCalculationsSidebar.jsx   # List of saved calcs with click-to-deselect on active item
