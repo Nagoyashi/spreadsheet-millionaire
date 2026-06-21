@@ -4,12 +4,14 @@ import { Wallet, DollarSign, TrendingUp, Home, Gem, CreditCard, ArrowLeft } from
 import { useNetWorthData } from '../hooks/useNetWorthData'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { fmt } from '../utils/format'
+import CategoryManager from '../components/wealth/CategoryManager'
+import { CATEGORY_CONFIGS } from '../components/wealth/categories'
 
 // Net Worth tracker — the "Wealth" page. Auth-gated (the route wraps it in
-// RequireAuth). This is the #102 foundation: header, the sticky Net Worth /
-// Assets / Liabilities bar, the tab scaffold with live counts, and an Overview
-// of the server-computed summary. The per-category CRUD panels (#106) and the
-// recharts dashboard (#107) replace the placeholders below.
+// RequireAuth). Header, the sticky Net Worth / Assets / Liabilities bar, the
+// tab scaffold with live counts, an Overview of the server-computed summary,
+// and per-category CRUD panels (CategoryManager). The recharts dashboard (#107)
+// replaces the Overview's by-category list with charts.
 
 // Full-precision currency for headline figures (fmt() defaults to compact M/K).
 const money = (n) => fmt(n, { compact: false })
@@ -28,15 +30,6 @@ function StatCard({ label, value, tone = 'text-gray-800' }) {
     <div>
       <p className="text-sm text-gray-500 mb-1">{label}</p>
       <p className={`text-2xl sm:text-3xl font-bold ${tone}`}>{value}</p>
-    </div>
-  )
-}
-
-function Placeholder({ title }) {
-  return (
-    <div className="bg-white rounded-lg shadow-md p-8 text-center text-gray-500">
-      <p className="font-medium text-gray-700 mb-1">{title}</p>
-      <p className="text-sm">Management for this category is coming in this release.</p>
     </div>
   )
 }
@@ -105,20 +98,54 @@ export default function WealthPage({ auth }) {
   useDocumentTitle('Net Worth Tracker — SpreadsheetMillionaire')
   const [activeTab, setActiveTab] = useState('overview')
 
-  const { assets, liabilities, investments, properties, summary, loading, error, setError } =
-    useNetWorthData(auth.isAuthenticated)
+  const nw = useNetWorthData(auth.isAuthenticated)
+  const { assets, liabilities, investments, properties, summary, loading, error, setError } = nw
 
   // Liquid = non-collectible assets; collectibles = asset_type 'custom'.
-  const liquidCount = assets.filter((a) => a.asset_type !== 'custom').length
-  const collectibleCount = assets.filter((a) => a.asset_type === 'custom').length
+  const liquidAssets = assets.filter((a) => a.asset_type !== 'custom')
+  const collectibles = assets.filter((a) => a.asset_type === 'custom')
 
   const counts = {
     overview: null,
-    liquid: liquidCount,
+    liquid: liquidAssets.length,
     investments: investments.length,
     'real-estate': properties.length,
-    collectibles: collectibleCount,
+    collectibles: collectibles.length,
     liabilities: liabilities.length,
+  }
+
+  // Map each CategoryManager tab to its filtered rows + the hook's CRUD trio.
+  const RESOURCE_CRUD = {
+    asset: { onAdd: nw.addAsset, onUpdate: nw.updateAsset, onDelete: nw.deleteAsset },
+    liability: {
+      onAdd: nw.addLiability,
+      onUpdate: nw.updateLiability,
+      onDelete: nw.deleteLiability,
+    },
+    investment: {
+      onAdd: nw.addInvestment,
+      onUpdate: nw.updateInvestment,
+      onDelete: nw.deleteInvestment,
+    },
+    property: { onAdd: nw.addProperty, onUpdate: nw.updateProperty, onDelete: nw.deleteProperty },
+  }
+  const TAB_ITEMS = {
+    liquid: liquidAssets,
+    collectibles,
+    investments,
+    'real-estate': properties,
+    liabilities,
+  }
+
+  function renderManager(tabId) {
+    const config = CATEGORY_CONFIGS[tabId]
+    return (
+      <CategoryManager
+        config={config}
+        items={TAB_ITEMS[tabId]}
+        {...RESOURCE_CRUD[config.resource]}
+      />
+    )
   }
 
   return (
@@ -221,12 +248,7 @@ export default function WealthPage({ auth }) {
             </div>
           ) : (
             <div className="min-h-[400px]">
-              {activeTab === 'overview' && <Overview summary={summary} />}
-              {activeTab === 'liquid' && <Placeholder title="Liquid Assets" />}
-              {activeTab === 'investments' && <Placeholder title="Investments" />}
-              {activeTab === 'real-estate' && <Placeholder title="Real Estate" />}
-              {activeTab === 'collectibles' && <Placeholder title="Collectibles" />}
-              {activeTab === 'liabilities' && <Placeholder title="Liabilities" />}
+              {activeTab === 'overview' ? <Overview summary={summary} /> : renderManager(activeTab)}
             </div>
           )}
         </div>
