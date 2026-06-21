@@ -15,7 +15,8 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import SettingsPage from './pages/SettingsPage'
 import WealthPage from './pages/WealthPage'
-import { NET_WORTH_ENABLED } from './featureFlags'
+import IncomeExpensePage from './pages/IncomeExpensePage'
+import { NET_WORTH_ENABLED, INCOME_EXPENSE_ENABLED } from './featureFlags'
 
 // Authenticated users hitting a guest-only door (login/register) bounce into the
 // app, not the marketing page — they're already past the front door.
@@ -96,6 +97,19 @@ export default function App() {
               </RequireAuth>
             ) : (
               <Navigate to="/app/coming-soon/net-worth" replace />
+            )
+          }
+        />
+        <Route
+          path="/app/income-expenses"
+          element={
+            // Ships dark like Net Worth — teaser fallback when the flag is off.
+            INCOME_EXPENSE_ENABLED ? (
+              <RequireAuth isAuthenticated={auth.isAuthenticated}>
+                <IncomeExpensePage auth={auth} />
+              </RequireAuth>
+            ) : (
+              <Navigate to="/app/coming-soon/income-expenses" replace />
             )
           }
         />
