@@ -103,13 +103,14 @@ frontend/
     ├── constants.js            # Shared storage key generators (CALC_STORAGE_KEY, FAVOURITES_KEY)
     ├── upcomingFeatures.js     # UPCOMING_FEATURES tracker teasers (Net Worth, Income/Expense) — deliberately NOT in the calculator registry; raw source for trackers.js
     ├── setupTests.js           # vitest setup — jest-dom matchers + a ResizeObserver stub (for recharts in jsdom); wired via vite.config test.setupFiles
-    ├── featureFlags.js         # Build-time flags. NET_WORTH_ENABLED (env VITE_NETWORTH_ENABLED, default import.meta.env.DEV) — tracker ships dark in prod
+    ├── featureFlags.js         # Build-time flags. NET_WORTH_ENABLED / INCOME_EXPENSE_ENABLED (env VITE_NETWORTH_ENABLED / VITE_INCOME_EXPENSE_ENABLED, default import.meta.env.DEV) — trackers ship dark in prod
     ├── trackers.js             # Published-tracker surface: LIVE_TRACKERS + VISIBLE_UPCOMING (derived from the flag); every nav/grid consumer derives from these, never re-filters UPCOMING_FEATURES
     ├── api/
     │   ├── httpClient.js       # Shared fetch wrapper. createApi(baseUrl) factory + central CSRF injection
     │   ├── authApi.js          # register / login / logout / deleteAccount / getStatus / fetchCsrfToken / forgotPassword / resetPassword / changePassword / changeEmail
     │   ├── calculatorApi.js    # getAll / create / update / remove
     │   ├── netWorthApi.js      # /api/net-worth/* — assets/liabilities/investments/realEstate CRUD + getSummary + snapshots
+    │   ├── incomeExpenseApi.js # /api/income-expense/* — transactions CRUD (year/month filters) + getSummary
     │   └── netWorthApi.test.js # vitest — asserts each endpoint's verb + path + body wiring
     ├── utils/
     │   ├── format.js           # Shared fmt() — replaces 12 local copies, supports custom currency
@@ -157,6 +158,7 @@ frontend/
     │   ├── useAuth.js                 # login / logout / register / deleteAccount + session rehydration
     │   ├── useCalculatorData.js       # Saved-calculations CRUD via API
     │   ├── useNetWorthData.js         # Net Worth data layer — fetches resources + summary + snapshots; CRUD methods that refetch on success
+    │   ├── useIncomeExpenseData.js    # Income & Expense data layer — year/month-filtered transactions + summary; CRUD that refetches
     │   ├── useCalculatorInputs.js     # Input state plumbing (state + sync + onChange + version migration)
     │   ├── useSave.js                 # Save flow + status states. Strips version key before sending. Resets on type change.
     │   ├── useFavourites.js           # Per-user favourites via localStorage
@@ -180,6 +182,7 @@ frontend/
         ├── ComingSoonPage.jsx     # /app/coming-soon/:slug — build-in-public teaser page for an upcoming tracker; unknown slug redirects to /app like an unknown calc type
         ├── WealthPage.jsx         # /app/net-worth (auth-guarded) — Net Worth tracker: sticky NW/assets/liabilities bar + tabs + Overview dashboard + category panels
         ├── WealthPage.test.jsx    # RTL — sticky summary, default Overview, tab switch renders the category manager
+        ├── IncomeExpensePage.jsx  # /app/income-expenses (auth-guarded, ships dark) — Income & Expense tracker: sticky Income/Expense/Net bar + tabs (Overview #124, Transactions #123)
         ├── LoginPage.jsx          # Thin wrapper around AuthForm (+ "Forgot password?" link)
         ├── RegisterPage.jsx       # Thin wrapper around AuthForm
         ├── ForgotPasswordPage.jsx # /forgot-password — email field; always shows the same neutral "check your inbox" state
