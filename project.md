@@ -16,21 +16,22 @@ expanding from calculators into trackers and a freemium tier.
 
 ## Current phase
 
-**Phase 9 — Test & CI foundation** shipped as `v0.9.0` (2026-06-20). Next up:
-Phase 10 — Net Worth Tracker (`v0.10.0`), not yet opened as a milestone. (Roadmap
-resequenced 2026-06-21 — trackers and a go-live review now come before the referral
-engine; see § Future.)
+**Phase 10 — Net Worth Tracker** shipped as `v0.10.0` (2026-06-21). Next up:
+Phase 11 — Income & Expense Tracker (`v0.11.0`), not yet opened as a milestone.
+(Roadmap resequenced 2026-06-21 — trackers and a go-live review come before the
+referral engine; see § Future.)
 
 ## Current cycle
 
 > Canonical cycle state = the single **open GitHub Milestone**. This line mirrors
 > it for at-a-glance reading in the editor; if they disagree, the milestone wins.
 
-**Between cycles.** `v0.9.0` — Test & CI foundation shipped (2026-06-20); no
-milestone is currently open. The next cycle is `v0.10.0` — Net Worth Tracker (see
-§ Future) — open its milestone and promote its issues when starting it. `v0.8.1`
-live in production at www.spreadsheetmillionaire.com · backlog on the
-[Project board](https://github.com/users/Nagoyashi/projects) ↗
+**Between cycles.** `v0.10.0` — Net Worth Tracker shipped (2026-06-21), built
+production-ready but **dark** behind `NET_WORTH_ENABLED` (prod still shows "Coming
+soon"); no milestone is currently open. The next cycle is `v0.11.0` — Income &
+Expense Tracker (see § Future) — open its milestone and promote its issues when
+starting it. `v0.8.1` live in production at www.spreadsheetmillionaire.com ·
+backlog on the [Project board](https://github.com/users/Nagoyashi/projects) ↗
 
 Each release cycle is a Milestone named for its target version (`v0.10.0`); its
 issues are the cycle's scope. Patches (`vX.Y.Z`, Z > 0) skip milestones.
@@ -51,6 +52,7 @@ issues are the cycle's scope. Patches (`vX.Y.Z`, Z > 0) skip milestones.
 | **Phase 7 — Numeric input hardening** | `v0.7.0` · 2026-06-13 | Bounded/clamped inputs; `fmt()` ceiling; `finiteOr`. |
 | **Phase 8 — Launch** | `v0.8.0` · 2026-06-14 | Two-environment cutover: env-driven `BACKEND_ORIGIN` proxy (edge middleware); prod on `main` + Neon production branch; staging service on `develop`. |
 | **Phase 9 — Test & CI foundation** | `v0.9.0` · 2026-06-20 | pytest + vitest harnesses; auth/IDOR/migration coverage; ESLint + Prettier; CI gate with a Postgres service. → [v0.9.0](docs/releases/v0.9.0.md) |
+| **Phase 10 — Net Worth Tracker** | `v0.10.0` · 2026-06-21 | First tracker: 5 normalised `nw_*` tables, `/api/net-worth/*` (CRUD + summary + snapshots), tabbed Wealth page + category CRUD + recharts dashboard; ships dark behind `NET_WORTH_ENABLED`. → [v0.10.0](docs/releases/v0.10.0.md) |
 
 > Phases 1–5 integrated on `develop` (2026-06-11/12) with **no individual
 > release tags**; they first reached production bundled in **`v0.6.0`**.
@@ -71,12 +73,11 @@ issues are the cycle's scope. Patches (`vX.Y.Z`, Z > 0) skip milestones.
 > engine lands last so its rewards/fraud shape fits the launch posture decided in
 > the product review.
 
-- **Net Worth Tracker** *(next cycle — targeted at `v0.10.0`)* — first of two
-  trackers (teased in Phase 4). Own pages, API namespace, DB tables; every saved
-  shape carries `version: 1` + a migration path. Patterns set here inform the
-  Income & Expense Tracker. Promote to a milestone with issues when starting it.
-- **Income & Expense Tracker** *(targeted at `v0.11.0`)* — second tracker, reusing
-  the Net Worth patterns. Own pages, API namespace, DB tables.
+- **Income & Expense Tracker** *(next cycle — targeted at `v0.11.0`)* — second
+  tracker, reusing the Net Worth patterns (normalised `*_` tables, generic CRUD
+  manager, recharts). Decide here whether the two trackers justify a shared
+  tracker registry. Own pages, API namespace, DB tables. Promote to a milestone
+  with issues when starting it.
 - **Backlog cleanup + Security hardening** *(targeted at `v0.12.0`)* — one
   consolidation cycle after the trackers land: sweep accumulated board backlog
   (tech debt, bugs, small gaps) **and** harden security for finance-app credibility
@@ -103,8 +104,8 @@ issues are the cycle's scope. Patches (`vX.Y.Z`, Z > 0) skip milestones.
 - **Design-system refresh** — extract shared primitives once the visual language settles.
 
 > **Planned cycle sequence** (prose intent, not yet milestones — open one at a time
-> per the Session protocol): `v0.9.0` Test & CI ✅ shipped → `v0.10.0` Net Worth
-> Tracker (next) → `v0.11.0` Income & Expense Tracker → `v0.12.0` Backlog cleanup +
+> per the Session protocol): `v0.9.0` Test & CI ✅ → `v0.10.0` Net Worth Tracker ✅
+> → `v0.11.0` Income & Expense Tracker (next) → `v0.12.0` Backlog cleanup +
 > Security hardening → `v0.13.0` Product review & go-live readiness → `v0.14.0`
 > Referral engine. The Freemium tier slots in wherever entitlement/rewards work
 > forces it (likely alongside the referral engine, after the product review).
@@ -119,6 +120,12 @@ See `DECISIONS.md` § "Decisions still to make" for the open questions these car
 
 > Durable completion notes, newest first. Deeper rationale → `DECISIONS.md`
 > (linked per entry); per-task history lives on the board.
+
+### 2026-06-21 — Phase 10 · `v0.10.0` — Net Worth Tracker
+- First tracker: 5 normalised `nw_*` tables (#100), `/api/net-worth/*` CRUD +
+  summary + snapshots (#101), tabbed Wealth page (#102) + category CRUD (#106) +
+  recharts dashboard (#107); ships dark behind `NET_WORTH_ENABLED` (#104); tests
+  (#103) + a dev session-cookie fix. → [v0.10.0](docs/releases/v0.10.0.md).
 
 ### 2026-06-20 — Phase 9 · `v0.9.0` — Test & CI foundation
 - pytest + vitest harnesses, high-risk coverage (auth #29, IDOR #28, migration
