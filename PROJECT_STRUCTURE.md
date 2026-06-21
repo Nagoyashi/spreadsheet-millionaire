@@ -134,6 +134,7 @@ frontend/
     │   ├── wealth/                        # Net Worth tracker components (consumed by WealthPage)
     │   │   ├── categories.js              # Per-tab field/column configs + enum options (values mirror backend net_worth_types.py)
     │   │   ├── CategoryManager.jsx        # Generic add/edit form + table for one category; driven by a categories.js config
+    │   │   ├── Dashboard.jsx              # Overview tab — recharts allocation pie + category bar + category cards + net-worth-over-time line + "take snapshot"
     │   │   ├── managerHelpers.js          # Pure helpers (buildPayload/canSubmit/initialForm/formFromRow/formatCell)
     │   │   └── managerHelpers.test.js     # vitest unit tests for the helpers
     │   ├── CalculatorSidebar.jsx          # Grouped collapsible nav + Trackers (Net Worth) + saved calcs + UserFooter

@@ -5,15 +5,15 @@ import { useNetWorthData } from '../hooks/useNetWorthData'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { fmt } from '../utils/format'
 import CategoryManager from '../components/wealth/CategoryManager'
+import Dashboard from '../components/wealth/Dashboard'
 import { CATEGORY_CONFIGS } from '../components/wealth/categories'
 
 // Net Worth tracker — the "Wealth" page. Auth-gated (the route wraps it in
 // RequireAuth). Header, the sticky Net Worth / Assets / Liabilities bar, the
-// tab scaffold with live counts, an Overview of the server-computed summary,
-// and per-category CRUD panels (CategoryManager). The recharts dashboard (#107)
-// replaces the Overview's by-category list with charts.
+// tab scaffold with live counts, the Overview dashboard (recharts), and the
+// per-category CRUD panels (CategoryManager).
 
-// Full-precision currency for headline figures (fmt() defaults to compact M/K).
+// Full-precision currency for the sticky headline figures (fmt() defaults to compact M/K).
 const money = (n) => fmt(n, { compact: false })
 
 const TABS = [
@@ -25,81 +25,22 @@ const TABS = [
   { id: 'liabilities', label: 'Liabilities', Icon: CreditCard },
 ]
 
-function StatCard({ label, value, tone = 'text-gray-800' }) {
-  return (
-    <div>
-      <p className="text-sm text-gray-500 mb-1">{label}</p>
-      <p className={`text-2xl sm:text-3xl font-bold ${tone}`}>{value}</p>
-    </div>
-  )
-}
-
-function Overview({ summary }) {
-  if (!summary) return null
-  const c = summary.categories
-  const gainTone = summary.lifetime_gain >= 0 ? 'text-green-600' : 'text-red-600'
-
-  const rows = [
-    { key: 'liquid_assets', label: 'Liquid Assets' },
-    { key: 'investments', label: 'Investments' },
-    { key: 'real_estate', label: 'Real Estate' },
-    { key: 'collectibles', label: 'Collectibles' },
-    { key: 'liabilities', label: 'Liabilities' },
-  ]
-
-  return (
-    <div className="space-y-6">
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h2 className="text-xl font-bold text-gray-800 mb-5">Global Financial Summary</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <StatCard
-            label="Net Worth"
-            value={money(summary.net_worth)}
-            tone={summary.net_worth >= 0 ? 'text-gray-800' : 'text-red-600'}
-          />
-          <StatCard label="Total Assets" value={money(summary.total_assets)} tone="text-blue-600" />
-          <StatCard
-            label="Total Liabilities"
-            value={money(summary.total_liabilities)}
-            tone="text-red-600"
-          />
-          <StatCard
-            label="Lifetime Gain / Loss"
-            value={money(summary.lifetime_gain)}
-            tone={gainTone}
-          />
-        </div>
-      </div>
-
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h3 className="text-lg font-bold text-gray-800 mb-4">By category</h3>
-        <div className="divide-y divide-gray-100">
-          {rows.map(({ key, label }) => (
-            <div key={key} className="flex items-center justify-between py-2.5">
-              <span className="text-sm text-gray-600">
-                {label}
-                <span className="ml-2 text-xs text-gray-400">
-                  {c[key].count} {c[key].count === 1 ? 'item' : 'items'}
-                </span>
-              </span>
-              <span className="text-sm font-semibold text-gray-800">{money(c[key].total)}</span>
-            </div>
-          ))}
-        </div>
-        <p className="mt-4 text-xs text-gray-400">
-          Allocation charts and net-worth history arrive with the dashboard.
-        </p>
-      </div>
-    </div>
-  )
-}
-
 export default function WealthPage({ auth }) {
   useDocumentTitle('Net Worth Tracker — SpreadsheetMillionaire')
   const [activeTab, setActiveTab] = useState('overview')
 
   const nw = useNetWorthData(auth.isAuthenticated)
-  const { assets, liabilities, investments, properties, summary, loading, error, setError } = nw
+  const {
+    assets,
+    liabilities,
+    investments,
+    properties,
+    summary,
+    snapshots,
+    loading,
+    error,
+    setError,
+  } = nw
 
   // Liquid = non-collectible assets; collectibles = asset_type 'custom'.
   const liquidAssets = assets.filter((a) => a.asset_type !== 'custom')
@@ -248,7 +189,11 @@ export default function WealthPage({ auth }) {
             </div>
           ) : (
             <div className="min-h-[400px]">
-              {activeTab === 'overview' ? <Overview summary={summary} /> : renderManager(activeTab)}
+              {activeTab === 'overview' ? (
+                <Dashboard summary={summary} snapshots={snapshots} onSnapshot={nw.createSnapshot} />
+              ) : (
+                renderManager(activeTab)
+              )}
             </div>
           )}
         </div>
