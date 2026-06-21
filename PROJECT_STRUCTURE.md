@@ -97,7 +97,9 @@ frontend/
     ├── main.jsx                # React root mount
     ├── index.css               # Tailwind directives + base styles
     ├── constants.js            # Shared storage key generators (CALC_STORAGE_KEY, FAVOURITES_KEY)
-    ├── upcomingFeatures.js     # UPCOMING_FEATURES tracker teasers (Net Worth, Income/Expense) — deliberately NOT in the calculator registry; consumed only by the LandingPage grid + CalculatorSidebar "Coming soon" section
+    ├── upcomingFeatures.js     # UPCOMING_FEATURES tracker teasers (Net Worth, Income/Expense) — deliberately NOT in the calculator registry; raw source for trackers.js
+    ├── featureFlags.js         # Build-time flags. NET_WORTH_ENABLED (env VITE_NETWORTH_ENABLED, default import.meta.env.DEV) — tracker ships dark in prod
+    ├── trackers.js             # Published-tracker surface: LIVE_TRACKERS + VISIBLE_UPCOMING (derived from the flag); every nav/grid consumer derives from these, never re-filters UPCOMING_FEATURES
     ├── api/
     │   ├── httpClient.js       # Shared fetch wrapper. createApi(baseUrl) factory + central CSRF injection
     │   ├── authApi.js          # register / login / logout / deleteAccount / getStatus / fetchCsrfToken / forgotPassword / resetPassword / changePassword / changeEmail
