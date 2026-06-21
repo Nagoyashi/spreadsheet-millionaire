@@ -5,10 +5,11 @@ import { useIncomeExpenseData } from '../hooks/useIncomeExpenseData'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { fmt } from '../utils/format'
 import TransactionsPanel from '../components/income/TransactionsPanel'
+import CashflowDashboard from '../components/income/CashflowDashboard'
 
 // Income & Expense tracker page. Auth-gated (the route wraps it in RequireAuth).
-// Foundation (#122): header, sticky Income / Expense / Net bar, tabs. The
-// Transactions panel is filled by #123 and the Overview dashboard by #124.
+// Header, sticky Income / Expense / Net bar, tabs: the Overview cashflow
+// dashboard and the Transactions management panel.
 
 const money = (n) => fmt(n, { compact: false })
 
@@ -16,15 +17,6 @@ const TABS = [
   { id: 'overview', label: 'Overview', Icon: LayoutDashboard },
   { id: 'transactions', label: 'Transactions', Icon: ListOrdered },
 ]
-
-function Placeholder({ title }) {
-  return (
-    <div className="bg-white rounded-lg shadow-md p-8 text-center text-gray-500">
-      <p className="font-medium text-gray-700 mb-1">{title}</p>
-      <p className="text-sm">Coming in this release.</p>
-    </div>
-  )
-}
 
 export default function IncomeExpensePage({ auth }) {
   useDocumentTitle('Income & Expense Tracker — SpreadsheetMillionaire')
@@ -133,7 +125,9 @@ export default function IncomeExpensePage({ auth }) {
             </div>
           ) : (
             <div className="min-h-[400px]">
-              {activeTab === 'overview' && <Placeholder title="Cashflow dashboard" />}
+              {activeTab === 'overview' && (
+                <CashflowDashboard summary={summary} filters={filters} setFilters={setFilters} />
+              )}
               {activeTab === 'transactions' && (
                 <TransactionsPanel
                   transactions={transactions}
