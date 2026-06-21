@@ -53,6 +53,7 @@ _USER_TABLES = (
     "nw_investment_holdings",
     "nw_real_estate",
     "nw_snapshots",
+    "ie_transactions",
     "users",
 )
 
