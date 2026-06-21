@@ -131,7 +131,12 @@ frontend/
     │   │   ├── SaveNameModal.jsx
     │   │   ├── DeleteAccountModal.jsx     # Password-confirmed account deletion modal
     │   │   └── CalculatorSkeleton.jsx     # Loading skeleton for lazy calculator chunks
-    │   ├── CalculatorSidebar.jsx          # Grouped collapsible nav + saved calcs + UserFooter
+    │   ├── wealth/                        # Net Worth tracker components (consumed by WealthPage)
+    │   │   ├── categories.js              # Per-tab field/column configs + enum options (values mirror backend net_worth_types.py)
+    │   │   ├── CategoryManager.jsx        # Generic add/edit form + table for one category; driven by a categories.js config
+    │   │   ├── managerHelpers.js          # Pure helpers (buildPayload/canSubmit/initialForm/formFromRow/formatCell)
+    │   │   └── managerHelpers.test.js     # vitest unit tests for the helpers
+    │   ├── CalculatorSidebar.jsx          # Grouped collapsible nav + Trackers (Net Worth) + saved calcs + UserFooter
     │   ├── CalculatorHeader.jsx           # Header: title, save button, status pill, mobile menu, "New" button
     │   ├── CalculatorExplainer.jsx        # ← "What is X?" gradient banner, driven by registry data
     │   ├── SavedCalculationsSidebar.jsx   # List of saved calcs with click-to-deselect on active item
