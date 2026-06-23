@@ -43,12 +43,24 @@ export function formFromRow(fields, row) {
   return out
 }
 
+// Resolve a column's value for a row. A `derive(row)` column computes its value
+// from the row (e.g. gain/loss from current_value − cost_basis); a plain column
+// reads `row[col.key]`.
+export function deriveCell(col, row) {
+  return typeof col.derive === 'function' ? col.derive(row) : row[col.key]
+}
+
 // Render one table cell value by its declared format.
 export function formatCell(value, format, options) {
   if (value == null || value === '') return '—'
   switch (format) {
     case 'money':
       return fmt(Number(value), { compact: false })
+    case 'gainloss': {
+      // Signed money — fmt() already prefixes '-' for negatives; add '+' for gains.
+      const n = Number(value)
+      return `${n > 0 ? '+' : ''}${fmt(n, { compact: false })}`
+    }
     case 'percent':
       return fmtPct(Number(value), { fromPercent: true })
     case 'enum':
@@ -56,4 +68,11 @@ export function formatCell(value, format, options) {
     default:
       return String(value)
   }
+}
+
+// Tailwind tone for a signed gain/loss number.
+export function gainTone(value) {
+  const n = Number(value)
+  if (!Number.isFinite(n) || n === 0) return 'text-gray-500'
+  return n > 0 ? 'text-green-600' : 'text-red-600'
 }
