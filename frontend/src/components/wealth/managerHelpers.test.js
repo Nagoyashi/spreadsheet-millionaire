@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { buildPayload, canSubmit, initialForm, formFromRow, formatCell } from './managerHelpers'
+import {
+  buildPayload,
+  canSubmit,
+  initialForm,
+  formFromRow,
+  formatCell,
+  deriveCell,
+  gainTone,
+} from './managerHelpers'
 
 const FIELDS = [
   {
@@ -79,5 +87,30 @@ describe('formatCell', () => {
     expect(formatCell('cash', 'enum', [{ value: 'cash', label: 'Cash' }])).toBe('Cash')
     expect(formatCell('', 'money')).toBe('—')
     expect(formatCell(null, 'text')).toBe('—')
+  })
+
+  it('formats gain/loss with an explicit sign', () => {
+    expect(formatCell(1500, 'gainloss')).toBe('+$1,500')
+    expect(formatCell(-1500, 'gainloss')).toBe('-$1,500')
+    expect(formatCell(0, 'gainloss')).toBe('$0')
+  })
+})
+
+describe('deriveCell', () => {
+  it('reads row[col.key] for a plain column', () => {
+    expect(deriveCell({ key: 'current_value' }, { current_value: 42 })).toBe(42)
+  })
+  it('computes via derive(row) for a derived column', () => {
+    const col = { key: 'gain', derive: (r) => r.current_value - r.cost_basis }
+    expect(deriveCell(col, { current_value: 100, cost_basis: 60 })).toBe(40)
+  })
+})
+
+describe('gainTone', () => {
+  it('greens gains, reds losses, greys zero/non-finite', () => {
+    expect(gainTone(10)).toBe('text-green-600')
+    expect(gainTone(-10)).toBe('text-red-600')
+    expect(gainTone(0)).toBe('text-gray-500')
+    expect(gainTone(NaN)).toBe('text-gray-500')
   })
 })

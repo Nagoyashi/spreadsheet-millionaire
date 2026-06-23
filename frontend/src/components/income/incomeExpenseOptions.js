@@ -36,3 +36,24 @@ export const CATEGORY_OPTIONS = {
 export function categoryLabel(type, value) {
   return CATEGORY_OPTIONS[type]?.find((o) => o.value === value)?.label ?? value
 }
+
+// Recurrence — mirrors backend RECURRENCE_UNITS. A repeat is (unit, interval):
+// e.g. ('week', 2) = "Every 2 weeks". 'none' = a one-off.
+export const RECURRENCE_UNIT_OPTIONS = [
+  { value: 'none', label: 'Does not repeat' },
+  { value: 'day', label: 'Day' },
+  { value: 'week', label: 'Week' },
+  { value: 'month', label: 'Month' },
+  { value: 'year', label: 'Year' },
+]
+
+const RECURRENCE_ADVERB = { day: 'Daily', week: 'Weekly', month: 'Monthly', year: 'Yearly' }
+const RECURRENCE_NOUN = { day: 'days', week: 'weeks', month: 'months', year: 'years' }
+
+// Human label for a (unit, interval) pair: 'Monthly', 'Every 2 weeks', '' for none.
+export function recurrenceLabel(unit, interval = 1) {
+  if (!unit || unit === 'none') return ''
+  const n = Number(interval) || 1
+  if (n === 1) return RECURRENCE_ADVERB[unit] ?? unit
+  return `Every ${n} ${RECURRENCE_NOUN[unit] ?? unit}`
+}

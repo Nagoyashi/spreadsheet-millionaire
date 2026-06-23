@@ -15,6 +15,7 @@ import {
 } from 'recharts'
 import { Camera, TrendingUp, TrendingDown } from 'lucide-react'
 import { fmt, fmtPct } from '../../utils/format'
+import { debtToAssetRatio, snapshotDelta, liabilitiesBreakdown } from './overviewSelectors'
 
 // Net Worth overview dashboard (the Overview tab). Built on recharts (already a
 // dependency). Renders the global summary, an asset-allocation pie, a category
@@ -33,6 +34,10 @@ const COLORS = {
   liabilities: '#ef4444',
 }
 
+// Liabilities-breakdown palette (reds/oranges — kept distinct from the asset
+// allocation colours since this slices the liability side).
+const LIABILITY_COLORS = ['#ef4444', '#f97316', '#f59e0b', '#dc2626', '#b91c1c']
+
 const ASSET_CATEGORIES = [
   { key: 'liquid_assets', label: 'Liquid Assets' },
   { key: 'investments', label: 'Investments' },
@@ -50,7 +55,13 @@ function StatCard({ label, value, tone = 'text-gray-800', sub }) {
   )
 }
 
-export default function Dashboard({ summary, snapshots, onSnapshot }) {
+export default function Dashboard({
+  summary,
+  snapshots,
+  onSnapshot,
+  liabilities = [],
+  properties = [],
+}) {
   const [snapping, setSnapping] = useState(false)
 
   if (!summary) return null
@@ -59,6 +70,11 @@ export default function Dashboard({ summary, snapshots, onSnapshot }) {
   const pctReturn =
     summary.total_cost_basis > 0 ? (summary.lifetime_gain / summary.total_cost_basis) * 100 : null
   const gainPositive = summary.lifetime_gain >= 0
+
+  const debtRatio = debtToAssetRatio(summary)
+  const latestDelta = snapshotDelta(snapshots)
+  const liabilityParts = liabilitiesBreakdown(liabilities, properties)
+  const liabilityTotal = liabilityParts.reduce((sum, p) => sum + p.value, 0)
 
   // Pie: positive asset categories only.
   const allocation = ASSET_CATEGORIES.map((cat) => ({
@@ -97,6 +113,13 @@ export default function Dashboard({ summary, snapshots, onSnapshot }) {
             label="Total Liabilities"
             value={money(summary.total_liabilities)}
             tone="text-red-600"
+            sub={
+              debtRatio != null && (
+                <p className="mt-1 text-xs text-gray-500">
+                  {fmtPct(debtRatio, { fromPercent: true })} of assets (debt-to-asset)
+                </p>
+              )
+            }
           />
           <StatCard
             label="Lifetime Gain / Loss"
@@ -218,14 +241,61 @@ export default function Dashboard({ summary, snapshots, onSnapshot }) {
         })}
       </div>
 
+      {/* Liabilities breakdown — what the total liabilities are composed of
+          (explicit liabilities by type + mortgages from real estate). Only shown
+          when there's something to break down. */}
+      {liabilityParts.length > 0 && (
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <h3 className="text-lg font-bold text-gray-800 mb-4">Liabilities Breakdown</h3>
+          <div className="space-y-2.5">
+            {liabilityParts.map((part, i) => (
+              <div key={part.key} className="flex items-center justify-between text-sm">
+                <span className="flex items-center text-gray-700">
+                  <span
+                    className="w-3 h-3 rounded-full mr-2"
+                    style={{ backgroundColor: LIABILITY_COLORS[i % LIABILITY_COLORS.length] }}
+                  />
+                  {part.label}
+                </span>
+                <span className="text-gray-600">
+                  <span className="font-medium text-gray-800">{money(part.value)}</span>
+                  {liabilityTotal > 0 && (
+                    <span className="ml-2 text-gray-500">
+                      {fmtPct((part.value / liabilityTotal) * 100, { fromPercent: true })}
+                    </span>
+                  )}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Snapshot history */}
       <div className="bg-white rounded-lg shadow-md p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-bold text-gray-800">Net Worth Over Time</h3>
+        <div className="flex items-center justify-between mb-4 gap-3">
+          <div>
+            <h3 className="text-lg font-bold text-gray-800">Net Worth Over Time</h3>
+            {latestDelta != null && (
+              <p
+                className={`mt-1 flex items-center text-sm font-medium ${
+                  latestDelta >= 0 ? 'text-green-600' : 'text-red-600'
+                }`}
+              >
+                {latestDelta >= 0 ? (
+                  <TrendingUp className="w-4 h-4 mr-1" />
+                ) : (
+                  <TrendingDown className="w-4 h-4 mr-1" />
+                )}
+                {latestDelta >= 0 ? '+' : ''}
+                {money(latestDelta)} since last snapshot
+              </p>
+            )}
+          </div>
           <button
             onClick={handleSnapshot}
             disabled={snapping}
-            className="inline-flex items-center gap-2 bg-indigo-600 text-white px-3 py-2 rounded-lg hover:bg-indigo-700 transition text-sm font-medium disabled:opacity-50"
+            className="shrink-0 inline-flex items-center gap-2 bg-indigo-600 text-white px-3 py-2 rounded-lg hover:bg-indigo-700 transition text-sm font-medium disabled:opacity-50"
           >
             <Camera className="w-4 h-4" />
             {snapping ? 'Saving…' : 'Take snapshot'}
@@ -236,26 +306,33 @@ export default function Dashboard({ summary, snapshots, onSnapshot }) {
             No snapshots yet — take one to start tracking your net worth over time.
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={history} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#6b7280' }} />
-              <YAxis
-                tickFormatter={moneyCompact}
-                tick={{ fontSize: 12, fill: '#6b7280' }}
-                width={56}
-              />
-              <Tooltip formatter={(value) => money(value)} labelFormatter={(d) => `Date: ${d}`} />
-              <Line
-                type="monotone"
-                dataKey="net_worth"
-                name="Net worth"
-                stroke="#4f46e5"
-                strokeWidth={2}
-                dot={{ r: 3 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+          <>
+            <ResponsiveContainer width="100%" height={280}>
+              <LineChart data={history} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#6b7280' }} />
+                <YAxis
+                  tickFormatter={moneyCompact}
+                  tick={{ fontSize: 12, fill: '#6b7280' }}
+                  width={56}
+                />
+                <Tooltip formatter={(value) => money(value)} labelFormatter={(d) => `Date: ${d}`} />
+                <Line
+                  type="monotone"
+                  dataKey="net_worth"
+                  name="Net worth"
+                  stroke="#4f46e5"
+                  strokeWidth={2}
+                  dot={{ r: 3 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+            {history.length === 1 && (
+              <p className="mt-2 text-center text-xs text-gray-400">
+                Take a second snapshot to unlock the trend line.
+              </p>
+            )}
+          </>
         )}
       </div>
     </div>

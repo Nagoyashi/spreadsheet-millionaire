@@ -56,7 +56,7 @@ import WealthPage from './WealthPage'
 function renderPage() {
   render(
     <MemoryRouter>
-      <WealthPage auth={{ isAuthenticated: true }} />
+      <WealthPage auth={{ isAuthenticated: true, user: { email: 'test@example.com' } }} />
     </MemoryRouter>
   )
 }

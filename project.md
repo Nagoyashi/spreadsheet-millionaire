@@ -66,6 +66,7 @@ issues are the cycle's scope. Patches (`vX.Y.Z`, Z > 0) skip milestones.
 | `v0.8.1` | 2026-06-14 | httpClient cold-start/network hardening (#17); finalized legal pages (Impressum/Terms/Privacy) with real operator + contact values; Phase 8 launch recorded in the docs. |
 | `v0.8.2` | 2026-06-14 | Established `docs/releases/` per-release notes convention + the Release ritual checklist; backfilled v0.6.0–v0.8.1 notes. → [v0.8.2](docs/releases/v0.8.2.md) |
 | `v0.8.3` | 2026-06-17 | Tag-triggered release workflow; Session protocol + milestone-based cycles; doc-ownership map. → [v0.8.3](docs/releases/v0.8.3.md) |
+| `v0.11.1` | 2026-06-23 | Tracker polish & recurring transactions: one shared collapsible sidebar across the app + both trackers (#137), I&E Overview avg/median + monthly category + **recurring transactions** with a read-time cashflow forecast (#137, #141), Net Worth Overview polish — snapshot delta, debt-to-asset, liabilities breakdown, per-item gain (#140), and a compact app-wide footer. → [v0.11.1](docs/releases/v0.11.1.md) |
 
 ### ⬜ Future (prose only — not issues yet)
 
@@ -75,9 +76,23 @@ issues are the cycle's scope. Patches (`vX.Y.Z`, Z > 0) skip milestones.
 > engine lands last so its rewards/fraud shape fits the launch posture decided in
 > the product review.
 
-- **Recurring transactions & budgets** *(un-slotted backlog)* — deferred from the
-  Income & Expense cycle (`fintrackr_dev` had both); substantial enough for their
-  own cycle once the transaction tracker ships.
+- **Budgets** *(un-slotted backlog)* — per-category budgets (`fintrackr_dev` had
+  them); a separate feature with its own UI surface. **Recurring transactions**
+  (the other half of this item) shipped as a post-`v0.11.0` follow-up — a
+  `(recurrence_unit, recurrence_interval)` pair on the transaction row plus a
+  read-time cashflow forecast; see DECISIONS.md § "Income & Expense Tracker".
+- **Net Worth Overview — goal line + FIRE tie-in** *(un-slotted backlog)* — a target
+  net-worth line on the over-time chart (e.g. "reach $500K by 2030"), ideally seeded
+  from / linked to the registry-driven FIRE calculators (the tracker and the FIRE calc
+  answer the same question from two directions). Deferred: needs to *store* a goal
+  (schema change) and a deliberate cross-feature contract between calculators and the
+  tracker. A natural paid-tier hook. (Overview read-side polish — proper trend line +
+  delta, debt-to-asset ratio, liabilities breakdown, per-item gain/loss — shipped
+  separately as derive-only, no schema change.)
+- **Net Worth snapshots — richer history** *(un-slotted backlog)* — per-asset history
+  (one asset's value over time, not just aggregate NW) and snapshot comparison (diff any
+  two snapshots per asset class); both need a richer snapshot shape (schema change).
+  Auto/scheduled snapshots need a background-job concept that doesn't exist yet.
 - **Backlog cleanup + Security hardening** *(next cycle — targeted at `v0.12.0`)* — one
   consolidation cycle after the trackers land: sweep accumulated board backlog
   (tech debt, bugs, small gaps) **and** harden security for finance-app credibility

@@ -1,7 +1,15 @@
 import { useState } from 'react'
 import { Pencil, Trash2, Plus, X } from 'lucide-react'
 import NumInput from '../ui/NumInput'
-import { buildPayload, canSubmit, initialForm, formFromRow, formatCell } from './managerHelpers'
+import {
+  buildPayload,
+  canSubmit,
+  initialForm,
+  formFromRow,
+  formatCell,
+  deriveCell,
+  gainTone,
+} from './managerHelpers'
 
 // Generic add/edit form + table for one Net Worth category. Driven entirely by a
 // config from categories.js (fields + columns), so all five tabs share one
@@ -82,11 +90,15 @@ export default function CategoryManager({ config, items, onAdd, onUpdate, onDele
               <tbody className="divide-y divide-gray-100">
                 {items.map((row) => (
                   <tr key={row.id} className="hover:bg-gray-50">
-                    {columns.map((col) => (
-                      <td key={col.key} className="px-4 py-3 whitespace-nowrap text-gray-800">
-                        {formatCell(row[col.key], col.format, col.options)}
-                      </td>
-                    ))}
+                    {columns.map((col) => {
+                      const value = deriveCell(col, row)
+                      const tone = col.format === 'gainloss' ? gainTone(value) : 'text-gray-800'
+                      return (
+                        <td key={col.key} className={`px-4 py-3 whitespace-nowrap ${tone}`}>
+                          {formatCell(value, col.format, col.options)}
+                        </td>
+                      )
+                    })}
                     <td className="px-4 py-3 text-right whitespace-nowrap">
                       <button
                         onClick={() => startEdit(row)}

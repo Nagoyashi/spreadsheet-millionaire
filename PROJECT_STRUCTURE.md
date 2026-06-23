@@ -40,7 +40,7 @@ backend/
 ├── config.py                   # All config read from .env — exits if SECRET_KEY/DATABASE_URL invalid (and REDIS_URL in prod)
 ├── calc_types.py               # Single source of truth for VALID_CALC_TYPES (imported by schema + db_init)
 ├── net_worth_types.py          # Single source of truth for Net Worth enum sets (ASSET_TYPES/LIABILITY_TYPES/ASSET_CLASSES/PROPERTY_TYPES) — imported by nw schema + db_init
-├── income_expense_types.py     # Single source of truth for Income & Expense enums (TRANSACTION_TYPES/EXPENSE_CATEGORIES/INCOME_CATEGORIES/ALL_CATEGORIES) — imported by ie schema + db_init
+├── income_expense_types.py     # Single source of truth for Income & Expense enums (TRANSACTION_TYPES/EXPENSE_CATEGORIES/INCOME_CATEGORIES/ALL_CATEGORIES/RECURRENCE_UNITS) — imported by ie schema + db_init
 ├── db.py                       # Per-request psycopg connection on Flask g, closed on teardown (no in-process pool)
 ├── db_init.py                  # Postgres schema creation + idempotent CHECK-constraint rebuild (users, saved_calculators, password_reset_tokens, nw_* Net Worth tables, ie_transactions)
 ├── __pycache__/
@@ -140,22 +140,27 @@ frontend/
     │   │   ├── DeleteAccountModal.jsx     # Password-confirmed account deletion modal
     │   │   └── CalculatorSkeleton.jsx     # Loading skeleton for lazy calculator chunks
     │   ├── wealth/                        # Net Worth tracker components (consumed by WealthPage)
-    │   │   ├── categories.js              # Per-tab field/column configs + enum options (values mirror backend net_worth_types.py)
-    │   │   ├── CategoryManager.jsx        # Generic add/edit form + table for one category; driven by a categories.js config
-    │   │   ├── Dashboard.jsx              # Overview tab — recharts allocation pie + category bar + category cards + net-worth-over-time line + "take snapshot"
-    │   │   ├── managerHelpers.js          # Pure helpers (buildPayload/canSubmit/initialForm/formFromRow/formatCell)
+    │   │   ├── categories.js              # Per-tab field/column configs + enum options (values mirror backend net_worth_types.py); gain/loss columns use derive() from overviewSelectors
+    │   │   ├── overviewSelectors.js       # Pure Overview derivation — per-item gain (asset/investment/property, mirrors backend), debtToAssetRatio, snapshotDelta, liabilitiesBreakdown (incl. mortgages slice)
+    │   │   ├── CategoryManager.jsx        # Generic add/edit form + table for one category; driven by a categories.js config (supports derived + gainloss columns)
+    │   │   ├── Dashboard.jsx              # Overview tab — recharts allocation pie + category bar + category cards + liabilities breakdown + net-worth-over-time line (with delta-vs-last) + "take snapshot"
+    │   │   ├── managerHelpers.js          # Pure helpers (buildPayload/canSubmit/initialForm/formFromRow/formatCell/deriveCell/gainTone)
     │   │   ├── managerHelpers.test.js     # vitest unit tests for the helpers
+    │   │   ├── overviewSelectors.test.js  # vitest — gain reconciliation, debt ratio, snapshot delta, liabilities breakdown
     │   │   ├── CategoryManager.test.jsx   # RTL — render/add/edit/delete/validation
     │   │   └── Dashboard.test.jsx         # RTL — summary figures, chart sections, snapshot action
     │   ├── income/                        # Income & Expense tracker components (consumed by IncomeExpensePage)
-    │   │   ├── incomeExpenseOptions.js    # TYPE_OPTIONS + per-type CATEGORY_OPTIONS (values mirror backend income_expense_types.py)
-    │   │   ├── TransactionsPanel.jsx      # Year/month/type filters + table + add/edit form (category options depend on type)
-    │   │   └── CashflowDashboard.jsx      # Overview tab — recharts: summary cards + savings rate, monthly income-vs-expense bar, spending-by-category pie, year selector
-    │   ├── AppFooter.jsx                  # Light-theme legal footer (Privacy/Terms/Imprint/Source) for the in-app surface — brand links to marketing home
-    │   ├── CalculatorSidebar.jsx          # Grouped collapsible nav + Trackers (live, flag-gated) + saved calcs + UserFooter
+    │   │   ├── incomeExpenseOptions.js    # TYPE_OPTIONS + per-type CATEGORY_OPTIONS + RECURRENCE_UNIT_OPTIONS/recurrenceLabel (values mirror backend income_expense_types.py)
+    │   │   ├── TransactionsPanel.jsx      # Year/month/type filters + table + add/edit form (category + recurrence rule, options depend on type)
+    │   │   ├── cashflowSelectors.js       # Pure Overview derivation — monthlyIncomeStats (avg/median), categoryBreakdown (year/month slice of the txn list); single source for month/year filtering
+    │   │   ├── recurrence.js              # Pure forecast projection — projectRecurring/forecastByMonth: project recurring txns into the empty future months (read-time only, never persisted)
+    │   │   └── CashflowDashboard.jsx      # Overview tab — recharts: per-month income (avg/median toggle), monthly income-vs-expense bar (with recurrence forecast), spending-by-category pie (year or month-scoped), year selector
+    │   ├── AppFooter.jsx                  # Compact single-row legal footer (© line + Privacy/Terms/Imprint/Source) — rendered once by AppShell, so it appears on every /app page
+    │   ├── AppShell.jsx                   # In-app layout shell — renders AppSidebar (desktop slot + mobile drawer) + content + AppFooter; render-prop children get { openSidebar }. Wraps every /app page
+    │   ├── AppSidebar.jsx                 # THE shared sidebar — three sibling top-level categories (Calculators expandable→muted calcs, Net Worth, Income & Expenses, all flag-gated) + collapse toggle + optional saved-calcs slot + UserFooter
     │   ├── CalculatorHeader.jsx           # Header: title, save button, status pill, mobile menu, "New" button
     │   ├── CalculatorExplainer.jsx        # ← "What is X?" gradient banner, driven by registry data
-    │   ├── SavedCalculationsSidebar.jsx   # List of saved calcs with click-to-deselect on active item
+    │   ├── SavedCalculationsSidebar.jsx   # List of saved calcs with click-to-deselect on active item (injected into AppSidebar's slot by CalculatorPage)
     │   ├── AuthCardShell.jsx              # Presentational chrome (gray page + top bar + white card + badge/title/subtitle/footer) for the auth family; used by AuthForm + Forgot/Reset pages
     │   ├── AuthForm.jsx                   # Shared email+password form for LoginPage + RegisterPage (renders inside AuthCardShell)
     │   └── UserFooter.jsx                 # Authenticated-user footer (email + Settings link + sign out + delete account modal)
@@ -167,6 +172,7 @@ frontend/
     │   ├── useCalculatorInputs.js     # Input state plumbing (state + sync + onChange + version migration)
     │   ├── useSave.js                 # Save flow + status states. Strips version key before sending. Resets on type change.
     │   ├── useFavourites.js           # Per-user favourites via localStorage
+    │   ├── useSidebarCollapse.js      # Session-scoped sidebar collapse state — module-level boolean via useSyncExternalStore, persists across navigation (no storage/Context/store)
     │   └── useDocumentTitle.js        # Sets a distinct document.title per route (SPA SEO); resets to default on unmount
     ├── marketing/                     # Public marketing surface (parallel to calculators/) — consumed only by the landing + legal pages
     │   ├── links.js                   # Single source for GITHUB_URL + CONTACT_EMAIL placeholder (used by nav/strip/footer/legal)
@@ -183,7 +189,7 @@ frontend/
         ├── TermsPage.jsx          # /terms — terms of service on LegalLayout; educational-tools-not-advice disclaimer
         ├── ImprintPage.jsx        # /imprint — imprint/Impressum on LegalLayout; placeholder operator details to complete before launch
         ├── CalculatorPage.jsx     # /app/calculator/:type — orchestrator; renders explainer + lazy calc inside Suspense
-        ├── LandingPage.jsx        # /app — the *in-app* landing: calculator grid + filter tabs + favourites + coming-soon teaser cards. Collapsible sidebar drawer below lg (local mobileSidebarOpen state)
+        ├── LandingPage.jsx        # /app — the *in-app* landing: calculator grid + filter tabs + favourites + coming-soon teaser cards. Wrapped in AppShell (shared sidebar + mobile drawer)
         ├── ComingSoonPage.jsx     # /app/coming-soon/:slug — build-in-public teaser page for an upcoming tracker; unknown slug redirects to /app like an unknown calc type
         ├── WealthPage.jsx         # /app/net-worth (auth-guarded) — Net Worth tracker: sticky NW/assets/liabilities bar + tabs + Overview dashboard + category panels
         ├── WealthPage.test.jsx    # RTL — sticky summary, default Overview, tab switch renders the category manager
@@ -293,7 +299,7 @@ See `DECISIONS.md` § "MVP narrowing via `published` flag".
 | Shared UI | All reusable primitives live in `src/components/ui/`. Larger composed components (sidebar, header, explainer, footer, auth form) live one level up in `src/components/` |
 | Auth state | Owned by `App.jsx` via `useAuth`, passed down as props — no Context |
 | Auth pages | Both `LoginPage` and `RegisterPage` are thin wrappers around `<AuthForm>` — only badge, copy, and submit handler differ |
-| User footer | The authenticated-user block (email + sign out + delete account modal) is `<UserFooter>` — used on both LandingPage (`variant="roomy"`) and CalculatorSidebar (`variant="compact"`). Owns the delete-modal state internally. |
+| User footer | The authenticated-user block (email + sign out + delete account modal) is `<UserFooter>` — rendered once inside the shared `AppSidebar` (`variant="compact"`). Owns the delete-modal state internally. |
 | Save logic | Fully encapsulated in `src/hooks/useSave.js`. Uses `stripVersion()` so the internal `__v` key never reaches the backend. Resets `activeSavedCalcId` on calculator type change |
 | New / deselect | "New" button on header (visible only when a record is loaded) and click-on-active in saved sidebar both detach from `activeSavedCalcId` without resetting inputs |
 | Favourites | Stored in `localStorage` keyed by `sm_favourites_${user.id}` — per-user, no backend needed. Logic in `useFavourites.js` |

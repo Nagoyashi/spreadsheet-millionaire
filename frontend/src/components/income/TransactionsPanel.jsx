@@ -1,8 +1,14 @@
 import { useState } from 'react'
-import { Pencil, Trash2, Plus, X } from 'lucide-react'
+import { Pencil, Trash2, Plus, X, Repeat } from 'lucide-react'
 import NumInput from '../ui/NumInput'
 import { fmt } from '../../utils/format'
-import { TYPE_OPTIONS, CATEGORY_OPTIONS, categoryLabel } from './incomeExpenseOptions'
+import {
+  TYPE_OPTIONS,
+  CATEGORY_OPTIONS,
+  categoryLabel,
+  RECURRENCE_UNIT_OPTIONS,
+  recurrenceLabel,
+} from './incomeExpenseOptions'
 
 // Transactions tab — year/month/type filters + a table + an add/edit form.
 // Category options depend on the selected type, so this is a dedicated form
@@ -31,6 +37,8 @@ const emptyForm = () => ({
   amount: '',
   occurred_on: '',
   note: '',
+  recurrence_unit: 'none',
+  recurrence_interval: '1',
 })
 
 const selectClass =
@@ -73,6 +81,8 @@ export default function TransactionsPanel({
       amount: String(t.amount),
       occurred_on: t.occurred_on,
       note: t.note ?? '',
+      recurrence_unit: t.recurrence_unit ?? 'none',
+      recurrence_interval: String(t.recurrence_interval ?? 1),
     })
     setEditingId(t.id)
     setFormError('')
@@ -85,12 +95,18 @@ export default function TransactionsPanel({
     if (!canSubmit) return
     setSubmitting(true)
     setFormError('')
+    const repeats = form.recurrence_unit !== 'none'
     const payload = {
       type: form.type,
       category: form.category,
       amount: Number(form.amount),
       occurred_on: form.occurred_on,
       ...(form.note ? { note: form.note } : {}),
+      // Always send recurrence so an edit can clear/change it (the PUT is partial;
+      // omitting it would leave a stale rule in place). Interval only matters when
+      // it repeats — the backend normalises a one-off back to interval 1.
+      recurrence_unit: form.recurrence_unit,
+      recurrence_interval: repeats ? Math.max(1, Number(form.recurrence_interval) || 1) : 1,
     }
     const res = editingId ? await onUpdate(editingId, payload) : await onAdd(payload)
     setSubmitting(false)
@@ -190,7 +206,20 @@ export default function TransactionsPanel({
                         {t.type}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-gray-800">{categoryLabel(t.type, t.category)}</td>
+                    <td className="px-4 py-3 text-gray-800">
+                      <span className="inline-flex items-center gap-1.5">
+                        {categoryLabel(t.type, t.category)}
+                        {t.recurrence_unit && t.recurrence_unit !== 'none' && (
+                          <span
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-indigo-100 text-indigo-700"
+                            title={recurrenceLabel(t.recurrence_unit, t.recurrence_interval)}
+                          >
+                            <Repeat className="w-3 h-3" />
+                            {recurrenceLabel(t.recurrence_unit, t.recurrence_interval)}
+                          </span>
+                        )}
+                      </span>
+                    </td>
                     <td
                       className={`px-4 py-3 text-right whitespace-nowrap font-semibold ${
                         t.type === 'income' ? 'text-emerald-600' : 'text-rose-600'
@@ -298,6 +327,40 @@ export default function TransactionsPanel({
               className={selectClass}
             />
           </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-600 mb-1">Repeat</label>
+            <select
+              value={form.recurrence_unit}
+              onChange={(e) => setField('recurrence_unit', e.target.value)}
+              className={selectClass}
+            >
+              {RECURRENCE_UNIT_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          {form.recurrence_unit !== 'none' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-1">Repeat every</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={form.recurrence_interval}
+                  onChange={(e) => setField('recurrence_interval', e.target.value)}
+                  className={`${selectClass} w-20`}
+                />
+                <span className="text-sm text-gray-600">
+                  {Number(form.recurrence_interval) === 1
+                    ? form.recurrence_unit
+                    : `${form.recurrence_unit}s`}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
         {formError && <p className="mt-4 text-sm text-red-600">{formError}</p>}

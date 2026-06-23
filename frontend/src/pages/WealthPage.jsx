@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Wallet, DollarSign, TrendingUp, Home, Gem, CreditCard, ArrowLeft } from 'lucide-react'
+import { Wallet, DollarSign, TrendingUp, Home, Gem, CreditCard, Menu } from 'lucide-react'
 import { useNetWorthData } from '../hooks/useNetWorthData'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { fmt } from '../utils/format'
+import AppShell from '../components/AppShell'
 import CategoryManager from '../components/wealth/CategoryManager'
 import Dashboard from '../components/wealth/Dashboard'
 import { CATEGORY_CONFIGS } from '../components/wealth/categories'
@@ -90,22 +91,24 @@ export default function WealthPage({ auth }) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col">
-      {/* Top bar */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-        <Link to="/app" className="text-xl font-bold text-gray-800 tracking-tight">
-          Spreadsheet<span className="text-amber-400">Millionaire</span>
-        </Link>
-        <Link
-          to="/app"
-          className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 transition"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to calculators
-        </Link>
-      </header>
+    <AppShell auth={auth}>
+      {({ openSidebar }) => (
+        <>
+        {/* Mobile top bar — desktop gets the brand from the sidebar */}
+        <header className="lg:hidden bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3">
+          <button
+            className="flex items-center justify-center min-h-[44px] min-w-[44px] -ml-2 text-gray-500 hover:text-gray-800"
+            onClick={openSidebar}
+            aria-label="Open sidebar"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+          <Link to="/app" className="text-lg font-bold text-gray-800 tracking-tight">
+            Spreadsheet<span className="text-amber-400">Millionaire</span>
+          </Link>
+        </header>
 
-      <main className="flex-1 overflow-y-auto p-6">
+        <main className="flex-1 overflow-y-auto p-6">
         <div className="max-w-6xl mx-auto">
           <div className="mb-6">
             <h1 className="text-3xl font-bold text-gray-800">Net Worth</h1>
@@ -190,14 +193,22 @@ export default function WealthPage({ auth }) {
           ) : (
             <div className="min-h-[400px]">
               {activeTab === 'overview' ? (
-                <Dashboard summary={summary} snapshots={snapshots} onSnapshot={nw.createSnapshot} />
+                <Dashboard
+                  summary={summary}
+                  snapshots={snapshots}
+                  onSnapshot={nw.createSnapshot}
+                  liabilities={liabilities}
+                  properties={properties}
+                />
               ) : (
                 renderManager(activeTab)
               )}
             </div>
           )}
         </div>
-      </main>
-    </div>
+        </main>
+        </>
+      )}
+    </AppShell>
   )
 }
