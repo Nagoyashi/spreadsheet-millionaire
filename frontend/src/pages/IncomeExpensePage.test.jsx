@@ -34,7 +34,7 @@ import IncomeExpensePage from './IncomeExpensePage'
 function renderPage() {
   render(
     <MemoryRouter>
-      <IncomeExpensePage auth={{ isAuthenticated: true }} />
+      <IncomeExpensePage auth={{ isAuthenticated: true, user: { email: 'test@example.com' } }} />
     </MemoryRouter>
   )
 }

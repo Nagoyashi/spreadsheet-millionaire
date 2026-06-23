@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { LayoutDashboard, ListOrdered, ArrowLeft } from 'lucide-react'
+import { LayoutDashboard, ListOrdered, Menu } from 'lucide-react'
 import { useIncomeExpenseData } from '../hooks/useIncomeExpenseData'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { fmt } from '../utils/format'
+import AppShell from '../components/AppShell'
 import TransactionsPanel from '../components/income/TransactionsPanel'
 import CashflowDashboard from '../components/income/CashflowDashboard'
 
@@ -37,21 +38,24 @@ export default function IncomeExpensePage({ auth }) {
   const totals = summary?.totals
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col">
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-        <Link to="/app" className="text-xl font-bold text-gray-800 tracking-tight">
-          Spreadsheet<span className="text-amber-400">Millionaire</span>
-        </Link>
-        <Link
-          to="/app"
-          className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 transition"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to calculators
-        </Link>
-      </header>
+    <AppShell auth={auth}>
+      {({ openSidebar }) => (
+        <>
+        {/* Mobile top bar — desktop gets the brand from the sidebar */}
+        <header className="lg:hidden bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3">
+          <button
+            className="flex items-center justify-center min-h-[44px] min-w-[44px] -ml-2 text-gray-500 hover:text-gray-800"
+            onClick={openSidebar}
+            aria-label="Open sidebar"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+          <Link to="/app" className="text-lg font-bold text-gray-800 tracking-tight">
+            Spreadsheet<span className="text-amber-400">Millionaire</span>
+          </Link>
+        </header>
 
-      <main className="flex-1 overflow-y-auto p-6">
+        <main className="flex-1 overflow-y-auto p-6">
         <div className="max-w-6xl mx-auto">
           <div className="mb-6">
             <h1 className="text-3xl font-bold text-gray-800">Income &amp; Expenses</h1>
@@ -126,7 +130,12 @@ export default function IncomeExpensePage({ auth }) {
           ) : (
             <div className="min-h-[400px]">
               {activeTab === 'overview' && (
-                <CashflowDashboard summary={summary} filters={filters} setFilters={setFilters} />
+                <CashflowDashboard
+                  summary={summary}
+                  transactions={transactions}
+                  filters={filters}
+                  setFilters={setFilters}
+                />
               )}
               {activeTab === 'transactions' && (
                 <TransactionsPanel
@@ -142,7 +151,9 @@ export default function IncomeExpensePage({ auth }) {
             </div>
           )}
         </div>
-      </main>
-    </div>
+        </main>
+        </>
+      )}
+    </AppShell>
   )
 }
