@@ -117,6 +117,23 @@ here.** The two services must **not** share the secret key, database, or Redis.
 **once** against the main-branch `DATABASE_URL` before the first real request
 (idempotent). See the launch runbook (§ 5).
 
+> **How to actually run `db_init.py` (both Render services are free-tier — no Shell).**
+> The free instance type has no Web Shell / SSH and no one-off jobs, so you cannot
+> run it *on* Render. Run it **locally, pointed at the target branch's
+> `DATABASE_URL`** — an inline env var wins over `.env` (`load_dotenv()` does not
+> override an already-set var):
+> ```sh
+> cd backend
+> DATABASE_URL='<paste the target branch pooled URL from Render → Environment>' \
+>   venv/bin/python db_init.py     # expect: "Database schema initialised (Postgres)."
+> ```
+> Run it against **each** environment's branch separately (Neon `main` = production,
+> Neon `dev` = staging). Alternatively, paste the equivalent DDL into the **Neon SQL
+> editor** on the chosen branch. This is **not** a one-time-at-launch step: any later
+> release that changes the schema (additive `ALTER`s — e.g. the v0.11.1 recurrence
+> columns) needs the same run against both branches before the new code serves
+> writes. `db_init.py` is idempotent, so re-running is always safe.
+
 ---
 
 ## 3. Vercel — one project, two scopes
