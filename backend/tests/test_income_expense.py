@@ -106,6 +106,49 @@ def test_amount_must_be_positive(auth_client, get_csrf_token):
                        json=_txn(amount=0)).status_code == 422
 
 
+# --------------------------------------------------------------------------- #
+# Recurrence (DDL-migrated columns — see db_init.py)
+# --------------------------------------------------------------------------- #
+def test_recurrence_defaults_and_roundtrip(auth_client, get_csrf_token):
+    client, _ = auth_client
+    h = {"X-CSRF-Token": get_csrf_token(client)}
+
+    # Omitting recurrence defaults to a one-off.
+    one_off = client.post("/api/income-expense/transactions", headers=h, json=_txn()).get_json()["item"]
+    assert one_off["recurrence_unit"] == "none"
+    assert one_off["recurrence_interval"] == 1
+
+    # A repeat round-trips its (unit, interval).
+    repeating = client.post(
+        "/api/income-expense/transactions",
+        headers=h,
+        json=_txn(recurrence_unit="week", recurrence_interval=2),
+    ).get_json()["item"]
+    assert repeating["recurrence_unit"] == "week"
+    assert repeating["recurrence_interval"] == 2
+
+
+def test_recurrence_none_normalises_interval(auth_client, get_csrf_token):
+    client, _ = auth_client
+    h = {"X-CSRF-Token": get_csrf_token(client)}
+    # A non-repeating transaction always stores interval 1, whatever was sent.
+    item = client.post(
+        "/api/income-expense/transactions",
+        headers=h,
+        json=_txn(recurrence_unit="none", recurrence_interval=9),
+    ).get_json()["item"]
+    assert item["recurrence_interval"] == 1
+
+
+def test_invalid_recurrence_is_rejected(auth_client, get_csrf_token):
+    client, _ = auth_client
+    h = {"X-CSRF-Token": get_csrf_token(client)}
+    assert client.post("/api/income-expense/transactions", headers=h,
+                       json=_txn(recurrence_unit="fortnight")).status_code == 422
+    assert client.post("/api/income-expense/transactions", headers=h,
+                       json=_txn(recurrence_unit="day", recurrence_interval=0)).status_code == 422
+
+
 def test_list_requires_auth(client):
     assert client.get("/api/income-expense/transactions").status_code == 401
 

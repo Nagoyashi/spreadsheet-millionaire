@@ -34,7 +34,7 @@ from net_worth_types import (
     ASSET_CLASSES,
     PROPERTY_TYPES,
 )
-from income_expense_types import TRANSACTION_TYPES, ALL_CATEGORIES
+from income_expense_types import TRANSACTION_TYPES, ALL_CATEGORIES, RECURRENCE_UNITS
 
 
 _CONSTRAINT_NAME = "saved_calculators_calc_type_check"
@@ -371,6 +371,21 @@ def init_db() -> None:
                 ON ie_transactions(user_id, occurred_on)
             """)
 
+            # Recurrence (added after v0.11.0). A transaction can repeat every N
+            # units; existing rows default to a one-off ('none', 1). Additive,
+            # idempotent ALTERs — the normalised-table migration path (DDL in
+            # db_init), NOT a client blob version bump (hard rule #5 is scoped to
+            # opaque blobs). Forecast occurrences are derived on the client at read
+            # time and never written here.
+            cur.execute("""
+                ALTER TABLE ie_transactions
+                    ADD COLUMN IF NOT EXISTS recurrence_unit TEXT NOT NULL DEFAULT 'none'
+            """)
+            cur.execute("""
+                ALTER TABLE ie_transactions
+                    ADD COLUMN IF NOT EXISTS recurrence_interval INTEGER NOT NULL DEFAULT 1
+            """)
+
             _rebuild_check(
                 cur, "ie_transactions", "ie_transactions_type_check",
                 _in_check("type", TRANSACTION_TYPES),
@@ -378,6 +393,14 @@ def init_db() -> None:
             _rebuild_check(
                 cur, "ie_transactions", "ie_transactions_category_check",
                 _in_check("category", ALL_CATEGORIES),
+            )
+            _rebuild_check(
+                cur, "ie_transactions", "ie_transactions_recurrence_unit_check",
+                _in_check("recurrence_unit", RECURRENCE_UNITS),
+            )
+            _rebuild_check(
+                cur, "ie_transactions", "ie_transactions_recurrence_interval_check",
+                sql.SQL("recurrence_interval >= 1"),
             )
             _attach_updated_at_trigger(cur, "ie_transactions")
 
