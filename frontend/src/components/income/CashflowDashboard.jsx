@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import {
   BarChart,
   Bar,
@@ -13,6 +14,7 @@ import {
 } from 'recharts'
 import { fmt, fmtPct } from '../../utils/format'
 import { categoryLabel } from './incomeExpenseOptions'
+import { monthlyIncomeStats, categoryBreakdown } from './cashflowSelectors'
 
 // Income & Expense Overview dashboard (recharts, already a dep): summary cards
 // (with savings rate), a monthly income-vs-expense bar, and an expense-by-
@@ -50,21 +52,54 @@ const MONTHS_SHORT = [
   'Dec',
 ]
 
-function StatCard({ label, value, tone = 'text-gray-800', sub }) {
+function StatCard({ label, value, tone = 'text-gray-800', sub, action }) {
   return (
     <div>
-      <p className="text-sm text-gray-500 mb-1">{label}</p>
+      <div className="flex items-center justify-between mb-1 gap-2">
+        <p className="text-sm text-gray-500">{label}</p>
+        {action}
+      </div>
       <p className={`text-2xl sm:text-3xl font-bold ${tone}`}>{value}</p>
       {sub}
     </div>
   )
 }
 
-export default function CashflowDashboard({ summary, filters, setFilters }) {
+// Tiny two-option segmented control, styled to match the year <select>.
+function Segmented({ options, value, onChange }) {
+  return (
+    <div className="inline-flex rounded-md border border-gray-300 overflow-hidden text-xs">
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          onClick={() => onChange(o.value)}
+          className={`px-2 py-1 font-medium transition ${
+            value === o.value
+              ? 'bg-emerald-600 text-white'
+              : 'bg-white text-gray-600 hover:bg-gray-50'
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+export default function CashflowDashboard({ summary, transactions = [], filters, setFilters }) {
+  const [incomeStat, setIncomeStat] = useState('average') // 'average' | 'median'
+  const [categoryMonth, setCategoryMonth] = useState(null) // null = full year, else 1–12
+
   if (!summary) return null
   const { totals } = summary
+  const year = summary.year
 
   const savingsRate = totals.income > 0 ? (totals.net / totals.income) * 100 : null
+
+  // Per-month income, summarised (average vs median) over active months.
+  const incomeStats = monthlyIncomeStats(summary.by_month)
+  const perMonthIncome = incomeStat === 'average' ? incomeStats.average : incomeStats.median
 
   const monthlyData = summary.by_month.map((m) => ({
     name: MONTHS_SHORT[m.month - 1],
@@ -72,9 +107,18 @@ export default function CashflowDashboard({ summary, filters, setFilters }) {
     expense: m.expense,
   }))
 
-  const expenseByCategory = Object.entries(summary.by_category.expense)
-    .map(([cat, value]) => ({ name: categoryLabel('expense', cat), value }))
+  // Category pie — full year reads the year-complete summary; a specific month
+  // re-slices the transaction list (the /summary endpoint is year-scoped only).
+  const expenseByCategory = (
+    categoryMonth == null
+      ? Object.entries(summary.by_category.expense).map(([category, value]) => ({ category, value }))
+      : categoryBreakdown(transactions, { year, month: categoryMonth, type: 'expense' })
+  )
+    .map(({ category, value }) => ({ name: categoryLabel('expense', category), value }))
     .sort((a, b) => b.value - a.value)
+
+  const categoryTotal = expenseByCategory.reduce((sum, e) => sum + e.value, 0)
+  const categoryScopeLabel = categoryMonth == null ? year : `${MONTHS_SHORT[categoryMonth - 1]} ${year}`
 
   const yearOptions = Array.from(new Set(summary.available_years)).sort((a, b) => b - a)
 
@@ -99,7 +143,24 @@ export default function CashflowDashboard({ summary, filters, setFilters }) {
           )}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <StatCard label="Income" value={money(totals.income)} tone="text-emerald-600" />
+          <StatCard
+            label="Income / month"
+            value={perMonthIncome != null ? money(perMonthIncome) : '—'}
+            tone="text-emerald-600"
+            action={
+              <Segmented
+                options={[
+                  { value: 'average', label: 'Avg' },
+                  { value: 'median', label: 'Median' },
+                ]}
+                value={incomeStat}
+                onChange={setIncomeStat}
+              />
+            }
+            sub={
+              <p className="text-xs text-gray-400 mt-1">{money(totals.income)} total in {year}</p>
+            }
+          />
           <StatCard label="Expenses" value={money(totals.expense)} tone="text-rose-600" />
           <StatCard
             label="Net"
@@ -119,7 +180,15 @@ export default function CashflowDashboard({ summary, filters, setFilters }) {
         <div className="bg-white rounded-lg shadow-md p-6">
           <h3 className="text-lg font-bold text-gray-800 mb-4">Monthly income vs. expense</h3>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={monthlyData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+            <BarChart
+              data={monthlyData}
+              margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
+              onClick={(state) => {
+                const m = state?.activeTooltipIndex
+                if (m == null) return
+                setCategoryMonth((cur) => (cur === m + 1 ? null : m + 1))
+              }}
+            >
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#6b7280' }} />
               <YAxis
@@ -133,13 +202,28 @@ export default function CashflowDashboard({ summary, filters, setFilters }) {
               <Bar dataKey="expense" name="Expense" fill={EXPENSE_COLOR} />
             </BarChart>
           </ResponsiveContainer>
+          <p className="mt-2 text-xs text-gray-400">Tip: click a month to scope the category breakdown.</p>
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-bold text-gray-800 mb-4">Spending by category</h3>
+          <div className="flex items-center justify-between mb-4 gap-2">
+            <h3 className="text-lg font-bold text-gray-800">Spending by category</h3>
+            <select
+              value={categoryMonth ?? ''}
+              onChange={(e) => setCategoryMonth(e.target.value ? Number(e.target.value) : null)}
+              className="px-2.5 py-1.5 text-xs text-gray-800 bg-white rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            >
+              <option value="">Full year</option>
+              {MONTHS_SHORT.map((m, i) => (
+                <option key={m} value={i + 1}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </div>
           {expenseByCategory.length === 0 ? (
             <div className="h-[300px] flex items-center justify-center text-sm text-gray-500">
-              No expenses recorded for {summary.year}.
+              No expenses recorded for {categoryScopeLabel}.
             </div>
           ) : (
             <>
@@ -171,7 +255,7 @@ export default function CashflowDashboard({ summary, filters, setFilters }) {
                       {entry.name}
                     </span>
                     <span className="text-gray-600 font-medium">
-                      {fmtPct((entry.value / totals.expense) * 100, { fromPercent: true })}
+                      {fmtPct((entry.value / categoryTotal) * 100, { fromPercent: true })}
                     </span>
                   </div>
                 ))}

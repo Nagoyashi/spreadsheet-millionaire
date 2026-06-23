@@ -18,7 +18,9 @@ describe('CashflowDashboard', () => {
   it('renders totals and the savings rate', () => {
     render(<CashflowDashboard summary={SUMMARY} filters={{}} setFilters={vi.fn()} />)
     expect(screen.getByText('Cashflow — 2026')).toBeInTheDocument()
-    expect(screen.getByText('$5,000')).toBeInTheDocument() // income
+    // Income card shows per-month income (avg over the 2 active months: [5000, 0] → 2500).
+    expect(screen.getByText('$2,500')).toBeInTheDocument()
+    expect(screen.getByText(/total in 2026/)).toBeInTheDocument() // $5,000 annual total sub
     expect(screen.getByText('$3,000')).toBeInTheDocument() // net
     expect(screen.getByText('60.0%')).toBeInTheDocument() // savings rate 3000/5000
   })

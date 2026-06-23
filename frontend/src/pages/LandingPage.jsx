@@ -1,12 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
-import { BarChart2, ArrowRight, Star, Menu, X } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { ArrowRight, Star, Menu } from 'lucide-react'
 import { PUBLISHED_CALCULATORS, CATEGORIES } from '../calculators/registry'
 import { LIVE_TRACKERS, VISIBLE_UPCOMING } from '../trackers'
 import { useFavourites } from '../hooks/useFavourites'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
-import UserFooter from '../components/UserFooter'
-import AppFooter from '../components/AppFooter'
+import AppShell from '../components/AppShell'
 
 // ─── Small toast for unauthenticated star attempt ─────────────────────────────
 function AuthToast({ visible }) {
@@ -19,111 +18,12 @@ function AuthToast({ visible }) {
   )
 }
 
-// ─── Dark in-app sidebar ──────────────────────────────────────────────────────
-// Rendered twice by LandingPage: once in the desktop slot (hidden below lg) and
-// once inside the mobile drawer overlay. `onClose` is only passed in the drawer,
-// where it shows a close button and lets backdrop/nav taps dismiss it. Mirrors
-// the CalculatorPage / CalculatorSidebar drawer pattern — one drawer mechanism
-// for the whole app.
-function LandingSidebar({ auth, navigate, onClose }) {
-  return (
-    <aside className="w-64 shrink-0 bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 flex flex-col h-full">
-      <div className="px-6 py-5 border-b border-white/10 flex items-center justify-between">
-        <Link to="/" className="text-xl font-bold text-white tracking-tight">
-          Spreadsheet<span className="text-amber-400">Millionaire</span>
-        </Link>
-        {onClose && (
-          <button
-            className="lg:hidden text-gray-400 hover:text-white"
-            onClick={onClose}
-            aria-label="Close sidebar"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        )}
-      </div>
-      <nav className="flex-1 px-3 py-4 space-y-1">
-        <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-white/10 text-white font-medium text-sm">
-          <BarChart2 className="w-5 h-5 text-amber-400" />
-          Calculators
-        </div>
-
-        {/* Trackers — live tracker features (from trackers.js); hidden when none
-            are revealed (production, while Net Worth ships dark). */}
-        {LIVE_TRACKERS.length > 0 && (
-          <div className="mt-3 pt-3 border-t border-white/10">
-            <p className="px-3 mb-1 text-xs font-semibold uppercase tracking-wider text-gray-600">
-              Trackers
-            </p>
-            {LIVE_TRACKERS.map(({ slug, label, Icon, to }) => (
-              <button
-                key={slug}
-                onClick={() => navigate(to)}
-                className="w-full flex items-center gap-2.5 px-3 py-2.5 sm:py-2 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-white/10 transition"
-              >
-                <Icon className="w-4 h-4 shrink-0" />
-                <span className="truncate">{label}</span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Coming soon — same muted, badged teasers as the calculator-page
-            sidebar. VISIBLE_UPCOMING already excludes anything now live. */}
-        {VISIBLE_UPCOMING.length > 0 && (
-          <div className="mt-3 pt-3 border-t border-white/10">
-            <p className="px-3 mb-1 text-xs font-semibold uppercase tracking-wider text-gray-600">
-              Coming soon
-            </p>
-            {VISIBLE_UPCOMING.map(({ slug, label, Icon }) => (
-              <button
-                key={slug}
-                onClick={() => navigate(`/app/coming-soon/${slug}`)}
-                className="w-full flex items-center justify-between gap-2.5 px-3 py-2.5 sm:py-2 rounded-lg text-sm text-gray-500 hover:text-gray-300 hover:bg-white/5 transition"
-              >
-                <span className="flex items-center gap-2.5 min-w-0">
-                  <Icon className="w-4 h-4 shrink-0 opacity-60" />
-                  <span className="truncate">{label}</span>
-                </span>
-                <span className="shrink-0 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-full bg-white/10 text-gray-400">
-                  Soon
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
-      </nav>
-      <div className="px-4 py-4 border-t border-white/10">
-        {auth.isAuthenticated ? (
-          <UserFooter auth={auth} variant="roomy" />
-        ) : (
-          <div className="space-y-2">
-            <button
-              onClick={() => navigate('/login')}
-              className="w-full px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition text-sm text-left"
-            >
-              Sign in
-            </button>
-            <button
-              onClick={() => navigate('/register')}
-              className="w-full px-3 py-2 rounded-lg bg-amber-400 text-gray-900 font-medium text-sm hover:bg-amber-300 transition text-center"
-            >
-              Create account
-            </button>
-          </div>
-        )}
-      </div>
-    </aside>
-  )
-}
-
 export default function LandingPage({ auth }) {
   useDocumentTitle('Calculators — SpreadsheetMillionaire')
   const navigate = useNavigate()
   const [activeCategory, setActiveCategory] = useState('All')
   const { favourites, toggle } = useFavourites(auth)
   const [showAuthToast, setShowAuthToast] = useState(false)
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const toastTimerRef = useRef(null)
 
   function handleStarClick(e, type) {
@@ -157,31 +57,14 @@ export default function LandingPage({ auth }) {
   const tabs = ['Favourites', 'All', ...CATEGORIES.filter((c) => c !== 'All')]
 
   return (
-    <div className="min-h-screen flex">
-      {/* ── Dark Sidebar — desktop slot ───────────────────────────────────── */}
-      <div className="hidden lg:block">
-        <LandingSidebar auth={auth} navigate={navigate} />
-      </div>
-
-      {/* ── Dark Sidebar — mobile drawer ──────────────────────────────────── */}
-      {mobileSidebarOpen && (
-        <div className="fixed inset-0 z-50 flex lg:hidden">
-          <LandingSidebar
-            auth={auth}
-            navigate={navigate}
-            onClose={() => setMobileSidebarOpen(false)}
-          />
-          <div className="flex-1 bg-black/50" onClick={() => setMobileSidebarOpen(false)} />
-        </div>
-      )}
-
-      {/* ── Light Content Area ────────────────────────────────────────────── */}
-      <div className="flex-1 bg-gray-100 overflow-y-auto">
+    <AppShell auth={auth}>
+      {({ openSidebar }) => (
+        <>
         <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
               className="lg:hidden flex items-center justify-center min-h-[44px] min-w-[44px] -ml-2 text-gray-500 hover:text-gray-800"
-              onClick={() => setMobileSidebarOpen(true)}
+              onClick={openSidebar}
               aria-label="Open sidebar"
             >
               <Menu className="w-5 h-5" />
@@ -425,10 +308,9 @@ export default function LandingPage({ auth }) {
           )}
         </main>
 
-        <AppFooter />
-      </div>
-
-      <AuthToast visible={showAuthToast} />
-    </div>
+        <AuthToast visible={showAuthToast} />
+        </>
+      )}
+    </AppShell>
   )
 }

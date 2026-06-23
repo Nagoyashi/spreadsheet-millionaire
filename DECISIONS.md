@@ -269,13 +269,21 @@
 **Decision:** Both pages share a single form shell. They differ only in badge, copy, button labels, and submit handler.
 **Why:** They were ~95% identical before extraction. Two files, same maintenance burden when fixing a styling bug or adjusting validation rendering.
 
-## `<UserFooter>` shared across LandingPage + CalculatorSidebar
+## `<UserFooter>` shared, rendered once in `AppSidebar`
 
 **TL;DR:** One component, two variants (`compact`, `roomy`). Owns the delete-modal state internally.
 
-**Decision:** The authenticated-user footer block (email, sign-out, delete account modal) is one component with two variants (`compact`, `roomy`). Owns the delete-confirmation modal state internally.
-**Why:** The block was duplicated, *and* both parents owned their own copy of the delete-modal state with identical handlers. Extraction collapsed both. The variants exist because the surrounding contexts have slightly different visual weight.
-**Why unauthenticated CTAs are NOT shared:** LandingPage shows two buttons (Sign in + Create account, the latter as an amber CTA). CalculatorSidebar shows a single muted "Sign in to save" link. Different surfaces, different intent — sharing would force a worse compromise on both.
+**Decision:** The authenticated-user footer block (email, sign-out, delete account modal) is one component with two variants (`compact`, `roomy`). Owns the delete-confirmation modal state internally. As of the shared-sidebar work it renders in exactly one place — `AppSidebar`'s footer (`variant="compact"`).
+**Why:** The block was duplicated across two sidebar forks, *and* both owned their own copy of the delete-modal state with identical handlers. Extraction collapsed both; the shared sidebar then collapsed the call site too.
+
+## Shared collapsible sidebar — `AppSidebar` + `AppShell`
+
+**TL;DR:** One sidebar for the calculator landing, every calculator page, and both trackers. Three sibling top-level categories. Collapse state persists across navigation via a module-level boolean — not storage, not Context, not a store.
+
+**Decision:** A single `AppSidebar` (the nav + footer) and `AppShell` (the desktop-slot + mobile-drawer layout, render-prop content) back every `/app` page. It replaced two forks: the old `CalculatorSidebar` and an inline `LandingSidebar` in `LandingPage`. The trackers previously had **no** sidebar at all.
+**Structure:** three **sibling** top-level categories, same visual tier — 📊 Calculators (expandable; its calculators render *muted* as sub-items), 📈 Net Worth, 💰 Income & Expenses. The earlier hierarchy nested the trackers under a "Trackers" sub-heading, which read as subordinate. Trackers still ship dark: they appear as top-level siblings only via `LIVE_TRACKERS` (flag-gated), otherwise stay in the muted "Coming soon" section. Calculator sub-items derive from the registry (`PUBLISHED_CALCULATORS`); tracker entries from `trackers.js` — no second list.
+**Saved-calcs slot:** the calculator page's saved-calculations list is page-specific data (`useCalculatorData`/`useSave`), so it is *injected* into `AppSidebar` via an optional `children` slot (a function receiving the mobile-drawer `onClose`), rather than pulling that fetch into the shared layout. Trackers pass nothing.
+**Collapse persistence — why a module-level boolean (`useSidebarCollapse`):** the requirement is "persist across navigation within a session." Per-component `useState` resets on every route change (each page mounts its own `AppShell`). The DECISIONS prop-drilling rule discourages Context/stores until a prop trail exceeds ~4 levels — this is a *single app-wide UI boolean*, not application state, so a 20-line `useSyncExternalStore`-backed module singleton is the minimum machinery: it survives navigation, needs no provider, and resets on full reload (the intended lifetime). Deliberately **not** `localStorage` (avoids a persisted-preference surface for one ephemeral toggle), and **not** a store library.
 
 ## Save logic in `useSave` with `activeSavedCalcId` reset on type change
 

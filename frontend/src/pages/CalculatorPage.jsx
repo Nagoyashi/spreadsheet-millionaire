@@ -5,7 +5,8 @@ import { useSave } from '../hooks/useSave'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { CALC_MAP, PUBLISHED_TYPES } from '../calculators/registry'
 import { CALC_STORAGE_KEY } from '../constants'
-import CalculatorSidebar from '../components/CalculatorSidebar'
+import AppShell from '../components/AppShell'
+import SavedCalculationsSidebar from '../components/SavedCalculationsSidebar'
 import CalculatorHeader from '../components/CalculatorHeader'
 import CalculatorExplainer from '../components/CalculatorExplainer'
 import CalculatorSkeleton from '../components/ui/CalculatorSkeleton'
@@ -42,9 +43,8 @@ export default function CalculatorPage({ auth }) {
     deleteCalc,
   } = useCalculatorData(auth.isAuthenticated, type)
 
-  const [initialData, setInitialData]             = useState(null)
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
-  const currentDataRef                            = useRef({})
+  const [initialData, setInitialData] = useState(null)
+  const currentDataRef                = useRef({})
 
   // Restore inputs saved to sessionStorage before an auth redirect
   useEffect(() => {
@@ -75,7 +75,6 @@ export default function CalculatorPage({ auth }) {
     currentDataRef,
     onLoad: (calc) => {
       setInitialData(calc.data)
-      setMobileSidebarOpen(false)
     },
   })
 
@@ -107,66 +106,58 @@ export default function CalculatorPage({ auth }) {
   // unknown/unpublished type without changing hook order between renders.
   if (!isPublished) return <Navigate to="/app" replace />
 
-  const sidebarProps = {
-    activeType: type,
-    auth,
-    savedCalcs,
-    calcsLoading,
-    calcsError,
-    activeSavedCalcId,
-    onLoad: handleLoad,
-    onDeselect: handleNew,                  // click active record in sidebar = detach
-    onRename: (id, name) => updateCalc(id, { name }),
-    onDelete: handleDeleteCalc,
-    onClose: () => setMobileSidebarOpen(false),
-    onNavigateLogin: () => navigate('/login', { state: { from: `/app/calculator/${type}` } }),
-  }
+  // Saved-calcs slot for the sidebar (authenticated only). The function form
+  // receives `onClose` so loading a record dismisses the mobile drawer.
+  const savedCalcsSlot = auth.isAuthenticated
+    ? (onClose) => (
+        <SavedCalculationsSidebar
+          savedCalcs={savedCalcs}
+          loading={calcsLoading}
+          error={calcsError}
+          activeSavedCalcId={activeSavedCalcId}
+          onLoad={(calc) => {
+            handleLoad(calc)
+            onClose?.()
+          }}
+          onDeselect={handleNew}            // click active record in sidebar = detach
+          onRename={(id, name) => updateCalc(id, { name })}
+          onDelete={handleDeleteCalc}
+        />
+      )
+    : null
 
   return (
-    <div className="min-h-screen flex">
+    <AppShell auth={auth} sidebar={savedCalcsSlot}>
+      {({ openSidebar }) => (
+        <>
+          <CalculatorHeader
+            Icon={Icon}
+            iconColor={color}
+            label={label}
+            activeCalcName={activeSavedCalcId && activeCalc ? activeCalc.name : null}
+            saveStatus={saveStatus}
+            saveError={saveError}
+            saveLabel={saveLabel}
+            isSaving={isSaving}
+            onSaveClick={handleSaveClick}
+            onNewClick={handleNew}
+            onMobileMenuClick={openSidebar}
+          />
 
-      <div className="hidden lg:block">
-        <CalculatorSidebar {...sidebarProps} />
-      </div>
+          <main className="flex-1 overflow-y-auto p-6">
+            <div className="max-w-5xl mx-auto space-y-6">
+              <CalculatorExplainer Icon={Icon} gradient={gradient} explainer={explainer} />
+              <Suspense fallback={<CalculatorSkeleton />}>
+                {calculator}
+              </Suspense>
+            </div>
+          </main>
 
-      {mobileSidebarOpen && (
-        <div className="fixed inset-0 z-50 flex lg:hidden">
-          <CalculatorSidebar {...sidebarProps} />
-          <div className="flex-1 bg-black/50" onClick={() => setMobileSidebarOpen(false)} />
-        </div>
+          {showNameModal && (
+            <SaveNameModal onConfirm={handleNameConfirm} onCancel={handleNameCancel} />
+          )}
+        </>
       )}
-
-      <div className="flex-1 flex flex-col bg-gray-100 min-h-screen">
-
-        <CalculatorHeader
-          Icon={Icon}
-          iconColor={color}
-          label={label}
-          activeCalcName={activeSavedCalcId && activeCalc ? activeCalc.name : null}
-          saveStatus={saveStatus}
-          saveError={saveError}
-          saveLabel={saveLabel}
-          isSaving={isSaving}
-          onSaveClick={handleSaveClick}
-          onNewClick={handleNew}
-          onMobileMenuClick={() => setMobileSidebarOpen(true)}
-        />
-
-        <main className="flex-1 overflow-y-auto p-6">
-          <div className="max-w-5xl mx-auto space-y-6">
-            <CalculatorExplainer Icon={Icon} gradient={gradient} explainer={explainer} />
-            <Suspense fallback={<CalculatorSkeleton />}>
-              {calculator}
-            </Suspense>
-          </div>
-        </main>
-
-      </div>
-
-      {showNameModal && (
-        <SaveNameModal onConfirm={handleNameConfirm} onCancel={handleNameCancel} />
-      )}
-
-    </div>
+    </AppShell>
   )
 }
