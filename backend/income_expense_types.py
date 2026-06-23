@@ -44,3 +44,16 @@ INCOME_CATEGORIES = (
 # Union for the DB CHECK constraint — dedup while preserving order ('other'
 # appears in both).
 ALL_CATEGORIES = tuple(dict.fromkeys(EXPENSE_CATEGORIES + INCOME_CATEGORIES))
+
+# ie_transactions.recurrence_unit — a transaction can repeat. A repeat is
+# expressed as (unit, interval): e.g. ('week', 2) = "every two weeks", ('month', 1)
+# = "monthly". 'none' = a one-off (the default for every existing row). Forecast
+# occurrences are derived at read time on the client and never persisted (so the
+# table never holds projected rows). See DECISIONS.md § "Income & Expense Tracker".
+RECURRENCE_UNITS = (
+    "none",
+    "day",
+    "week",
+    "month",
+    "year",
+)

@@ -15,6 +15,7 @@ import {
 import { fmt, fmtPct } from '../../utils/format'
 import { categoryLabel } from './incomeExpenseOptions'
 import { monthlyIncomeStats, categoryBreakdown } from './cashflowSelectors'
+import { forecastByMonth } from './recurrence'
 
 // Income & Expense Overview dashboard (recharts, already a dep): summary cards
 // (with savings rate), a monthly income-vs-expense bar, and an expense-by-
@@ -101,11 +102,21 @@ export default function CashflowDashboard({ summary, transactions = [], filters,
   const incomeStats = monthlyIncomeStats(summary.by_month)
   const perMonthIncome = incomeStat === 'average' ? incomeStats.average : incomeStats.median
 
-  const monthlyData = summary.by_month.map((m) => ({
-    name: MONTHS_SHORT[m.month - 1],
-    income: m.income,
-    expense: m.expense,
-  }))
+  // Forecast: recurring transactions projected into the empty future months of
+  // the year (read-side only — nothing persisted). An empty month with a
+  // projection renders as a lighter "forecast" bar.
+  const forecast = forecastByMonth(transactions, year)
+  const monthlyData = summary.by_month.map((m, i) => {
+    const fc = forecast[i]
+    const isForecast = m.income === 0 && m.expense === 0 && (fc.income > 0 || fc.expense > 0)
+    return {
+      name: MONTHS_SHORT[m.month - 1],
+      income: isForecast ? fc.income : m.income,
+      expense: isForecast ? fc.expense : m.expense,
+      forecast: isForecast,
+    }
+  })
+  const hasForecast = monthlyData.some((m) => m.forecast)
 
   // Category pie — full year reads the year-complete summary; a specific month
   // re-slices the transaction list (the /summary endpoint is year-scoped only).
@@ -196,13 +207,29 @@ export default function CashflowDashboard({ summary, transactions = [], filters,
                 tick={{ fontSize: 12, fill: '#6b7280' }}
                 width={56}
               />
-              <Tooltip formatter={(value) => money(value)} />
+              <Tooltip
+                formatter={(value, name, item) => [
+                  money(value),
+                  item?.payload?.forecast ? `${name} (forecast)` : name,
+                ]}
+              />
               <Legend />
-              <Bar dataKey="income" name="Income" fill={INCOME_COLOR} />
-              <Bar dataKey="expense" name="Expense" fill={EXPENSE_COLOR} />
+              <Bar dataKey="income" name="Income" fill={INCOME_COLOR}>
+                {monthlyData.map((d, i) => (
+                  <Cell key={`inc-${i}`} fill={INCOME_COLOR} fillOpacity={d.forecast ? 0.4 : 1} />
+                ))}
+              </Bar>
+              <Bar dataKey="expense" name="Expense" fill={EXPENSE_COLOR}>
+                {monthlyData.map((d, i) => (
+                  <Cell key={`exp-${i}`} fill={EXPENSE_COLOR} fillOpacity={d.forecast ? 0.4 : 1} />
+                ))}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
-          <p className="mt-2 text-xs text-gray-400">Tip: click a month to scope the category breakdown.</p>
+          <p className="mt-2 text-xs text-gray-400">
+            Tip: click a month to scope the category breakdown.
+            {hasForecast && ' Lighter bars are projected from recurring transactions.'}
+          </p>
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-6">

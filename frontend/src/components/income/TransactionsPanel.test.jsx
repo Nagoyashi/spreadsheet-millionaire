@@ -74,7 +74,26 @@ describe('TransactionsPanel', () => {
       category: 'housing',
       amount: 100,
       occurred_on: '2026-05-01',
+      recurrence_unit: 'none',
+      recurrence_interval: 1,
     })
+  })
+
+  it('submits a recurrence rule when set', () => {
+    const { onAdd } = setup([])
+    fireEvent.change(within(form()).getByRole('spinbutton'), { target: { value: '100' } })
+    fireEvent.change(document.querySelector('input[type="date"]'), {
+      target: { value: '2026-05-01' },
+    })
+    // The 3rd combobox in the form is the Repeat unit selector.
+    const repeat = within(form()).getAllByRole('combobox')[2]
+    fireEvent.change(repeat, { target: { value: 'week' } })
+    // The interval number input appears once it repeats.
+    fireEvent.change(within(form()).getByDisplayValue('1'), { target: { value: '2' } })
+    fireEvent.click(within(form()).getByRole('button', { name: /add/i }))
+    expect(onAdd).toHaveBeenCalledWith(
+      expect.objectContaining({ recurrence_unit: 'week', recurrence_interval: 2 })
+    )
   })
 
   it('keeps Add disabled until amount and date are set', () => {
