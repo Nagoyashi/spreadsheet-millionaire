@@ -140,11 +140,13 @@ frontend/
     │   │   ├── DeleteAccountModal.jsx     # Password-confirmed account deletion modal
     │   │   └── CalculatorSkeleton.jsx     # Loading skeleton for lazy calculator chunks
     │   ├── wealth/                        # Net Worth tracker components (consumed by WealthPage)
-    │   │   ├── categories.js              # Per-tab field/column configs + enum options (values mirror backend net_worth_types.py)
-    │   │   ├── CategoryManager.jsx        # Generic add/edit form + table for one category; driven by a categories.js config
-    │   │   ├── Dashboard.jsx              # Overview tab — recharts allocation pie + category bar + category cards + net-worth-over-time line + "take snapshot"
-    │   │   ├── managerHelpers.js          # Pure helpers (buildPayload/canSubmit/initialForm/formFromRow/formatCell)
+    │   │   ├── categories.js              # Per-tab field/column configs + enum options (values mirror backend net_worth_types.py); gain/loss columns use derive() from overviewSelectors
+    │   │   ├── overviewSelectors.js       # Pure Overview derivation — per-item gain (asset/investment/property, mirrors backend), debtToAssetRatio, snapshotDelta, liabilitiesBreakdown (incl. mortgages slice)
+    │   │   ├── CategoryManager.jsx        # Generic add/edit form + table for one category; driven by a categories.js config (supports derived + gainloss columns)
+    │   │   ├── Dashboard.jsx              # Overview tab — recharts allocation pie + category bar + category cards + liabilities breakdown + net-worth-over-time line (with delta-vs-last) + "take snapshot"
+    │   │   ├── managerHelpers.js          # Pure helpers (buildPayload/canSubmit/initialForm/formFromRow/formatCell/deriveCell/gainTone)
     │   │   ├── managerHelpers.test.js     # vitest unit tests for the helpers
+    │   │   ├── overviewSelectors.test.js  # vitest — gain reconciliation, debt ratio, snapshot delta, liabilities breakdown
     │   │   ├── CategoryManager.test.jsx   # RTL — render/add/edit/delete/validation
     │   │   └── Dashboard.test.jsx         # RTL — summary figures, chart sections, snapshot action
     │   ├── income/                        # Income & Expense tracker components (consumed by IncomeExpensePage)
