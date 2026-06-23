@@ -75,9 +75,11 @@ issues are the cycle's scope. Patches (`vX.Y.Z`, Z > 0) skip milestones.
 > engine lands last so its rewards/fraud shape fits the launch posture decided in
 > the product review.
 
-- **Recurring transactions & budgets** *(un-slotted backlog)* — deferred from the
-  Income & Expense cycle (`fintrackr_dev` had both); substantial enough for their
-  own cycle once the transaction tracker ships.
+- **Budgets** *(un-slotted backlog)* — per-category budgets (`fintrackr_dev` had
+  them); a separate feature with its own UI surface. **Recurring transactions**
+  (the other half of this item) shipped as a post-`v0.11.0` follow-up — a
+  `(recurrence_unit, recurrence_interval)` pair on the transaction row plus a
+  read-time cashflow forecast; see DECISIONS.md § "Income & Expense Tracker".
 - **Backlog cleanup + Security hardening** *(next cycle — targeted at `v0.12.0`)* — one
   consolidation cycle after the trackers land: sweep accumulated board backlog
   (tech debt, bugs, small gaps) **and** harden security for finance-app credibility

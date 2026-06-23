@@ -15,7 +15,15 @@ from decimal import Decimal
 from db import get_db
 
 # Insert/update allow-list (server-side, never request input).
-_COLUMNS = ("type", "category", "amount", "occurred_on", "note")
+_COLUMNS = (
+    "type",
+    "category",
+    "amount",
+    "occurred_on",
+    "note",
+    "recurrence_unit",
+    "recurrence_interval",
+)
 
 
 def _jsonify_value(v):

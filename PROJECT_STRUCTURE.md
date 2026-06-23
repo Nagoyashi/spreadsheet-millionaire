@@ -40,7 +40,7 @@ backend/
 ├── config.py                   # All config read from .env — exits if SECRET_KEY/DATABASE_URL invalid (and REDIS_URL in prod)
 ├── calc_types.py               # Single source of truth for VALID_CALC_TYPES (imported by schema + db_init)
 ├── net_worth_types.py          # Single source of truth for Net Worth enum sets (ASSET_TYPES/LIABILITY_TYPES/ASSET_CLASSES/PROPERTY_TYPES) — imported by nw schema + db_init
-├── income_expense_types.py     # Single source of truth for Income & Expense enums (TRANSACTION_TYPES/EXPENSE_CATEGORIES/INCOME_CATEGORIES/ALL_CATEGORIES) — imported by ie schema + db_init
+├── income_expense_types.py     # Single source of truth for Income & Expense enums (TRANSACTION_TYPES/EXPENSE_CATEGORIES/INCOME_CATEGORIES/ALL_CATEGORIES/RECURRENCE_UNITS) — imported by ie schema + db_init
 ├── db.py                       # Per-request psycopg connection on Flask g, closed on teardown (no in-process pool)
 ├── db_init.py                  # Postgres schema creation + idempotent CHECK-constraint rebuild (users, saved_calculators, password_reset_tokens, nw_* Net Worth tables, ie_transactions)
 ├── __pycache__/
@@ -148,10 +148,11 @@ frontend/
     │   │   ├── CategoryManager.test.jsx   # RTL — render/add/edit/delete/validation
     │   │   └── Dashboard.test.jsx         # RTL — summary figures, chart sections, snapshot action
     │   ├── income/                        # Income & Expense tracker components (consumed by IncomeExpensePage)
-    │   │   ├── incomeExpenseOptions.js    # TYPE_OPTIONS + per-type CATEGORY_OPTIONS (values mirror backend income_expense_types.py)
-    │   │   ├── TransactionsPanel.jsx      # Year/month/type filters + table + add/edit form (category options depend on type)
+    │   │   ├── incomeExpenseOptions.js    # TYPE_OPTIONS + per-type CATEGORY_OPTIONS + RECURRENCE_UNIT_OPTIONS/recurrenceLabel (values mirror backend income_expense_types.py)
+    │   │   ├── TransactionsPanel.jsx      # Year/month/type filters + table + add/edit form (category + recurrence rule, options depend on type)
     │   │   ├── cashflowSelectors.js       # Pure Overview derivation — monthlyIncomeStats (avg/median), categoryBreakdown (year/month slice of the txn list); single source for month/year filtering
-    │   │   └── CashflowDashboard.jsx      # Overview tab — recharts: per-month income (avg/median toggle), monthly income-vs-expense bar, spending-by-category pie (year or month-scoped), year selector
+    │   │   ├── recurrence.js              # Pure forecast projection — projectRecurring/forecastByMonth: project recurring txns into the empty future months (read-time only, never persisted)
+    │   │   └── CashflowDashboard.jsx      # Overview tab — recharts: per-month income (avg/median toggle), monthly income-vs-expense bar (with recurrence forecast), spending-by-category pie (year or month-scoped), year selector
     │   ├── AppFooter.jsx                  # Compact single-row legal footer (© line + Privacy/Terms/Imprint/Source) — rendered once by AppShell, so it appears on every /app page
     │   ├── AppShell.jsx                   # In-app layout shell — renders AppSidebar (desktop slot + mobile drawer) + content + AppFooter; render-prop children get { openSidebar }. Wraps every /app page
     │   ├── AppSidebar.jsx                 # THE shared sidebar — three sibling top-level categories (Calculators expandable→muted calcs, Net Worth, Income & Expenses, all flag-gated) + collapse toggle + optional saved-calcs slot + UserFooter
