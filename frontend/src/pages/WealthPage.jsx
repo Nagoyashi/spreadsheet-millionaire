@@ -193,7 +193,13 @@ export default function WealthPage({ auth }) {
           ) : (
             <div className="min-h-[400px]">
               {activeTab === 'overview' ? (
-                <Dashboard summary={summary} snapshots={snapshots} onSnapshot={nw.createSnapshot} />
+                <Dashboard
+                  summary={summary}
+                  snapshots={snapshots}
+                  onSnapshot={nw.createSnapshot}
+                  liabilities={liabilities}
+                  properties={properties}
+                />
               ) : (
                 renderManager(activeTab)
               )}

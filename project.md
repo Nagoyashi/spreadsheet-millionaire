@@ -78,6 +78,18 @@ issues are the cycle's scope. Patches (`vX.Y.Z`, Z > 0) skip milestones.
 - **Recurring transactions & budgets** *(un-slotted backlog)* — deferred from the
   Income & Expense cycle (`fintrackr_dev` had both); substantial enough for their
   own cycle once the transaction tracker ships.
+- **Net Worth Overview — goal line + FIRE tie-in** *(un-slotted backlog)* — a target
+  net-worth line on the over-time chart (e.g. "reach $500K by 2030"), ideally seeded
+  from / linked to the registry-driven FIRE calculators (the tracker and the FIRE calc
+  answer the same question from two directions). Deferred: needs to *store* a goal
+  (schema change) and a deliberate cross-feature contract between calculators and the
+  tracker. A natural paid-tier hook. (Overview read-side polish — proper trend line +
+  delta, debt-to-asset ratio, liabilities breakdown, per-item gain/loss — shipped
+  separately as derive-only, no schema change.)
+- **Net Worth snapshots — richer history** *(un-slotted backlog)* — per-asset history
+  (one asset's value over time, not just aggregate NW) and snapshot comparison (diff any
+  two snapshots per asset class); both need a richer snapshot shape (schema change).
+  Auto/scheduled snapshots need a background-job concept that doesn't exist yet.
 - **Backlog cleanup + Security hardening** *(next cycle — targeted at `v0.12.0`)* — one
   consolidation cycle after the trackers land: sweep accumulated board backlog
   (tech debt, bugs, small gaps) **and** harden security for finance-app credibility

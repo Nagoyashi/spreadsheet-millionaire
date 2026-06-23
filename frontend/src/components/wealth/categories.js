@@ -5,6 +5,11 @@
 // CHECK constraints + Marshmallow OneOf reject anything else). Labels are
 // UI-only. This is the frontend mirror, analogous to how the calculator
 // registry's VALID_TYPES mirrors backend calc_types.py.
+//
+// A `gainloss` column uses a `derive(row)` from overviewSelectors so the per-item
+// gain matches the backend's aggregate computation exactly.
+
+import { assetGain, investmentGain, propertyGain } from './overviewSelectors'
 
 export const ASSET_TYPE_OPTIONS = [
   { value: 'cash', label: 'Cash' },
@@ -70,6 +75,7 @@ export const CATEGORY_CONFIGS = {
       { key: 'asset_type', label: 'Type', format: 'enum', options: ASSET_TYPE_OPTIONS },
       { key: 'current_value', label: 'Value', format: 'money' },
       { key: 'cost_basis', label: 'Cost basis', format: 'money' },
+      { key: 'gain', label: 'Gain / loss', format: 'gainloss', derive: assetGain },
     ],
   },
 
@@ -94,6 +100,7 @@ export const CATEGORY_CONFIGS = {
       { key: 'name', label: 'Name' },
       { key: 'current_value', label: 'Value', format: 'money' },
       { key: 'cost_basis', label: 'Cost basis', format: 'money' },
+      { key: 'gain', label: 'Gain / loss', format: 'gainloss', derive: assetGain },
     ],
   },
 
@@ -136,6 +143,7 @@ export const CATEGORY_CONFIGS = {
       { key: 'quantity', label: 'Qty' },
       { key: 'cost_basis', label: 'Cost / unit', format: 'money' },
       { key: 'current_value', label: 'Market value', format: 'money' },
+      { key: 'gain', label: 'Gain / loss', format: 'gainloss', derive: investmentGain },
     ],
   },
 
@@ -178,6 +186,7 @@ export const CATEGORY_CONFIGS = {
       { key: 'property_type', label: 'Type', format: 'enum', options: PROPERTY_TYPE_OPTIONS },
       { key: 'current_value', label: 'Value', format: 'money' },
       { key: 'mortgage_balance', label: 'Mortgage', format: 'money' },
+      { key: 'gain', label: 'Gain / loss', format: 'gainloss', derive: propertyGain },
     ],
   },
 
