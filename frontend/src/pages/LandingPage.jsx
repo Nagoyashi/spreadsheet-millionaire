@@ -6,7 +6,6 @@ import { LIVE_TRACKERS, VISIBLE_UPCOMING } from '../trackers'
 import { useFavourites } from '../hooks/useFavourites'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import AppShell from '../components/AppShell'
-import AppFooter from '../components/AppFooter'
 
 // ─── Small toast for unauthenticated star attempt ─────────────────────────────
 function AuthToast({ visible }) {
@@ -308,8 +307,6 @@ export default function LandingPage({ auth }) {
             </div>
           )}
         </main>
-
-        <AppFooter />
 
         <AuthToast visible={showAuthToast} />
         </>

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import AppSidebar from './AppSidebar'
+import AppFooter from './AppFooter'
 
 // The in-app layout shell: renders the shared AppSidebar in the desktop slot and
 // (below lg) in a mobile drawer, with the page content beside it. Every /app
@@ -36,9 +37,10 @@ export default function AppShell({ auth, sidebar = null, children }) {
         </div>
       )}
 
-      {/* Content area */}
+      {/* Content area — page content fills, the shared footer sits at the bottom */}
       <div className="flex-1 flex flex-col bg-gray-100 min-h-screen overflow-x-hidden">
         {children({ openSidebar })}
+        <AppFooter />
       </div>
     </div>
   )
