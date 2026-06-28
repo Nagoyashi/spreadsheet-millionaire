@@ -18,6 +18,7 @@ from calc_types import VALID_CALC_TYPES
 from user_tiers import USER_TIERS
 from models import calculator_publish, admin_audit
 from models.user import User
+from services import analytics
 from utils.auth_helpers import admin_required, csrf_protect
 
 bp = Blueprint("admin", __name__, url_prefix="/api/admin")
@@ -140,3 +141,25 @@ def update_user(user_id):
         )
 
     return jsonify({"user": updated.to_admin_dict()}), 200
+
+
+# ---------------------------------------------------------------------------- #
+# Analytics — GA4 (server-side proxy) + DB-sourced signups
+# ---------------------------------------------------------------------------- #
+@bp.route("/analytics", methods=["GET"])
+@admin_required
+def analytics_overview():
+    """
+    Usage & conversion for the Analytics screen. Signups + the tier funnel come
+    from our DB (always present); visitors / sources / per-calculator runs come
+    from GA4 when configured (server-side; the service-account key never reaches
+    the client). When GA4 is unset, `configured` is false and the GA fields are
+    null — the UI shows an empty "connect GA4" state. GET — read-only, no CSRF.
+    """
+    try:
+        range_days = int(request.args.get("range", "30").rstrip("d"))
+    except ValueError:
+        range_days = 30
+    range_days = max(1, min(range_days, 365))
+
+    return jsonify(analytics.get_overview(range_days)), 200

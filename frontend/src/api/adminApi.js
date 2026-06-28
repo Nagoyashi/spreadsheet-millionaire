@@ -30,4 +30,7 @@ export const adminApi = {
   // PATCH /api/admin/users/:id { tier?, suspended? } — tier control +
   // suspend/reinstate (audit-logged server-side).
   updateUser: (id, fields) => api.patch(`/users/${id}`, fields),
+
+  // GET /api/admin/analytics?range=30d — DB signups + GA4 (when configured).
+  getAnalytics: (range = '30d') => api.get(`/analytics?range=${encodeURIComponent(range)}`),
 }

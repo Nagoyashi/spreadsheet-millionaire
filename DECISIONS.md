@@ -84,6 +84,18 @@
 
 **Deferred (not built):** Activity (top calculator + run count) needs the GA4 `calc_run` event (Analytics phase, #152); LTV needs billing. Both render as placeholders (`—` / `$0.00`) until those land.
 
+## Admin analytics — GA4 proxy with a DB-backed empty state
+
+**TL;DR:** `GET /api/admin/analytics` always returns real signup + funnel numbers from our **own DB**; visitors / traffic sources / per-calculator runs come from **GA4 via a server-side proxy** when configured, else null with `configured: false`. The GA4 SDK is an **optional, lazily-imported** dependency so nothing is added to the default install until GA4 is actually wired.
+
+**Decision:** `services/analytics.py` assembles the payload. The DB half (total accounts, new signups in range, the Free/Pro/Elite funnel from `tier_counts`) is always present — it's ours, no third party needed. The GA half (`total_visitors`, `visitors_over_time`, `traffic_sources`, `top_calculators`) is fetched from the **GA4 Data API** with a **service-account key kept server-side** (`GA4_PROPERTY_ID` + `GA4_CREDENTIALS_JSON` env; never shipped to the client — hard rule spirit). When GA4 is unconfigured the endpoint returns `configured: false` and the GA fields null; the UI shows a "connect GA4" empty state but **still renders the real signup KPIs + funnel**. A configured-but-broken GA4 (missing SDK, bad creds, API error) surfaces as `ga_error` rather than a 500, and each GA sub-report is independently defensive (one failing section → null, not total failure).
+
+**Why the GA4 SDK is optional + commented in requirements.txt:** `google-analytics-data` pulls grpc/protobuf — heavy, and **unused until GA4 is configured**. Per the "deliberately boring, justify deps against the problem" rule, it stays commented; `_ga4_metrics` imports it lazily and raises a clear "add it to requirements" `AnalyticsError` if GA4 is configured without it. So the default install/CI/prod stay lean, and the empty state needs zero new deps.
+
+**Deferred (needs explicit setup, not built here):**
+- The **`calc_run` custom event** the "Most-used calculators" ranking depends on. Emitting it means adding GA4 (gtag) to the **public** site, which is a privacy decision (the app currently declines non-essential cookies and has a privacy policy) — out of scope for the empty-state phase and not done without that review.
+- `Free → Paid` KPI + the Pro/Elite funnel stages stay disabled ("activate after beta") until billing exists.
+
 ## Tracker teasers outside the calculator registry
 
 **TL;DR:** The two upcoming trackers live in their own `upcomingFeatures.js` module, not in `registry.js`. The registry stays calculators-only.

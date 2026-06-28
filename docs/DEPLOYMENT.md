@@ -111,6 +111,8 @@ here.** The two services must **not** share the secret key, database, or Redis.
 | `MAIL_FROM` | `noreply@spreadsheetmillionaire.com` | sender address | Only delivers to the Resend account owner until the domain is verified (§ "Known caveats"). |
 | `CORS_ORIGINS` | the production frontend origin (custom domain) | the staging/preview frontend origin | Comma-separated, no wildcard. Defence-in-depth; the single-origin proxy means the happy path doesn't rely on it. |
 | `SESSION_COOKIE_SECURE` | `True` | `True` | Both are HTTPS. |
+| `GA4_PROPERTY_ID` | *(optional)* GA4 property id | *(optional)* | Admin **Analytics** tab. Unset → the tab shows an empty "connect GA4" state (signup KPIs still render from the DB). Needs the commented `google-analytics-data` dep uncommented. |
+| `GA4_CREDENTIALS_JSON` | *(optional)* service-account JSON or key-file path | *(optional)* | Server-side only — never `VITE_`-prefixed; the key must not reach the client. Pairs with `GA4_PROPERTY_ID`. |
 
 **Schema:** the Neon **dev** branch already has the schema (Phase 2). The Neon
 **main** branch is fresh for production — run `python db_init.py` from `backend/`

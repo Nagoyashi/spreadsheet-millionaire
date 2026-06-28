@@ -325,3 +325,26 @@ def test_user_update_forbidden_for_non_admin(auth_client, app, get_csrf_token):
         json={"tier": "pro"},
     )
     assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------- #
+# Analytics — DB-sourced now, GA4 empty-state until configured
+# ---------------------------------------------------------------------------- #
+def test_analytics_requires_admin(auth_client):
+    client, _ = auth_client
+    assert client.get("/api/admin/analytics").status_code == 404
+
+
+def test_analytics_empty_state_uses_db_signups(admin_client, app):
+    """With GA4 unconfigured (tests never set it), the endpoint reports
+    configured=false but still returns real DB-sourced signups + tier funnel."""
+    client, _ = admin_client
+    _register(app, "newbie@example.com")
+    body = client.get("/api/admin/analytics?range=30d").get_json()
+
+    assert body["configured"] is False
+    assert body["kpis"]["total_visitors"] is None       # GA-sourced → null
+    assert body["kpis"]["new_signups"] >= 2             # admin + newbie, from DB
+    assert body["visitors_over_time"] is None
+    assert body["funnel"]["free"] >= 2                  # DB tier counts
+    assert body["funnel"]["pro"] == 0 and body["funnel"]["elite"] == 0

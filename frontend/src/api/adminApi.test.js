@@ -41,4 +41,9 @@ describe('adminApi', () => {
     adminApi.updateUser(7, { tier: 'elite' })
     expect(calls).toEqual([['patch', '/users/7', { tier: 'elite' }]])
   })
+
+  it('GETs analytics for a range', () => {
+    adminApi.getAnalytics('7d')
+    expect(calls).toEqual([['get', '/analytics?range=7d']])
+  })
 })

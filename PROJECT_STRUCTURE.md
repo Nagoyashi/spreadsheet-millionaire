@@ -57,7 +57,7 @@ backend/
 ├── routes/
 │   ├── auth.py                 # /api/auth/* — register (+welcome email), login, logout, status, delete account, csrf-token, forgot-password, reset-password, change-password, change-email
 │   ├── calculators.py          # /api/calculators/* — CRUD for saved calculations + GET /published (public runtime publish surface)
-│   ├── admin.py                # /api/admin/* — admin-only (admin_required, 404 for non-admins). Overview: GET /calculators, PATCH /calculators/:type {published}. Users: GET /users (search/tier), PATCH /users/:id {tier?,suspended?} (audit-logged; self-suspend guarded)
+│   ├── admin.py                # /api/admin/* — admin-only (admin_required, 404 for non-admins). Overview: GET /calculators, PATCH /calculators/:type {published}. Users: GET /users (search/tier), PATCH /users/:id {tier?,suspended?} (audit-logged; self-suspend guarded). Analytics: GET /analytics?range= (DB signups + GA4 proxy)
 │   ├── net_worth.py            # /api/net-worth/* — CRUD for assets/liabilities/investments/real-estate + /summary + /snapshots (login_required, CSRF, rate-limited writes)
 │   ├── income_expense.py       # /api/income-expense/* — transactions CRUD (year/month filters) + /summary (login_required, CSRF, rate-limited writes)
 │   └── health.py               # GET /api/health — liveness probe, rate-limit exempt, no DB/Redis
@@ -67,7 +67,8 @@ backend/
 │   ├── net_worth_schema.py     # Asset/Liability/Investment/RealEstate/Snapshot schemas — enums from net_worth_types.py
 │   └── income_expense_schema.py # TransactionSchema — enums from income_expense_types.py; per-type category validation
 ├── services/
-│   └── email.py                # Resend wrapper — send_email + send_welcome_email + send_password_reset_email; disabled (no-op) without RESEND_API_KEY
+│   ├── email.py                # Resend wrapper — send_email + send_welcome_email + send_password_reset_email; disabled (no-op) without RESEND_API_KEY
+│   └── analytics.py            # Admin Analytics — DB signups/funnel (always) + GA4 Data API proxy (optional, lazy SDK import); empty-state when GA4 unconfigured
 ├── utils/
 │   └── auth_helpers.py         # login_required, admin_required (404 for non-admins), csrf_protect, set/clear session, generate_csrf_token
 └── tests/
