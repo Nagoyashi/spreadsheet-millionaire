@@ -27,7 +27,7 @@ import psycopg
 from psycopg import sql
 
 from config import Config
-from calc_types import VALID_CALC_TYPES
+from calc_types import VALID_CALC_TYPES, DEFAULT_PUBLISHED_TYPES
 from net_worth_types import (
     ASSET_TYPES,
     LIABILITY_TYPES,
@@ -108,6 +108,16 @@ def init_db() -> None:
                 )
             """)
 
+            # is_admin gates the /admin portal (Phase 12 — Admin Control Center).
+            # Additive, idempotent; defaults false so every existing and new
+            # account is a normal user until explicitly promoted. The admin gate
+            # (utils/auth_helpers.admin_required) reads this column — there is no
+            # second source of truth for "who is an admin".
+            cur.execute("""
+                ALTER TABLE users
+                    ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT false
+            """)
+
             # ---------------------------------------------------------------- #
             # saved_calculators
             #   data is JSONB; user_id cascades on user deletion.
@@ -130,6 +140,38 @@ def init_db() -> None:
                 CREATE INDEX IF NOT EXISTS idx_saved_calculators_user_id
                 ON saved_calculators(user_id)
             """)
+
+            # ---------------------------------------------------------------- #
+            # calculator_publish — runtime publish state, one row per calc type.
+            #   The admin portal toggles `published` here and the public /app
+            #   reads it at runtime, so a calculator can be published/unpublished
+            #   without a redeploy. This is the DB source of truth that replaces
+            #   the build-time `published` constant in the frontend registry (the
+            #   registry still owns metadata — name/icon/category). calc_type is
+            #   the PK; updated_by references the admin who last flipped it (kept
+            #   even if that admin is later deleted, hence ON DELETE SET NULL).
+            #   See DECISIONS.md § "Runtime publish state — DB-backed, admin-
+            #   toggleable". The table is SEEDED below from DEFAULT_PUBLISHED_TYPES.
+            # ---------------------------------------------------------------- #
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS calculator_publish (
+                    calc_type  TEXT        PRIMARY KEY,
+                    published  BOOLEAN     NOT NULL,
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    updated_by BIGINT      REFERENCES users(id) ON DELETE SET NULL
+                )
+            """)
+
+            # Seed one row per known calc type, defaulting to the public MVP set.
+            # ON CONFLICT DO NOTHING makes this idempotent and — crucially —
+            # non-destructive: a later run never resets an admin's live toggle,
+            # it only backfills rows for newly-added calc types.
+            for _calc_type in VALID_CALC_TYPES:
+                cur.execute(
+                    "INSERT INTO calculator_publish (calc_type, published) "
+                    "VALUES (%s, %s) ON CONFLICT (calc_type) DO NOTHING",
+                    (_calc_type, _calc_type in DEFAULT_PUBLISHED_TYPES),
+                )
 
             # ---------------------------------------------------------------- #
             # password_reset_tokens

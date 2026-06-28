@@ -9,11 +9,19 @@ class User:
     No ORM — just plain SQL kept readable.
     """
 
-    def __init__(self, id: int, email: str, password_hash: str, created_at: str):
+    def __init__(
+        self,
+        id: int,
+        email: str,
+        password_hash: str,
+        created_at: str,
+        is_admin: bool = False,
+    ):
         self.id            = id
         self.email         = email
         self.password_hash = password_hash
         self.created_at    = created_at
+        self.is_admin      = bool(is_admin)
 
     # ------------------------------------------------------------------ #
     # Serialisation
@@ -24,6 +32,7 @@ class User:
             "id":         self.id,
             "email":      self.email,
             "created_at": self.created_at,
+            "is_admin":   self.is_admin,
         }
 
     # ------------------------------------------------------------------ #
@@ -81,6 +90,19 @@ class User:
             (password_hash, user_id),
         )
         conn.commit()
+
+    @classmethod
+    def set_admin(cls, user_id: int, is_admin: bool) -> "User | None":
+        """Promote/demote a user to admin. No self-serve UI — this is the
+        manual lever (used from a shell / db_init helper) for granting access
+        to the /admin portal. Returns the updated user, or None if not found."""
+        conn = get_db()
+        conn.execute(
+            "UPDATE users SET is_admin = %s WHERE id = %s",
+            (bool(is_admin), user_id),
+        )
+        conn.commit()
+        return cls.get_by_id(user_id)
 
     @classmethod
     def update_email(cls, user_id: int, new_email: str) -> "User | None":

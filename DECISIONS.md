@@ -52,6 +52,28 @@
 
 **When to revisit:** Once all twelve are published (or any that won't ship are genuinely retired), the flag can be removed and the derived `PUBLISHED_*` exports collapsed back into the base list. Until the set is final, the flag stays.
 
+## Runtime publish state — DB-backed, admin-toggleable
+
+**TL;DR:** The admin portal (Phase 12) needs to publish/unpublish calculators **live**, so publish state moves from the build-time `registry.js` constant into a `calculator_publish` DB table. The registry still owns *metadata*; the DB owns *published-or-not*. This deliberately revises the back half of § "MVP narrowing via `published` flag" and the registry-only wording of CLAUDE.md hard rule #3.
+
+**Decision:** A `calculator_publish` table (`calc_type` PK, `published`, `updated_at`, `updated_by`) is the runtime source of truth for the public surface. It's **seeded** from `calc_types.DEFAULT_PUBLISHED_TYPES` (the same four MVP calculators the registry shipped with) via idempotent `INSERT ... ON CONFLICT DO NOTHING`, so a migration never resets an admin's live toggle — it only backfills rows for newly-added calc types. The admin portal writes it (`PATCH /api/admin/calculators/:type`), the public `/app` reads it (`GET /api/calculators/published`, unauthenticated). The frontend registry keeps name/icon/category/descriptor; only the boolean moved.
+
+**Why move it out of the registry, against the original "frontend-only concern" stance:** That stance held when publishing was a developer action shipped in a build. The product now needs a *non-engineer, no-deploy* toggle from the admin portal, which a bundled constant fundamentally can't provide. So publish state becomes runtime data. `VALID_CALC_TYPES` staying at twelve server-side is unchanged and still right — validity ≠ visibility; saved rows for unpublished calculators remain loadable exactly as before.
+
+**Frontend consumer change (lands in the same cycle, after this backend foundation):** `PUBLISHED_TYPES` / `PUBLISHED_CALCULATORS` stop being static registry derivations and become a runtime fetch of `/api/calculators/published`, merged with registry metadata, **with the registry's build-time `published` as the fallback** if the request fails (so the app always renders). Consumers (sidebar, landing grid, route guards) still read a single derived published set — hard rule #3's *single-source* discipline holds; only the source flips from compile-time to runtime. CLAUDE.md rule #3 is updated when that wiring lands.
+
+**When to revisit:** If publish state ever needs per-environment or scheduling nuance, this table is where it grows. If the admin portal is dropped, fold the boolean back into the registry.
+
+## Admin portal auth — `is_admin` column + `admin_required` (404, not 403)
+
+**TL;DR:** Admin access is a single `users.is_admin` boolean, checked fresh from the DB on every `/api/admin/*` request by an `admin_required` decorator that returns **404** (not 403) to non-admins. No roles table, no admin self-serve.
+
+**Decision:** `users.is_admin BOOLEAN NOT NULL DEFAULT false` is the one source of truth for who is an admin; admins are promoted manually (`User.set_admin`, a DB/shell lever — there is deliberately no UI to grant admin). `admin_required` layers on `login_required`'s posture: 401 with no session, **404** for a logged-in non-admin — the portal must not acknowledge its own existence to normal users (the spec's "redirect/404 for non-admins, never expose it"). Status is read live from the column each request, so a demotion takes effect immediately, not at next login. The portal's mutations are gated at all three layers (hard rule #8): the SPA `/admin` route guard (UI), `admin_required` (route), and — for any future admin-scoped data — the query layer.
+
+**Why a boolean, not a roles/permissions system:** There is exactly one privileged role (founder/admin) and a handful of admins. An RBAC table would be ceremony for a binary distinction. If tiers of admin power ever appear, this is the revisit point — but not before.
+
+**Why 404 over 403:** A 403 confirms `/admin` exists and just isn't yours; a 404 leaks nothing. For an internal portal that can suspend users and flip the public site, invisibility to non-admins is worth the tiny semantic fib.
+
 ## Tracker teasers outside the calculator registry
 
 **TL;DR:** The two upcoming trackers live in their own `upcomingFeatures.js` module, not in `registry.js`. The registry stays calculators-only.
