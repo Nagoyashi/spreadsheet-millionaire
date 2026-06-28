@@ -17,4 +17,17 @@ export const adminApi = {
   // published flag; takes effect on the public /app at runtime.
   setPublished: (calcType, published) =>
     api.patch(`/calculators/${calcType}`, { published }),
+
+  // GET /api/admin/users?search=&tier= — accounts table + per-tier counts.
+  getUsers: ({ search = '', tier = '' } = {}) => {
+    const params = new URLSearchParams()
+    if (search) params.set('search', search)
+    if (tier) params.set('tier', tier)
+    const qs = params.toString()
+    return api.get(qs ? `/users?${qs}` : '/users')
+  },
+
+  // PATCH /api/admin/users/:id { tier?, suspended? } — tier control +
+  // suspend/reinstate (audit-logged server-side).
+  updateUser: (id, fields) => api.patch(`/users/${id}`, fields),
 }

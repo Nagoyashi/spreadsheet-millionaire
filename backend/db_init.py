@@ -28,6 +28,7 @@ from psycopg import sql
 
 from config import Config
 from calc_types import VALID_CALC_TYPES, DEFAULT_PUBLISHED_TYPES
+from user_tiers import USER_TIERS, DEFAULT_TIER
 from net_worth_types import (
     ASSET_TYPES,
     LIABILITY_TYPES,
@@ -118,6 +119,27 @@ def init_db() -> None:
                     ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT false
             """)
 
+            # Account tier (freemium) + suspension + last-login — managed from the
+            # admin Users screen (Phase 12). All additive/idempotent. tier defaults
+            # to 'free' (beta: everyone free, billing off); the tier CHECK is
+            # rebuilt below from user_tiers.USER_TIERS. suspended blocks login.
+            # last_login_at is stamped on each successful login (nullable until the
+            # account's first post-migration login).
+            cur.execute(
+                sql.SQL(
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS tier TEXT NOT NULL DEFAULT {}"
+                ).format(sql.Literal(DEFAULT_TIER))
+            )
+            cur.execute("""
+                ALTER TABLE users
+                    ADD COLUMN IF NOT EXISTS suspended BOOLEAN NOT NULL DEFAULT false
+            """)
+            cur.execute("""
+                ALTER TABLE users
+                    ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ
+            """)
+            _rebuild_check(cur, "users", "users_tier_check", _in_check("tier", USER_TIERS))
+
             # ---------------------------------------------------------------- #
             # saved_calculators
             #   data is JSONB; user_id cascades on user deletion.
@@ -172,6 +194,29 @@ def init_db() -> None:
                     "VALUES (%s, %s) ON CONFLICT (calc_type) DO NOTHING",
                     (_calc_type, _calc_type in DEFAULT_PUBLISHED_TYPES),
                 )
+
+            # ---------------------------------------------------------------- #
+            # admin_audit_log — append-only record of privileged admin actions
+            #   (tier changes, suspend/reinstate). Who did what, to whom, when,
+            #   with a JSONB detail (e.g. {"from": "free", "to": "pro"}). Both
+            #   user FKs are ON DELETE SET NULL so the log survives account
+            #   deletion (the audit trail outlives the row it described). Indexed
+            #   by target user for "show this account's history" later.
+            # ---------------------------------------------------------------- #
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS admin_audit_log (
+                    id             BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                    admin_user_id  BIGINT      REFERENCES users(id) ON DELETE SET NULL,
+                    action         TEXT        NOT NULL,
+                    target_user_id BIGINT      REFERENCES users(id) ON DELETE SET NULL,
+                    detail         JSONB       NOT NULL DEFAULT '{}'::jsonb,
+                    created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+                )
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_admin_audit_log_target
+                ON admin_audit_log(target_user_id)
+            """)
 
             # ---------------------------------------------------------------- #
             # password_reset_tokens

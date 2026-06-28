@@ -159,3 +159,169 @@ def test_published_endpoint_is_public(client, db):
     _reset_publish_to_defaults()
     body = client.get("/api/calculators/published").get_json()
     assert set(body["published"]) == set(DEFAULT_PUBLISHED_TYPES)
+
+
+# ---------------------------------------------------------------------------- #
+# Users — list / search / tier / suspend (audit-logged)
+# ---------------------------------------------------------------------------- #
+def _register(app, email, password="Testpass123"):
+    """Register a fresh user via its own client; returns that client."""
+    c = app.test_client()
+    token = c.get("/api/auth/csrf-token").get_json()["csrf_token"]
+    resp = c.post(
+        "/api/auth/register",
+        headers={"X-CSRF-Token": token},
+        json={"email": email, "password": password},
+    )
+    assert resp.status_code == 201, resp.get_data(as_text=True)
+    return c
+
+
+def _audit_count(action, target_id):
+    with psycopg.connect(_TEST_DB_URL) as conn:
+        return conn.execute(
+            "SELECT COUNT(*) FROM admin_audit_log WHERE action = %s AND target_user_id = %s",
+            (action, target_id),
+        ).fetchone()[0]
+
+
+def test_users_list_requires_admin(auth_client):
+    client, _ = auth_client
+    assert client.get("/api/admin/users").status_code == 404
+
+
+def test_users_list_and_tier_counts(admin_client, app):
+    client, admin = admin_client
+    _register(app, "alice@example.com")
+    body = client.get("/api/admin/users").get_json()
+    emails = {u["email"] for u in body["users"]}
+    assert {"test@example.com", "alice@example.com"} <= emails
+    assert body["tier_counts"].get("free", 0) >= 2  # everyone defaults to free
+
+
+def test_users_search_filters(admin_client, app):
+    client, _ = admin_client
+    _register(app, "findme@example.com")
+    body = client.get("/api/admin/users?search=findme").get_json()
+    assert [u["email"] for u in body["users"]] == ["findme@example.com"]
+
+
+def test_set_tier_persists_and_audits(admin_client, app, get_csrf_token):
+    client, _ = admin_client
+    target = _register(app, "promote@example.com")
+    target_id = target.get("/api/auth/status").get_json()["user"]["id"]
+    token = get_csrf_token(client)
+
+    resp = client.patch(
+        f"/api/admin/users/{target_id}",
+        headers={"X-CSRF-Token": token},
+        json={"tier": "pro"},
+    )
+    assert resp.status_code == 200
+    assert resp.get_json()["user"]["tier"] == "pro"
+    # persists on reload
+    again = client.get("/api/admin/users?search=promote").get_json()["users"][0]
+    assert again["tier"] == "pro"
+    assert _audit_count("set_tier", target_id) == 1
+
+
+def test_set_tier_rejects_unknown_tier(admin_client, app, get_csrf_token):
+    client, _ = admin_client
+    target = _register(app, "badtier@example.com")
+    target_id = target.get("/api/auth/status").get_json()["user"]["id"]
+    token = get_csrf_token(client)
+    resp = client.patch(
+        f"/api/admin/users/{target_id}",
+        headers={"X-CSRF-Token": token},
+        json={"tier": "platinum"},
+    )
+    assert resp.status_code == 400
+
+
+def test_suspend_blocks_login_and_reinstate_restores(admin_client, app, get_csrf_token):
+    client, _ = admin_client
+    target = _register(app, "suspendme@example.com")
+    target_id = target.get("/api/auth/status").get_json()["user"]["id"]
+    token = get_csrf_token(client)
+
+    # Suspend
+    resp = client.patch(
+        f"/api/admin/users/{target_id}",
+        headers={"X-CSRF-Token": token},
+        json={"suspended": True},
+    )
+    assert resp.status_code == 200 and resp.get_json()["user"]["suspended"] is True
+    assert _audit_count("suspend", target_id) == 1
+
+    # A suspended account can't log in (fresh client).
+    fresh = app.test_client()
+    t2 = fresh.get("/api/auth/csrf-token").get_json()["csrf_token"]
+    login = fresh.post(
+        "/api/auth/login",
+        headers={"X-CSRF-Token": t2},
+        json={"email": "suspendme@example.com", "password": "Testpass123"},
+    )
+    assert login.status_code == 403
+
+    # Reinstate → login works again.
+    token = get_csrf_token(client)
+    client.patch(
+        f"/api/admin/users/{target_id}",
+        headers={"X-CSRF-Token": token},
+        json={"suspended": False},
+    )
+    assert _audit_count("reinstate", target_id) == 1
+    fresh2 = app.test_client()
+    t3 = fresh2.get("/api/auth/csrf-token").get_json()["csrf_token"]
+    login2 = fresh2.post(
+        "/api/auth/login",
+        headers={"X-CSRF-Token": t3},
+        json={"email": "suspendme@example.com", "password": "Testpass123"},
+    )
+    assert login2.status_code == 200
+
+
+def test_admin_cannot_suspend_self(admin_client, get_csrf_token):
+    client, admin = admin_client
+    token = get_csrf_token(client)
+    resp = client.patch(
+        f"/api/admin/users/{admin['id']}",
+        headers={"X-CSRF-Token": token},
+        json={"suspended": True},
+    )
+    assert resp.status_code == 400
+
+
+def test_update_unknown_user_404(admin_client, get_csrf_token):
+    client, _ = admin_client
+    token = get_csrf_token(client)
+    resp = client.patch(
+        "/api/admin/users/999999",
+        headers={"X-CSRF-Token": token},
+        json={"tier": "pro"},
+    )
+    assert resp.status_code == 404
+
+
+def test_update_user_requires_a_field(admin_client, app, get_csrf_token):
+    client, _ = admin_client
+    target = _register(app, "nofields@example.com")
+    target_id = target.get("/api/auth/status").get_json()["user"]["id"]
+    token = get_csrf_token(client)
+    resp = client.patch(
+        f"/api/admin/users/{target_id}",
+        headers={"X-CSRF-Token": token},
+        json={},
+    )
+    assert resp.status_code == 400
+
+
+def test_user_update_forbidden_for_non_admin(auth_client, app, get_csrf_token):
+    client, _ = auth_client
+    token = get_csrf_token(client)
+    resp = client.patch(
+        "/api/admin/users/1",
+        headers={"X-CSRF-Token": token},
+        json={"tier": "pro"},
+    )
+    assert resp.status_code == 404

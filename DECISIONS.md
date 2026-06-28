@@ -74,6 +74,16 @@
 
 **Why 404 over 403:** A 403 confirms `/admin` exists and just isn't yours; a 404 leaks nothing. For an internal portal that can suspend users and flip the public site, invisibility to non-admins is worth the tiny semantic fib.
 
+## Account tiers, suspension & the admin audit log
+
+**TL;DR:** Tier is a single `users.tier` enum (`free`/`pro`/`elite`, single-sourced in `user_tiers.py`); `users.suspended` blocks login; every admin tier/suspend change appends to an `admin_audit_log` (write-only for now). Set from the admin Users screen.
+
+**Decision:** `users.tier TEXT DEFAULT 'free'` (CHECK from `user_tiers.USER_TIERS`, the `calc_types.py` single-source pattern) + `users.suspended BOOLEAN` + `users.last_login_at TIMESTAMPTZ` (stamped on login). During beta everyone is `free` and billing is off — tiers are **manual comp** an admin sets, with **no entitlement enforcement yet** (the Freemium gate is the deferred `v0.14.0` product-review decision). Suspension is real: a suspended account is blocked at login (403, checked only after the password verifies so it doesn't leak which emails exist), and an admin can't suspend their own account (lockout guard). Tier/suspend mutations go through `PATCH /api/admin/users/:id` and each append an `admin_audit_log` row (`admin_user_id`, `action`, `target_user_id`, JSONB `detail` with before/after). The audit log is **write-only this phase** — surfacing "this account's history" is a later read-side feature (the `target_user_id` index is already there).
+
+**Why store the audit detail as JSONB:** `{"from":"free","to":"pro"}` is queryable later without a column-per-action-type schema, and psycopg adapts a dict directly. The two user FKs are `ON DELETE SET NULL` so the trail outlives the accounts it describes.
+
+**Deferred (not built):** Activity (top calculator + run count) needs the GA4 `calc_run` event (Analytics phase, #152); LTV needs billing. Both render as placeholders (`—` / `$0.00`) until those land.
+
 ## Tracker teasers outside the calculator registry
 
 **TL;DR:** The two upcoming trackers live in their own `upcomingFeatures.js` module, not in `registry.js`. The registry stays calculators-only.

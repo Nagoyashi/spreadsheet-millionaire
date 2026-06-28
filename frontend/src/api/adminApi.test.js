@@ -26,4 +26,19 @@ describe('adminApi', () => {
     adminApi.setPublished('fire', false)
     expect(calls).toEqual([['patch', '/calculators/fire', { published: false }]])
   })
+
+  it('GETs users with no filters', () => {
+    adminApi.getUsers()
+    expect(calls).toEqual([['get', '/users']])
+  })
+
+  it('GETs users with search + tier filters', () => {
+    adminApi.getUsers({ search: 'al ice', tier: 'pro' })
+    expect(calls).toEqual([['get', '/users?search=al+ice&tier=pro']])
+  })
+
+  it('PATCHes a user tier / suspension', () => {
+    adminApi.updateUser(7, { tier: 'elite' })
+    expect(calls).toEqual([['patch', '/users/7', { tier: 'elite' }]])
+  })
 })

@@ -15,7 +15,9 @@ from flask import Blueprint, request, jsonify, session
 
 from app import limiter
 from calc_types import VALID_CALC_TYPES
-from models import calculator_publish
+from user_tiers import USER_TIERS
+from models import calculator_publish, admin_audit
+from models.user import User
 from utils.auth_helpers import admin_required, csrf_protect
 
 bp = Blueprint("admin", __name__, url_prefix="/api/admin")
@@ -67,3 +69,74 @@ def set_calculator_published(calc_type):
         return jsonify({"error": "Unknown calculator."}), 404
 
     return jsonify({"calculator": row}), 200
+
+
+# ---------------------------------------------------------------------------- #
+# Users — list / search / filter, tier control, suspend/reinstate (audit-logged)
+# ---------------------------------------------------------------------------- #
+@bp.route("/users", methods=["GET"])
+@admin_required
+def list_users():
+    """
+    Accounts for the Users table. Optional ?search= (email/name, case-insensitive)
+    and ?tier=free|pro|elite filters, pushed into SQL. Also returns per-tier
+    counts for the filter chips. GET — read-only, no CSRF.
+    """
+    search = request.args.get("search", "").strip() or None
+    tier = request.args.get("tier", "").strip().lower() or None
+    if tier and tier not in USER_TIERS:
+        return jsonify({"error": "Unknown tier."}), 400
+
+    users = User.list_for_admin(search=search, tier=tier)
+    return jsonify({
+        "users": [u.to_admin_dict() for u in users],
+        "tier_counts": User.tier_counts(),
+    }), 200
+
+
+@bp.route("/users/<int:user_id>", methods=["PATCH"])
+@admin_required
+@csrf_protect
+@limiter.limit("60 per minute")
+def update_user(user_id):
+    """
+    Set a user's tier and/or suspend/reinstate them. Body may carry `tier`
+    (free|pro|elite) and/or `suspended` (bool); at least one is required. Each
+    change is audit-logged with its before/after. An admin cannot suspend their
+    own account (lockout guard).
+    """
+    body = request.get_json(silent=True) or {}
+    has_tier = "tier" in body
+    has_suspended = "suspended" in body
+    if not has_tier and not has_suspended:
+        return jsonify({"error": "Provide 'tier' and/or 'suspended'."}), 400
+
+    if has_tier and body["tier"] not in USER_TIERS:
+        return jsonify({"error": "Field 'tier' must be one of: " + ", ".join(USER_TIERS)}), 400
+    if has_suspended and not isinstance(body["suspended"], bool):
+        return jsonify({"error": "Field 'suspended' must be a boolean."}), 400
+
+    target = User.get_by_id(user_id)
+    if target is None:
+        return jsonify({"error": "User not found."}), 404
+
+    admin_id = session["user_id"]
+    if has_suspended and user_id == admin_id and body["suspended"]:
+        return jsonify({"error": "You can't suspend your own admin account."}), 400
+
+    updated = target
+    if has_tier and body["tier"] != target.tier:
+        updated = User.set_tier(user_id, body["tier"])
+        admin_audit.record(
+            admin_id, "set_tier", user_id, {"from": target.tier, "to": body["tier"]}
+        )
+    if has_suspended and bool(body["suspended"]) != target.suspended:
+        updated = User.set_suspended(user_id, body["suspended"])
+        admin_audit.record(
+            admin_id,
+            "suspend" if body["suspended"] else "reinstate",
+            user_id,
+            {"suspended": bool(body["suspended"])},
+        )
+
+    return jsonify({"user": updated.to_admin_dict()}), 200

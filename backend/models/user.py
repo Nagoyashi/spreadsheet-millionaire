@@ -16,12 +16,18 @@ class User:
         password_hash: str,
         created_at: str,
         is_admin: bool = False,
+        tier: str = "free",
+        suspended: bool = False,
+        last_login_at=None,
     ):
         self.id            = id
         self.email         = email
         self.password_hash = password_hash
         self.created_at    = created_at
         self.is_admin      = bool(is_admin)
+        self.tier          = tier
+        self.suspended     = bool(suspended)
+        self.last_login_at = last_login_at
 
     # ------------------------------------------------------------------ #
     # Serialisation
@@ -33,6 +39,19 @@ class User:
             "email":      self.email,
             "created_at": self.created_at,
             "is_admin":   self.is_admin,
+            "tier":       self.tier,
+            "suspended":  self.suspended,
+        }
+
+    def to_admin_dict(self) -> dict:
+        """Richer representation for the admin Users table. Adds last_login_at
+        and beta-stub fields (activity + LTV are not tracked yet — GA4 `calc_run`
+        events and billing land in later phases; rendered as placeholders)."""
+        return {
+            **self.to_dict(),
+            "last_login_at": self.last_login_at,
+            "activity":      None,   # top calc + run count — pending GA4 (#152)
+            "ltv":           0.0,    # billing not live during beta
         }
 
     # ------------------------------------------------------------------ #
@@ -103,6 +122,68 @@ class User:
         )
         conn.commit()
         return cls.get_by_id(user_id)
+
+    # ------------------------------------------------------------------ #
+    # Admin Users screen — list / search / tier / suspend / last-login
+    # ------------------------------------------------------------------ #
+    @classmethod
+    def list_for_admin(cls, search: str | None = None, tier: str | None = None) -> list["User"]:
+        """All accounts for the admin Users table, newest first. Optional
+        case-insensitive email/name search and exact-tier filter, both pushed
+        into SQL (parameterised — no f-strings). NOT user-scoped: this is an
+        admin-only listing, gated at the route by admin_required."""
+        clauses, params = [], []
+        if search:
+            clauses.append("email ILIKE %s")
+            params.append(f"%{search.strip()}%")
+        if tier:
+            clauses.append("tier = %s")
+            params.append(tier)
+        where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+        conn = get_db()
+        rows = conn.execute(
+            f"SELECT * FROM users{where} ORDER BY created_at DESC, id DESC",
+            tuple(params),
+        ).fetchall()
+        return [cls(**row) for row in rows]
+
+    @classmethod
+    def tier_counts(cls) -> dict:
+        """Per-tier account counts for the filter chips (e.g. {'free': 1204,
+        'pro': 0, 'elite': 0}). One grouped query."""
+        conn = get_db()
+        rows = conn.execute("SELECT tier, COUNT(*) AS n FROM users GROUP BY tier").fetchall()
+        return {row["tier"]: row["n"] for row in rows}
+
+    @classmethod
+    def set_tier(cls, user_id: int, tier: str) -> "User | None":
+        """Set an account's tier (admin manual comp during beta). The tier CHECK
+        rejects unknown values at the DB layer. Returns the updated user, or None
+        if not found."""
+        conn = get_db()
+        cur = conn.execute(
+            "UPDATE users SET tier = %s WHERE id = %s", (tier, user_id)
+        )
+        conn.commit()
+        return cls.get_by_id(user_id) if cur.rowcount else None
+
+    @classmethod
+    def set_suspended(cls, user_id: int, suspended: bool) -> "User | None":
+        """Suspend/reinstate an account. Suspended accounts are blocked at login.
+        Returns the updated user, or None if not found."""
+        conn = get_db()
+        cur = conn.execute(
+            "UPDATE users SET suspended = %s WHERE id = %s", (bool(suspended), user_id)
+        )
+        conn.commit()
+        return cls.get_by_id(user_id) if cur.rowcount else None
+
+    @classmethod
+    def touch_last_login(cls, user_id: int) -> None:
+        """Stamp last_login_at = now() after a successful login."""
+        conn = get_db()
+        conn.execute("UPDATE users SET last_login_at = now() WHERE id = %s", (user_id,))
+        conn.commit()
 
     @classmethod
     def update_email(cls, user_id: int, new_email: str) -> "User | None":
