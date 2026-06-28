@@ -112,27 +112,36 @@ here.** The two services must **not** share the secret key, database, or Redis.
 | `CORS_ORIGINS` | the production frontend origin (custom domain) | the staging/preview frontend origin | Comma-separated, no wildcard. Defence-in-depth; the single-origin proxy means the happy path doesn't rely on it. |
 | `SESSION_COOKIE_SECURE` | `True` | `True` | Both are HTTPS. |
 
-**Schema:** the Neon **dev** branch already has the schema (Phase 2). The Neon
-**main** branch is fresh for production — run `python db_init.py` from `backend/`
-**once** against the main-branch `DATABASE_URL` before the first real request
-(idempotent). See the launch runbook (§ 5).
+**Schema — migrates automatically on every deploy.** `backend/gunicorn.conf.py`
+runs the idempotent `db_init.init_db()` in the gunicorn **master, before any
+worker forks or serves a request**, so each deploy brings its own schema current
+with no manual step (auto-loaded because the start command runs from `backend/`;
+no `-c` flag or dashboard change needed). If the migration fails, gunicorn aborts
+startup — the failed deploy never serves and the previous version keeps running.
+This is what closes the old "code shipped before the migration was run" gap that
+free-tier Render (no Shell) made easy to hit. See `DECISIONS.md` § "Schema
+migrations run on boot".
 
-> **How to actually run `db_init.py` (both Render services are free-tier — no Shell).**
-> The free instance type has no Web Shell / SSH and no one-off jobs, so you cannot
-> run it *on* Render. Run it **locally, pointed at the target branch's
-> `DATABASE_URL`** — an inline env var wins over `.env` (`load_dotenv()` does not
-> override an already-set var):
+> **Manual `db_init.py` is now a fallback, not the norm.** Boot-time migration
+> covers ordinary additive releases. You only run it by hand for the out-of-band
+> cases: seeding a brand-new Neon branch before its first deploy, or applying a
+> migration without a code deploy. Run it **locally, pointed at the target
+> branch's `DATABASE_URL`** — an inline env var wins over `.env` (`load_dotenv()`
+> does not override an already-set var):
 > ```sh
 > cd backend
 > DATABASE_URL='<paste the target branch pooled URL from Render → Environment>' \
 >   venv/bin/python db_init.py     # expect: "Database schema initialised (Postgres)."
 > ```
-> Run it against **each** environment's branch separately (Neon `main` = production,
-> Neon `dev` = staging). Alternatively, paste the equivalent DDL into the **Neon SQL
-> editor** on the chosen branch. This is **not** a one-time-at-launch step: any later
-> release that changes the schema (additive `ALTER`s — e.g. the v0.11.1 recurrence
-> columns) needs the same run against both branches before the new code serves
-> writes. `db_init.py` is idempotent, so re-running is always safe.
+> Alternatively, paste the equivalent DDL into the **Neon SQL editor** on the
+> chosen branch. `db_init.py` is idempotent, so re-running is always safe.
+>
+> **Caveat — boot-time migration is for *additive* changes only.** Adding tables,
+> columns, indexes, and rebuilding CHECKs is safe to apply while the old version
+> may still be serving briefly during a rolling deploy. A *destructive* or
+> rewriting change (drop/rename a column, narrow a type, backfill) is **not** —
+> it can break the still-running old code and a failed run blocks all boots. Those
+> need a deliberate expand/contract sequence run out-of-band, not a boot hook.
 
 ---
 

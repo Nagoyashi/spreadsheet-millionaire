@@ -37,6 +37,15 @@ from net_worth_types import (
 from income_expense_types import TRANSACTION_TYPES, ALL_CATEGORIES, RECURRENCE_UNITS
 
 
+# A fixed, app-specific key for the Postgres session advisory lock that
+# serialises init_db() across concurrent callers. When the app migrates on boot
+# (gunicorn.conf.py § on_starting), two workers/instances can call init_db() at
+# once; the lock makes the second wait for the first's idempotent DDL to commit
+# instead of racing on the same ALTER/CREATE. Any stable bigint works — it only
+# has to be unique within this database's advisory-lock namespace.
+_MIGRATION_LOCK_KEY = 0x5350_4D31  # "SPM1"
+
+
 _CONSTRAINT_NAME = "saved_calculators_calc_type_check"
 
 # CHECK expression:  calc_type IN ('fire', 'compound', ...)
@@ -94,6 +103,14 @@ def _attach_updated_at_trigger(cur, table: str) -> None:
 def init_db() -> None:
     with psycopg.connect(Config.DATABASE_URL) as conn:
         with conn.cursor() as cur:
+            # ---------------------------------------------------------------- #
+            # Serialise concurrent migrations. pg_advisory_xact_lock blocks until
+            # the lock is free and auto-releases at COMMIT/ROLLBACK, so two boot
+            # workers (or instances) run the idempotent DDL one-at-a-time instead
+            # of racing on the same ALTER/CREATE. Held for the whole transaction.
+            # ---------------------------------------------------------------- #
+            cur.execute("SELECT pg_advisory_xact_lock(%s)", (_MIGRATION_LOCK_KEY,))
+
             # ---------------------------------------------------------------- #
             # users
             #   email is stored lowercased by the model layer, so a plain UNIQUE
