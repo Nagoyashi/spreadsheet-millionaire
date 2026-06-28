@@ -16,21 +16,23 @@ expanding from calculators into trackers and a freemium tier.
 
 ## Current phase
 
-**Phase 11 — Income & Expense Tracker** shipped as `v0.11.0` (2026-06-21). Next up:
-Phase 12 — Backlog cleanup + Security hardening (`v0.12.0`), not yet opened as a
-milestone. (Roadmap resequenced 2026-06-21 — trackers and a go-live review come
-before the referral engine; see § Future.)
+**Phase 12 — Admin Control Center** shipped as `v0.12.0` (2026-06-28). Next up:
+Phase 13 — Backlog cleanup + Security hardening (`v0.13.0`), not yet opened as a
+milestone. (Roadmap resequenced 2026-06-28 — the admin portal took the `v0.12.0`
+slot and slid the planned cleanup/security + product-review phases one minor each;
+see § Future.)
 
 ## Current cycle
 
 > Canonical cycle state = the single **open GitHub Milestone**. This line mirrors
 > it for at-a-glance reading in the editor; if they disagree, the milestone wins.
 
-**Between cycles.** `v0.11.0` — Income & Expense Tracker shipped (2026-06-21);
-both trackers are now built production-ready but **dark** behind their flags
-(`NET_WORTH_ENABLED` / `INCOME_EXPENSE_ENABLED`), so prod still shows "Coming
-soon". No milestone is currently open. The next cycle is `v0.12.0` — Backlog
-cleanup + Security hardening (see § Future). `v0.8.1` live in production at
+**Between cycles.** `v0.12.0` — Admin Control Center shipped (2026-06-28): an
+internal admin-only `/admin` portal (live publish toggles, user tier/suspend +
+audit log, GA4-ready analytics), plus migrate-on-boot. No milestone is currently
+open. The next cycle is `v0.13.0` — Backlog cleanup + Security hardening (see
+§ Future). Both trackers remain built-but-**dark** behind their flags
+(`NET_WORTH_ENABLED` / `INCOME_EXPENSE_ENABLED`). `v0.8.1` live in production at
 www.spreadsheetmillionaire.com · backlog on the
 [Project board](https://github.com/users/Nagoyashi/projects) ↗
 
@@ -55,6 +57,7 @@ issues are the cycle's scope. Patches (`vX.Y.Z`, Z > 0) skip milestones.
 | **Phase 9 — Test & CI foundation** | `v0.9.0` · 2026-06-20 | pytest + vitest harnesses; auth/IDOR/migration coverage; ESLint + Prettier; CI gate with a Postgres service. → [v0.9.0](docs/releases/v0.9.0.md) |
 | **Phase 10 — Net Worth Tracker** | `v0.10.0` · 2026-06-21 | First tracker: 5 normalised `nw_*` tables, `/api/net-worth/*` (CRUD + summary + snapshots), tabbed Wealth page + category CRUD + recharts dashboard; ships dark behind `NET_WORTH_ENABLED`. → [v0.10.0](docs/releases/v0.10.0.md) |
 | **Phase 11 — Income & Expense Tracker** | `v0.11.0` · 2026-06-21 | Second tracker: `ie_transactions` + `/api/income-expense/*` (CRUD + monthly/yearly summary), transactions panel + recharts cashflow dashboard; ships dark behind `INCOME_EXPENSE_ENABLED`. No shared tracker framework. → [v0.11.0](docs/releases/v0.11.0.md) |
+| **Phase 12 — Admin Control Center** | `v0.12.0` · 2026-06-28 | Internal admin-only `/admin` portal (`users.is_admin`, 404 for non-admins): Overview with **live publish toggles** (publish state moved to a DB-backed `calculator_publish` table the public app reads at runtime), Users (tier `free`/`pro`/`elite` + suspend/reinstate + `admin_audit_log`), Analytics (GA4 server-side proxy + DB-signup empty state). Also: migrate-on-boot (gunicorn `on_starting`) + sidebar brand-link fix. → [v0.12.0](docs/releases/v0.12.0.md) |
 
 > Phases 1–5 integrated on `develop` (2026-06-11/12) with **no individual
 > release tags**; they first reached production bundled in **`v0.6.0`**.
@@ -75,6 +78,11 @@ issues are the cycle's scope. Patches (`vX.Y.Z`, Z > 0) skip milestones.
 > single phase. Trackers establish patterns and real user value first; the referral
 > engine lands last so its rewards/fraud shape fits the launch posture decided in
 > the product review.
+>
+> Resequenced 2026-06-28: the **Admin Control Center** (internal `/admin` portal —
+> calculator publish toggles, GA4 analytics, user tier/suspend management) takes the
+> `v0.12.0` slot; everything below slides one minor (Backlog cleanup + Security →
+> `v0.13.0`, Product review → `v0.14.0`, Referral engine → `v0.15.0`).
 
 - **Budgets** *(un-slotted backlog)* — per-category budgets (`fintrackr_dev` had
   them); a separate feature with its own UI surface. **Recurring transactions**
@@ -93,16 +101,16 @@ issues are the cycle's scope. Patches (`vX.Y.Z`, Z > 0) skip milestones.
   (one asset's value over time, not just aggregate NW) and snapshot comparison (diff any
   two snapshots per asset class); both need a richer snapshot shape (schema change).
   Auto/scheduled snapshots need a background-job concept that doesn't exist yet.
-- **Backlog cleanup + Security hardening** *(next cycle — targeted at `v0.12.0`)* — one
-  consolidation cycle after the trackers land: sweep accumulated board backlog
-  (tech debt, bugs, small gaps) **and** harden security for finance-app credibility
-  (input-validation hardening, API auth tightening, data-handling review). Scope
-  drawn from the board at the time, not pre-listed here.
-- **Product review & go-live readiness** *(targeted at `v0.13.0`)* — full product
+- **Backlog cleanup + Security hardening** *(next cycle — targeted at `v0.13.0`)* — one
+  consolidation cycle: sweep accumulated board backlog (tech debt, bugs, small gaps)
+  **and** harden security for finance-app credibility (input-validation hardening,
+  API auth tightening, data-handling review). Scope drawn from the board at the time,
+  not pre-listed here.
+- **Product review & go-live readiness** *(targeted at `v0.14.0`)* — full product
   audit before committing to a launch shape: what's working/missing, feedback
   synthesis, competitive landscape, and the launch-posture decision (freemium vs.
-  free-only, positioning). Output: clarity on go-live + the v0.14.0+ roadmap.
-- **Referral engine** *(targeted at `v0.14.0`)* — referral codes/links, attribution
+  free-only, positioning). Output: clarity on go-live + the v0.15.0+ roadmap.
+- **Referral engine** *(targeted at `v0.15.0`)* — referral codes/links, attribution
   + reward tracking, abuse/fraud guards, three-layer gating (UI / route / DB), and
   its own DB tables + API namespace. Shape depends on the product-review outcome
   (rewards as Freemium entitlement grants); design decisions recorded in

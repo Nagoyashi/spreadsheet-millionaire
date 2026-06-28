@@ -52,6 +52,50 @@
 
 **When to revisit:** Once all twelve are published (or any that won't ship are genuinely retired), the flag can be removed and the derived `PUBLISHED_*` exports collapsed back into the base list. Until the set is final, the flag stays.
 
+## Runtime publish state — DB-backed, admin-toggleable
+
+**TL;DR:** The admin portal (Phase 12) needs to publish/unpublish calculators **live**, so publish state moves from the build-time `registry.js` constant into a `calculator_publish` DB table. The registry still owns *metadata*; the DB owns *published-or-not*. This deliberately revises the back half of § "MVP narrowing via `published` flag" and the registry-only wording of CLAUDE.md hard rule #3.
+
+**Decision:** A `calculator_publish` table (`calc_type` PK, `published`, `updated_at`, `updated_by`) is the runtime source of truth for the public surface. It's **seeded** from `calc_types.DEFAULT_PUBLISHED_TYPES` (the same four MVP calculators the registry shipped with) via idempotent `INSERT ... ON CONFLICT DO NOTHING`, so a migration never resets an admin's live toggle — it only backfills rows for newly-added calc types. The admin portal writes it (`PATCH /api/admin/calculators/:type`), the public `/app` reads it (`GET /api/calculators/published`, unauthenticated). The frontend registry keeps name/icon/category/descriptor; only the boolean moved.
+
+**Why move it out of the registry, against the original "frontend-only concern" stance:** That stance held when publishing was a developer action shipped in a build. The product now needs a *non-engineer, no-deploy* toggle from the admin portal, which a bundled constant fundamentally can't provide. So publish state becomes runtime data. `VALID_CALC_TYPES` staying at twelve server-side is unchanged and still right — validity ≠ visibility; saved rows for unpublished calculators remain loadable exactly as before.
+
+**Frontend consumer change (lands in the same cycle, after this backend foundation):** `PUBLISHED_TYPES` / `PUBLISHED_CALCULATORS` stop being static registry derivations and become a runtime fetch of `/api/calculators/published`, merged with registry metadata, **with the registry's build-time `published` as the fallback** if the request fails (so the app always renders). Consumers (sidebar, landing grid, route guards) still read a single derived published set — hard rule #3's *single-source* discipline holds; only the source flips from compile-time to runtime. CLAUDE.md rule #3 is updated when that wiring lands.
+
+**When to revisit:** If publish state ever needs per-environment or scheduling nuance, this table is where it grows. If the admin portal is dropped, fold the boolean back into the registry.
+
+## Admin portal auth — `is_admin` column + `admin_required` (404, not 403)
+
+**TL;DR:** Admin access is a single `users.is_admin` boolean, checked fresh from the DB on every `/api/admin/*` request by an `admin_required` decorator that returns **404** (not 403) to non-admins. No roles table, no admin self-serve.
+
+**Decision:** `users.is_admin BOOLEAN NOT NULL DEFAULT false` is the one source of truth for who is an admin; admins are promoted manually (`User.set_admin`, a DB/shell lever — there is deliberately no UI to grant admin). `admin_required` layers on `login_required`'s posture: 401 with no session, **404** for a logged-in non-admin — the portal must not acknowledge its own existence to normal users (the spec's "redirect/404 for non-admins, never expose it"). Status is read live from the column each request, so a demotion takes effect immediately, not at next login. The portal's mutations are gated at all three layers (hard rule #8): the SPA `/admin` route guard (UI), `admin_required` (route), and — for any future admin-scoped data — the query layer.
+
+**Why a boolean, not a roles/permissions system:** There is exactly one privileged role (founder/admin) and a handful of admins. An RBAC table would be ceremony for a binary distinction. If tiers of admin power ever appear, this is the revisit point — but not before.
+
+**Why 404 over 403:** A 403 confirms `/admin` exists and just isn't yours; a 404 leaks nothing. For an internal portal that can suspend users and flip the public site, invisibility to non-admins is worth the tiny semantic fib.
+
+## Account tiers, suspension & the admin audit log
+
+**TL;DR:** Tier is a single `users.tier` enum (`free`/`pro`/`elite`, single-sourced in `user_tiers.py`); `users.suspended` blocks login; every admin tier/suspend change appends to an `admin_audit_log` (write-only for now). Set from the admin Users screen.
+
+**Decision:** `users.tier TEXT DEFAULT 'free'` (CHECK from `user_tiers.USER_TIERS`, the `calc_types.py` single-source pattern) + `users.suspended BOOLEAN` + `users.last_login_at TIMESTAMPTZ` (stamped on login). During beta everyone is `free` and billing is off — tiers are **manual comp** an admin sets, with **no entitlement enforcement yet** (the Freemium gate is the deferred `v0.14.0` product-review decision). Suspension is real: a suspended account is blocked at login (403, checked only after the password verifies so it doesn't leak which emails exist), and an admin can't suspend their own account (lockout guard). Tier/suspend mutations go through `PATCH /api/admin/users/:id` and each append an `admin_audit_log` row (`admin_user_id`, `action`, `target_user_id`, JSONB `detail` with before/after). The audit log is **write-only this phase** — surfacing "this account's history" is a later read-side feature (the `target_user_id` index is already there).
+
+**Why store the audit detail as JSONB:** `{"from":"free","to":"pro"}` is queryable later without a column-per-action-type schema, and psycopg adapts a dict directly. The two user FKs are `ON DELETE SET NULL` so the trail outlives the accounts it describes.
+
+**Deferred (not built):** Activity (top calculator + run count) needs the GA4 `calc_run` event (Analytics phase, #152); LTV needs billing. Both render as placeholders (`—` / `$0.00`) until those land.
+
+## Admin analytics — GA4 proxy with a DB-backed empty state
+
+**TL;DR:** `GET /api/admin/analytics` always returns real signup + funnel numbers from our **own DB**; visitors / traffic sources / per-calculator runs come from **GA4 via a server-side proxy** when configured, else null with `configured: false`. The GA4 SDK is an **optional, lazily-imported** dependency so nothing is added to the default install until GA4 is actually wired.
+
+**Decision:** `services/analytics.py` assembles the payload. The DB half (total accounts, new signups in range, the Free/Pro/Elite funnel from `tier_counts`) is always present — it's ours, no third party needed. The GA half (`total_visitors`, `visitors_over_time`, `traffic_sources`, `top_calculators`) is fetched from the **GA4 Data API** with a **service-account key kept server-side** (`GA4_PROPERTY_ID` + `GA4_CREDENTIALS_JSON` env; never shipped to the client — hard rule spirit). When GA4 is unconfigured the endpoint returns `configured: false` and the GA fields null; the UI shows a "connect GA4" empty state but **still renders the real signup KPIs + funnel**. A configured-but-broken GA4 (missing SDK, bad creds, API error) surfaces as `ga_error` rather than a 500, and each GA sub-report is independently defensive (one failing section → null, not total failure).
+
+**Why the GA4 SDK is optional + commented in requirements.txt:** `google-analytics-data` pulls grpc/protobuf — heavy, and **unused until GA4 is configured**. Per the "deliberately boring, justify deps against the problem" rule, it stays commented; `_ga4_metrics` imports it lazily and raises a clear "add it to requirements" `AnalyticsError` if GA4 is configured without it. So the default install/CI/prod stay lean, and the empty state needs zero new deps.
+
+**Deferred (needs explicit setup, not built here):**
+- The **`calc_run` custom event** the "Most-used calculators" ranking depends on. Emitting it means adding GA4 (gtag) to the **public** site, which is a privacy decision (the app currently declines non-essential cookies and has a privacy policy) — out of scope for the empty-state phase and not done without that review.
+- `Free → Paid` KPI + the Pro/Elite funnel stages stay disabled ("activate after beta") until billing exists.
+
 ## Tracker teasers outside the calculator registry
 
 **TL;DR:** The two upcoming trackers live in their own `upcomingFeatures.js` module, not in `registry.js`. The registry stays calculators-only.
@@ -174,6 +218,20 @@
 **No-ORM stance carries over:** see § "No ORM — raw SQL via psycopg". Parameterised `%s` queries, `AND user_id = %s` on every user-scoped query, identity PKs, `TIMESTAMPTZ` timestamps, and an idempotent `db_init.py` (`python db_init.py` still creates/migrates the schema, now Postgres-side).
 
 **When to revisit:** If query volume or table count grows enough that hand-written SQL becomes a maintenance drag (see the no-ORM revisit trigger), or if Neon's pooling model stops fitting (e.g. needing long-lived connections / `LISTEN`/`NOTIFY`), reconsider the per-request-connection shape.
+
+## Schema migrations run on boot
+
+**TL;DR:** `backend/gunicorn.conf.py`'s `on_starting` hook runs the idempotent `db_init.init_db()` in the gunicorn master, before any worker forks — so every deploy self-migrates. The manual `db_init.py` run is now a fallback, not the per-release norm.
+
+**Decision:** Production migrates automatically on each deploy. Gunicorn auto-loads `gunicorn.conf.py` from the start command's working directory (`backend/`, per `DEPLOYMENT.md`), and its `on_starting(server)` hook calls `init_db()` once in the master process before workers fork and before a request is served. The dev runner (`python -m app`) keeps migrating via app.py's `__main__` block. `init_db()` is wrapped in a Postgres advisory lock (`pg_advisory_xact_lock`) so concurrent boots — two workers without `--preload`, or two Render instances — serialise the DDL instead of racing.
+
+**Why this, reversing the prior "manual `db_init.py` per branch" process:** The old process deployed code and ran the migration as *separate* steps — code auto-deploys on merge, but `db_init.py` was a human task run locally against each Neon branch (free-tier Render has no Shell). Forget it, or run it after the deploy, and any write touching a new column 500s in production until someone notices. That gap bit a local DB in dev (v0.11.1's `recurrence_*` columns) and was a standing production hazard. Tying the migration to app boot makes code and schema arrive together, atomically, with no human step.
+
+**Why the gunicorn hook and not `init_db()` inside `create_app()`:** `app:create_app()` is imported by the DB-free unit tests with a dummy, unconnectable `DATABASE_URL` (see § "Test harnesses"). Migrating inside the factory would make every such test open a real connection and fail. The `on_starting` hook only fires under gunicorn, never in tests or bare imports — and running in the master (pre-fork) means the migration happens exactly once per boot, so workers never race even before the advisory lock is considered.
+
+**Failure policy:** if the migration raises, the exception propagates and gunicorn aborts startup — a deploy whose migration failed refuses to serve, and Render keeps the previous version live. Loud failure over a half-migrated database serving requests.
+
+**Scope — additive migrations only.** This is safe for the project's established migration style: additive, idempotent DDL (`CREATE TABLE IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`, rebuilt CHECKs — see § "Net Worth Tracker" and § "Income & Expense Tracker"). A *destructive* or rewriting change (drop/rename a column, narrow a type, backfill) must **not** ride the boot hook: old workers may still serve during a rolling deploy, and a failed run would block all boots. Those need a deliberate expand/contract migration run out-of-band. When that day comes, this decision is the thing to revisit.
 
 ## Redis sessions via Upstash
 

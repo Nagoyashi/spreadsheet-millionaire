@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { BarChart2, ChevronDown, ChevronsLeft, ChevronsRight, X } from 'lucide-react'
-import { PUBLISHED_CALCULATORS } from '../calculators/registry'
+import { usePublishedCalculators } from '../calculators/usePublished'
 import { LIVE_TRACKERS, VISIBLE_UPCOMING } from '../trackers'
 import { useSidebarCollapse } from '../hooks/useSidebarCollapse'
 import UserFooter from './UserFooter'
@@ -27,6 +27,7 @@ const CALCULATORS_HOME = '/app'
 export default function AppSidebar({ auth, onClose, children }) {
   const [collapsed, toggleCollapsed] = useSidebarCollapse()
   const { pathname } = useLocation()
+  const { publishedCalculators } = usePublishedCalculators()
 
   const onCalculators = pathname === '/app' || pathname.startsWith('/app/calculator/')
   const activeCalcType = pathname.startsWith('/app/calculator/')
@@ -90,7 +91,7 @@ export default function AppSidebar({ auth, onClose, children }) {
     <aside className="w-64 shrink-0 bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 flex flex-col h-full">
       {/* Brand + collapse / mobile-close controls */}
       <div className="px-5 py-5 border-b border-white/10 flex items-center justify-between gap-2">
-        <Link to="/app" className="text-xl font-bold text-white tracking-tight truncate">
+        <Link to="/" className="text-xl font-bold text-white tracking-tight truncate">
           Spreadsheet<span className="text-amber-400">Millionaire</span>
         </Link>
         <div className="flex items-center gap-1 shrink-0">
@@ -134,7 +135,7 @@ export default function AppSidebar({ auth, onClose, children }) {
 
         {calcsOpen && (
           <div className="mt-0.5 mb-1 ml-2 pl-2 border-l border-white/10 space-y-0.5">
-            {PUBLISHED_CALCULATORS.map(({ type, label, Icon, color }) => {
+            {publishedCalculators.map(({ type, label, Icon, color }) => {
               const active = type === activeCalcType
               return (
                 <Link

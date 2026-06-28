@@ -10,3 +10,10 @@ psycopg[binary]==3.3.4
 redis==8.0.0
 resend==2.32.2
 gunicorn==26.0.0
+
+# Optional — only needed to enable the admin Analytics tab's live GA4 numbers.
+# Until GA4 is configured (GA4_PROPERTY_ID + GA4_CREDENTIALS_JSON), the endpoint
+# returns the "not configured" empty state and this package is unused, so it is
+# intentionally left commented to keep the default install lean. Uncomment when
+# wiring GA4. See services/analytics.py and DECISIONS.md § "Admin analytics".
+# google-analytics-data==0.18.18

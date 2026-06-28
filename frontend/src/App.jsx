@@ -16,6 +16,7 @@ import ResetPasswordPage from './pages/ResetPasswordPage'
 import SettingsPage from './pages/SettingsPage'
 import WealthPage from './pages/WealthPage'
 import IncomeExpensePage from './pages/IncomeExpensePage'
+import AdminPage from './pages/admin/AdminPage'
 import { NET_WORTH_ENABLED, INCOME_EXPENSE_ENABLED } from './featureFlags'
 
 // Authenticated users hitting a guest-only door (login/register) bounce into the
@@ -32,6 +33,15 @@ function RequireAuth({ isAuthenticated, children }) {
   if (!isAuthenticated) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />
   }
+  return children
+}
+
+// Admin-only gate for /admin. Non-admins (anonymous OR a normal logged-in user)
+// are redirected to the homepage — the portal stays invisible, mirroring the
+// server's 404 posture (admin_required). Admin status comes from the session
+// user's is_admin flag (auth/status), which the backend keeps as the one source.
+function RequireAdmin({ user, children }) {
+  if (!user?.is_admin) return <Navigate to="/" replace />
   return children
 }
 
@@ -119,6 +129,16 @@ export default function App() {
             <RequireAuth isAuthenticated={auth.isAuthenticated}>
               <SettingsPage auth={auth} />
             </RequireAuth>
+          }
+        />
+
+        {/* ── Internal admin portal — admin-only, invisible to everyone else ── */}
+        <Route
+          path="/admin"
+          element={
+            <RequireAdmin user={auth.user}>
+              <AdminPage auth={auth} />
+            </RequireAdmin>
           }
         />
 

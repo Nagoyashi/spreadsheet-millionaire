@@ -158,6 +158,16 @@ class Config:
     # ── Public frontend origin (reset links) ─────────────────────────────────
     APP_BASE_URL = _app_base_url
 
+    # ── Analytics (GA4 Data API — admin portal) ───────────────────────────────
+    # Both must be set for the Analytics tab to show live numbers; until then the
+    # endpoint reports "not configured" and the UI shows an empty state (the
+    # signup KPIs, which come from our own DB, still render). The credentials are
+    # a service-account JSON — kept server-side, never shipped to the client.
+    # GA4_CREDENTIALS_JSON is either the raw JSON or a path to the key file.
+    GA4_PROPERTY_ID       = os.getenv("GA4_PROPERTY_ID", "").strip()
+    GA4_CREDENTIALS_JSON  = os.getenv("GA4_CREDENTIALS_JSON", "").strip()
+    GA4_CONFIGURED        = bool(GA4_PROPERTY_ID and GA4_CREDENTIALS_JSON)
+
     # ── Environment ───────────────────────────────────────────────────────────
     FLASK_ENV   = _flask_env
     FLASK_DEBUG = _flask_env == "development"

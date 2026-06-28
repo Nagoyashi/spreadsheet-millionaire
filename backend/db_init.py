@@ -27,7 +27,8 @@ import psycopg
 from psycopg import sql
 
 from config import Config
-from calc_types import VALID_CALC_TYPES
+from calc_types import VALID_CALC_TYPES, DEFAULT_PUBLISHED_TYPES
+from user_tiers import USER_TIERS, DEFAULT_TIER
 from net_worth_types import (
     ASSET_TYPES,
     LIABILITY_TYPES,
@@ -35,6 +36,15 @@ from net_worth_types import (
     PROPERTY_TYPES,
 )
 from income_expense_types import TRANSACTION_TYPES, ALL_CATEGORIES, RECURRENCE_UNITS
+
+
+# A fixed, app-specific key for the Postgres session advisory lock that
+# serialises init_db() across concurrent callers. When the app migrates on boot
+# (gunicorn.conf.py § on_starting), two workers/instances can call init_db() at
+# once; the lock makes the second wait for the first's idempotent DDL to commit
+# instead of racing on the same ALTER/CREATE. Any stable bigint works — it only
+# has to be unique within this database's advisory-lock namespace.
+_MIGRATION_LOCK_KEY = 0x5350_4D31  # "SPM1"
 
 
 _CONSTRAINT_NAME = "saved_calculators_calc_type_check"
@@ -95,6 +105,14 @@ def init_db() -> None:
     with psycopg.connect(Config.DATABASE_URL) as conn:
         with conn.cursor() as cur:
             # ---------------------------------------------------------------- #
+            # Serialise concurrent migrations. pg_advisory_xact_lock blocks until
+            # the lock is free and auto-releases at COMMIT/ROLLBACK, so two boot
+            # workers (or instances) run the idempotent DDL one-at-a-time instead
+            # of racing on the same ALTER/CREATE. Held for the whole transaction.
+            # ---------------------------------------------------------------- #
+            cur.execute("SELECT pg_advisory_xact_lock(%s)", (_MIGRATION_LOCK_KEY,))
+
+            # ---------------------------------------------------------------- #
             # users
             #   email is stored lowercased by the model layer, so a plain UNIQUE
             #   is effectively case-insensitive (mirrors the old COLLATE NOCASE).
@@ -107,6 +125,37 @@ def init_db() -> None:
                     created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
                 )
             """)
+
+            # is_admin gates the /admin portal (Phase 12 — Admin Control Center).
+            # Additive, idempotent; defaults false so every existing and new
+            # account is a normal user until explicitly promoted. The admin gate
+            # (utils/auth_helpers.admin_required) reads this column — there is no
+            # second source of truth for "who is an admin".
+            cur.execute("""
+                ALTER TABLE users
+                    ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT false
+            """)
+
+            # Account tier (freemium) + suspension + last-login — managed from the
+            # admin Users screen (Phase 12). All additive/idempotent. tier defaults
+            # to 'free' (beta: everyone free, billing off); the tier CHECK is
+            # rebuilt below from user_tiers.USER_TIERS. suspended blocks login.
+            # last_login_at is stamped on each successful login (nullable until the
+            # account's first post-migration login).
+            cur.execute(
+                sql.SQL(
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS tier TEXT NOT NULL DEFAULT {}"
+                ).format(sql.Literal(DEFAULT_TIER))
+            )
+            cur.execute("""
+                ALTER TABLE users
+                    ADD COLUMN IF NOT EXISTS suspended BOOLEAN NOT NULL DEFAULT false
+            """)
+            cur.execute("""
+                ALTER TABLE users
+                    ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ
+            """)
+            _rebuild_check(cur, "users", "users_tier_check", _in_check("tier", USER_TIERS))
 
             # ---------------------------------------------------------------- #
             # saved_calculators
@@ -129,6 +178,61 @@ def init_db() -> None:
             cur.execute("""
                 CREATE INDEX IF NOT EXISTS idx_saved_calculators_user_id
                 ON saved_calculators(user_id)
+            """)
+
+            # ---------------------------------------------------------------- #
+            # calculator_publish — runtime publish state, one row per calc type.
+            #   The admin portal toggles `published` here and the public /app
+            #   reads it at runtime, so a calculator can be published/unpublished
+            #   without a redeploy. This is the DB source of truth that replaces
+            #   the build-time `published` constant in the frontend registry (the
+            #   registry still owns metadata — name/icon/category). calc_type is
+            #   the PK; updated_by references the admin who last flipped it (kept
+            #   even if that admin is later deleted, hence ON DELETE SET NULL).
+            #   See DECISIONS.md § "Runtime publish state — DB-backed, admin-
+            #   toggleable". The table is SEEDED below from DEFAULT_PUBLISHED_TYPES.
+            # ---------------------------------------------------------------- #
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS calculator_publish (
+                    calc_type  TEXT        PRIMARY KEY,
+                    published  BOOLEAN     NOT NULL,
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    updated_by BIGINT      REFERENCES users(id) ON DELETE SET NULL
+                )
+            """)
+
+            # Seed one row per known calc type, defaulting to the public MVP set.
+            # ON CONFLICT DO NOTHING makes this idempotent and — crucially —
+            # non-destructive: a later run never resets an admin's live toggle,
+            # it only backfills rows for newly-added calc types.
+            for _calc_type in VALID_CALC_TYPES:
+                cur.execute(
+                    "INSERT INTO calculator_publish (calc_type, published) "
+                    "VALUES (%s, %s) ON CONFLICT (calc_type) DO NOTHING",
+                    (_calc_type, _calc_type in DEFAULT_PUBLISHED_TYPES),
+                )
+
+            # ---------------------------------------------------------------- #
+            # admin_audit_log — append-only record of privileged admin actions
+            #   (tier changes, suspend/reinstate). Who did what, to whom, when,
+            #   with a JSONB detail (e.g. {"from": "free", "to": "pro"}). Both
+            #   user FKs are ON DELETE SET NULL so the log survives account
+            #   deletion (the audit trail outlives the row it described). Indexed
+            #   by target user for "show this account's history" later.
+            # ---------------------------------------------------------------- #
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS admin_audit_log (
+                    id             BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                    admin_user_id  BIGINT      REFERENCES users(id) ON DELETE SET NULL,
+                    action         TEXT        NOT NULL,
+                    target_user_id BIGINT      REFERENCES users(id) ON DELETE SET NULL,
+                    detail         JSONB       NOT NULL DEFAULT '{}'::jsonb,
+                    created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+                )
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_admin_audit_log_target
+                ON admin_audit_log(target_user_id)
             """)
 
             # ---------------------------------------------------------------- #

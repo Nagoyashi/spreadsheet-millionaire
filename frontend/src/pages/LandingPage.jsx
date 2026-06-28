@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowRight, Star, Menu } from 'lucide-react'
-import { PUBLISHED_CALCULATORS, CATEGORIES } from '../calculators/registry'
+import { usePublishedCalculators } from '../calculators/usePublished'
 import { LIVE_TRACKERS, VISIBLE_UPCOMING } from '../trackers'
 import { useFavourites } from '../hooks/useFavourites'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
@@ -23,6 +23,7 @@ export default function LandingPage({ auth }) {
   const navigate = useNavigate()
   const [activeCategory, setActiveCategory] = useState('All')
   const { favourites, toggle } = useFavourites(auth)
+  const { publishedCalculators, categories } = usePublishedCalculators()
   const [showAuthToast, setShowAuthToast] = useState(false)
   const toastTimerRef = useRef(null)
 
@@ -42,19 +43,19 @@ export default function LandingPage({ auth }) {
   // Starred calcs float to top within any tab
   const displayed = (() => {
     if (activeCategory === 'Favourites') {
-      return PUBLISHED_CALCULATORS.filter((c) => favourites.includes(c.type))
+      return publishedCalculators.filter((c) => favourites.includes(c.type))
     }
     const pool =
       activeCategory === 'All'
-        ? PUBLISHED_CALCULATORS
-        : PUBLISHED_CALCULATORS.filter((c) => c.category === activeCategory)
+        ? publishedCalculators
+        : publishedCalculators.filter((c) => c.category === activeCategory)
     return [
       ...pool.filter((c) => favourites.includes(c.type)),
       ...pool.filter((c) => !favourites.includes(c.type)),
     ]
   })()
 
-  const tabs = ['Favourites', 'All', ...CATEGORIES.filter((c) => c !== 'All')]
+  const tabs = ['Favourites', 'All', ...categories.filter((c) => c !== 'All')]
 
   return (
     <AppShell auth={auth}>
@@ -119,8 +120,8 @@ export default function LandingPage({ auth }) {
               const count = isFavTab
                 ? favourites.length
                 : tab === 'All'
-                  ? PUBLISHED_CALCULATORS.length
-                  : PUBLISHED_CALCULATORS.filter((c) => c.category === tab).length
+                  ? publishedCalculators.length
+                  : publishedCalculators.filter((c) => c.category === tab).length
               const isActive = activeCategory === tab
               return (
                 <button

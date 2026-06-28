@@ -1,18 +1,19 @@
 import { Link } from 'react-router-dom'
 import { ArrowRight } from 'lucide-react'
-import { PUBLISHED_CALCULATORS } from '../calculators/registry'
+import { usePublishedCalculators } from '../calculators/usePublished'
 
-// One card per published calculator, driven entirely by PUBLISHED_CALCULATORS
-// from the registry — label, subtitle, description, gradient, and Icon all come
-// from there. This list is never duplicated or re-filtered here; publishing a
-// calculator (flipping `published`) adds its card automatically. See
-// PROJECT_STRUCTURE.md § "Registry entry shape".
+// One card per published calculator, driven by the runtime published set
+// (usePublishedCalculators) merged with registry metadata — label, subtitle,
+// description, gradient, and Icon all come from the registry. This list is never
+// duplicated or re-filtered here; publishing a calculator (admin toggle) adds its
+// card automatically. See PROJECT_STRUCTURE.md § "Registry entry shape".
 //
 // Each card links DIRECTLY to /app/calculator/:type, not to a signup wall — the
 // whole pitch is that the calculators work without an account, so the landing
 // page lets a visitor prove that to themselves in one click.
 
 export default function CalculatorShowcase() {
+  const { publishedCalculators } = usePublishedCalculators()
   return (
     <section id="calculators" className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
       <div className="text-center mb-10 sm:mb-12">
@@ -25,7 +26,7 @@ export default function CalculatorShowcase() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-        {PUBLISHED_CALCULATORS.map(({ type, label, subtitle, description, Icon, gradient }) => (
+        {publishedCalculators.map(({ type, label, subtitle, description, Icon, gradient }) => (
           <Link
             key={type}
             to={`/app/calculator/${type}`}

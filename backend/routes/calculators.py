@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify, session
 from marshmallow import ValidationError
 
 from models.calculator import SavedCalculator
+from models import calculator_publish
 from schemas.calculator_schema import SaveCalculatorSchema, UpdateCalculatorSchema
 from utils.auth_helpers import login_required, csrf_protect
 
@@ -9,6 +10,20 @@ bp = Blueprint("calculators", __name__, url_prefix="/api/calculators")
 
 save_schema   = SaveCalculatorSchema()
 update_schema = UpdateCalculatorSchema()
+
+
+@bp.route("/published", methods=["GET"])
+def list_published():
+    """
+    The calc types currently published on the public /app — the runtime publish
+    state the admin portal toggles. PUBLIC and unauthenticated: every visitor
+    (including anonymous) needs it to know which calculators to show.
+
+    The frontend uses this as the source of truth for the published surface,
+    falling back to the registry's build-time defaults if the request fails so
+    the app still renders. GET — read-only, no CSRF.
+    """
+    return jsonify({"published": calculator_publish.published_types()}), 200
 
 
 @bp.route("", methods=["GET"])

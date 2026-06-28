@@ -41,19 +41,24 @@ backend/
 ├── calc_types.py               # Single source of truth for VALID_CALC_TYPES (imported by schema + db_init)
 ├── net_worth_types.py          # Single source of truth for Net Worth enum sets (ASSET_TYPES/LIABILITY_TYPES/ASSET_CLASSES/PROPERTY_TYPES) — imported by nw schema + db_init
 ├── income_expense_types.py     # Single source of truth for Income & Expense enums (TRANSACTION_TYPES/EXPENSE_CATEGORIES/INCOME_CATEGORIES/ALL_CATEGORIES/RECURRENCE_UNITS) — imported by ie schema + db_init
+├── user_tiers.py               # Single source of truth for account tiers (USER_TIERS = free/pro/elite, DEFAULT_TIER) — imported by admin route + db_init (users.tier CHECK)
 ├── db.py                       # Per-request psycopg connection on Flask g, closed on teardown (no in-process pool)
-├── db_init.py                  # Postgres schema creation + idempotent CHECK-constraint rebuild (users, saved_calculators, password_reset_tokens, nw_* Net Worth tables, ie_transactions)
+├── db_init.py                  # Postgres schema creation + idempotent CHECK-constraint rebuild (users [+is_admin/tier/suspended/last_login_at], saved_calculators, password_reset_tokens, nw_* Net Worth tables, ie_transactions, calculator_publish [seeded from DEFAULT_PUBLISHED_TYPES], admin_audit_log); advisory-locked so concurrent boots serialise
+├── gunicorn.conf.py            # Auto-loaded by gunicorn (run from backend/) — on_starting hook runs db_init once in the master before workers fork, so every deploy self-migrates (DECISIONS.md § "Schema migrations run on boot")
 ├── __pycache__/
 ├── venv/                       # Python virtual environment — never committed
 ├── models/
-│   ├── user.py                 # User model — bcrypt hashing, create/get/delete, update_password/update_email
+│   ├── user.py                 # User model — bcrypt hashing, create/get/delete, update_password/update_email, set_admin; admin Users screen: list_for_admin/tier_counts/set_tier/set_suspended/touch_last_login (is_admin/tier/suspended/last_login_at)
 │   ├── calculator.py           # SavedCalculator model — all queries include AND user_id = %s
+│   ├── calculator_publish.py   # Runtime publish-state access (global, not user-scoped) — list_all/published_types/set_published; admin portal writes it, public /app reads it
+│   ├── admin_audit.py          # Append-only admin audit trail — record(admin_id, action, target_user_id, detail JSONB); written on tier/suspend changes
 │   ├── net_worth.py            # Net Worth data-access — generic NetWorthTable CRUD (assets/liabilities/investments/real-estate) + SQL summary + snapshots; all queries filter user_id
 │   ├── income_expense.py       # Income & Expense data-access — ie_transactions CRUD (year/month filters) + SQL monthly/yearly summary; all queries filter user_id
 │   └── password_reset.py       # PasswordResetToken model — stores only the SHA-256 hash; create/find-valid-by-hash/mark-used/invalidate-all-for-user/delete-expired
 ├── routes/
 │   ├── auth.py                 # /api/auth/* — register (+welcome email), login, logout, status, delete account, csrf-token, forgot-password, reset-password, change-password, change-email
-│   ├── calculators.py          # /api/calculators/* — CRUD for saved calculations
+│   ├── calculators.py          # /api/calculators/* — CRUD for saved calculations + GET /published (public runtime publish surface)
+│   ├── admin.py                # /api/admin/* — admin-only (admin_required, 404 for non-admins). Overview: GET /calculators, PATCH /calculators/:type {published}. Users: GET /users (search/tier), PATCH /users/:id {tier?,suspended?} (audit-logged; self-suspend guarded). Analytics: GET /analytics?range= (DB signups + GA4 proxy)
 │   ├── net_worth.py            # /api/net-worth/* — CRUD for assets/liabilities/investments/real-estate + /summary + /snapshots (login_required, CSRF, rate-limited writes)
 │   ├── income_expense.py       # /api/income-expense/* — transactions CRUD (year/month filters) + /summary (login_required, CSRF, rate-limited writes)
 │   └── health.py               # GET /api/health — liveness probe, rate-limit exempt, no DB/Redis
@@ -63,15 +68,17 @@ backend/
 │   ├── net_worth_schema.py     # Asset/Liability/Investment/RealEstate/Snapshot schemas — enums from net_worth_types.py
 │   └── income_expense_schema.py # TransactionSchema — enums from income_expense_types.py; per-type category validation
 ├── services/
-│   └── email.py                # Resend wrapper — send_email + send_welcome_email + send_password_reset_email; disabled (no-op) without RESEND_API_KEY
+│   ├── email.py                # Resend wrapper — send_email + send_welcome_email + send_password_reset_email; disabled (no-op) without RESEND_API_KEY
+│   └── analytics.py            # Admin Analytics — DB signups/funnel (always) + GA4 Data API proxy (optional, lazy SDK import); empty-state when GA4 unconfigured
 ├── utils/
-│   └── auth_helpers.py         # login_required, csrf_protect, set/clear session, generate_csrf_token
+│   └── auth_helpers.py         # login_required, admin_required (404 for non-admins), csrf_protect, set/clear session, generate_csrf_token
 └── tests/
     ├── conftest.py             # Hermetic test env (forced before import) + app/client/get_csrf_token fixtures; db/auth_client skip without TEST_DATABASE_URL
     ├── test_health.py          # GET /api/health smoke test (no DB)
     ├── test_db_smoke.py        # DB-path wiring proof (register + truncation isolation); skips without TEST_DATABASE_URL, runs in CI
     ├── test_auth.py            # End-to-end auth-flow tests (register/login/logout/forgot+reset/delete/change-pw/change-email); email mocked, DB-backed
-    └── test_idor.py            # Tenant-isolation tests for saved_calculators (Hard Rule #6) — route + model layer, two users, unauth 401
+    ├── test_idor.py            # Tenant-isolation tests for saved_calculators (Hard Rule #6) — route + model layer, two users, unauth 401
+    └── test_admin.py           # Admin gate (401/404) + publish toggle + public /published surface; DB-backed
 ```
 
 ### Backend .env variables
@@ -108,7 +115,9 @@ frontend/
     ├── api/
     │   ├── httpClient.js       # Shared fetch wrapper. createApi(baseUrl) factory + central CSRF injection
     │   ├── authApi.js          # register / login / logout / deleteAccount / getStatus / fetchCsrfToken / forgotPassword / resetPassword / changePassword / changeEmail
-    │   ├── calculatorApi.js    # getAll / create / update / remove
+    │   ├── calculatorApi.js    # getPublished (public runtime publish surface) / getAll / create / update / remove
+    │   ├── adminApi.js         # /api/admin/* — getCalculators / setPublished (admin portal; PATCH via createApi)
+    │   ├── adminApi.test.js    # vitest — admin endpoint verb + path + body wiring
     │   ├── netWorthApi.js      # /api/net-worth/* — assets/liabilities/investments/realEstate CRUD + getSummary + snapshots
     │   ├── incomeExpenseApi.js # /api/income-expense/* — transactions CRUD (year/month filters) + getSummary
     │   └── netWorthApi.test.js # vitest — asserts each endpoint's verb + path + body wiring
@@ -118,7 +127,9 @@ frontend/
     │   ├── migrateCalcData.js  # migrate() / stripVersion() / injectVersion() — saved-data versioning
     │   └── migrateCalcData.test.js # vitest unit tests for the migration engine (sankey v1→v2, idempotency, version guards)
     ├── calculators/
-    │   ├── registry.js                     # ← ONLY file to touch when adding a calculator
+    │   ├── registry.js                     # ← ONLY file to touch when adding a calculator. Exports CALCULATORS/CALC_MAP/VALID_TYPES + DEFAULT_PUBLISHED_* (build-time fallback for the runtime publish surface)
+    │   ├── usePublished.js                 # Runtime publish surface — usePublishedTypes/usePublishedCalculators (reads GET /api/calculators/published; module-store, no Context); registry defaults as fallback. invalidatePublished() after an admin toggle
+    │   ├── usePublished.test.js            # vitest — fallback-to-defaults then adopt-fetched-set
     │   ├── FIRECalculator.jsx
     │   ├── CompoundInterestCalculator.jsx
     │   ├── SankeyDiagram.jsx              # v2: nested income/expense_groups, 4-col diagram, currency+%/permalink. Two-slice state, calls migrate/stripVersion directly
@@ -198,7 +209,12 @@ frontend/
         ├── RegisterPage.jsx       # Thin wrapper around AuthForm
         ├── ForgotPasswordPage.jsx # /forgot-password — email field; always shows the same neutral "check your inbox" state
         ├── ResetPasswordPage.jsx  # /reset-password/:token — new password + confirm; success / generic-invalid-link / weak-password states
-        └── SettingsPage.jsx       # /app/settings (auth-guarded) — account email + change password + change email + danger zone (DeleteAccountModal)
+        ├── SettingsPage.jsx       # /app/settings (auth-guarded) — account email + change password + change email + danger zone (DeleteAccountModal)
+        └── admin/                 # /admin — internal admin-only portal (RequireAdmin gate; invisible to non-admins). Phase 12 — Admin Control Center
+            ├── AdminPage.jsx      # Shell: dark sticky top bar (wordmark + 3 tabs + "internal · /admin" badge + avatar), switches Overview/Analytics/Users
+            ├── AdminOverview.jsx  # Project Status — stat strip + calculator catalog table with live publish toggles (optimistic + rollback; invalidatePublished on success)
+            ├── AdminAnalytics.jsx # Placeholder — GA4 analytics lands in a later phase (#152)
+            └── AdminUsers.jsx     # Placeholder — tier control / suspend / audit log lands in a later phase (#151)
 ```
 
 ### Frontend environment variables (Vercel)

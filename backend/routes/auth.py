@@ -98,6 +98,12 @@ def login():
     if not user or not user.check_password(data["password"]):
         return jsonify({"error": "Invalid email or password."}), 401
 
+    # Suspended accounts (set from the admin Users screen) can't log in. Checked
+    # only after the password verifies, so it doesn't leak which emails exist.
+    if user.suspended:
+        return jsonify({"error": "This account has been suspended."}), 403
+
+    User.touch_last_login(user.id)
     set_session(user)
     return jsonify({"user": user.to_dict()}), 200
 
