@@ -219,6 +219,20 @@
 
 **When to revisit:** If query volume or table count grows enough that hand-written SQL becomes a maintenance drag (see the no-ORM revisit trigger), or if Neon's pooling model stops fitting (e.g. needing long-lived connections / `LISTEN`/`NOTIFY`), reconsider the per-request-connection shape.
 
+## Schema migrations run on boot
+
+**TL;DR:** `backend/gunicorn.conf.py`'s `on_starting` hook runs the idempotent `db_init.init_db()` in the gunicorn master, before any worker forks — so every deploy self-migrates. The manual `db_init.py` run is now a fallback, not the per-release norm.
+
+**Decision:** Production migrates automatically on each deploy. Gunicorn auto-loads `gunicorn.conf.py` from the start command's working directory (`backend/`, per `DEPLOYMENT.md`), and its `on_starting(server)` hook calls `init_db()` once in the master process before workers fork and before a request is served. The dev runner (`python -m app`) keeps migrating via app.py's `__main__` block. `init_db()` is wrapped in a Postgres advisory lock (`pg_advisory_xact_lock`) so concurrent boots — two workers without `--preload`, or two Render instances — serialise the DDL instead of racing.
+
+**Why this, reversing the prior "manual `db_init.py` per branch" process:** The old process deployed code and ran the migration as *separate* steps — code auto-deploys on merge, but `db_init.py` was a human task run locally against each Neon branch (free-tier Render has no Shell). Forget it, or run it after the deploy, and any write touching a new column 500s in production until someone notices. That gap bit a local DB in dev (v0.11.1's `recurrence_*` columns) and was a standing production hazard. Tying the migration to app boot makes code and schema arrive together, atomically, with no human step.
+
+**Why the gunicorn hook and not `init_db()` inside `create_app()`:** `app:create_app()` is imported by the DB-free unit tests with a dummy, unconnectable `DATABASE_URL` (see § "Test harnesses"). Migrating inside the factory would make every such test open a real connection and fail. The `on_starting` hook only fires under gunicorn, never in tests or bare imports — and running in the master (pre-fork) means the migration happens exactly once per boot, so workers never race even before the advisory lock is considered.
+
+**Failure policy:** if the migration raises, the exception propagates and gunicorn aborts startup — a deploy whose migration failed refuses to serve, and Render keeps the previous version live. Loud failure over a half-migrated database serving requests.
+
+**Scope — additive migrations only.** This is safe for the project's established migration style: additive, idempotent DDL (`CREATE TABLE IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`, rebuilt CHECKs — see § "Net Worth Tracker" and § "Income & Expense Tracker"). A *destructive* or rewriting change (drop/rename a column, narrow a type, backfill) must **not** ride the boot hook: old workers may still serve during a rolling deploy, and a failed run would block all boots. Those need a deliberate expand/contract migration run out-of-band. When that day comes, this decision is the thing to revisit.
+
 ## Redis sessions via Upstash
 
 **TL;DR:** Sessions and rate limiting live in Redis (Upstash) so they hold across workers. Dev can fall back to filesystem sessions + in-memory limiting with one env var unset.
