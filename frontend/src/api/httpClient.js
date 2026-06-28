@@ -109,9 +109,9 @@ export function describeError(result, fallback = 'Something went wrong. Please t
   return fallback
 }
 
-// Factory — returns a small { get, post, put, delete } facade bound to a baseUrl.
-// Each verb just forwards into request() with the right method, so adding a new
-// verb later means editing one place.
+// Factory — returns a small { get, post, put, patch, delete } facade bound to a
+// baseUrl. Each verb just forwards into request() with the right method, so
+// adding a new verb later means editing one place.
 //
 // Body handling: only stringifies when an actual object/value is provided.
 // Calling api.post('/logout') with no body sends a bodyless POST (not JSON "undefined").
@@ -124,6 +124,7 @@ export function createApi(baseUrl) {
     get:    (path, opts)         => request(baseUrl, path, { ...opts, method: 'GET' }),
     post:   (path, body, opts)   => request(baseUrl, path, { ...opts, method: 'POST',   body: bodyInit(body) }),
     put:    (path, body, opts)   => request(baseUrl, path, { ...opts, method: 'PUT',    body: bodyInit(body) }),
+    patch:  (path, body, opts)   => request(baseUrl, path, { ...opts, method: 'PATCH',  body: bodyInit(body) }),
     delete: (path, body, opts)   => request(baseUrl, path, { ...opts, method: 'DELETE', body: bodyInit(body) }),
     // Escape hatch for unusual cases (e.g. query-string GETs); rarely needed.
     raw:    (path, opts)         => request(baseUrl, path, opts),

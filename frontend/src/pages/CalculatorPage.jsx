@@ -3,7 +3,8 @@ import { useParams, useNavigate, Navigate } from 'react-router-dom'
 import { useCalculatorData } from '../hooks/useCalculatorData'
 import { useSave } from '../hooks/useSave'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
-import { CALC_MAP, PUBLISHED_TYPES } from '../calculators/registry'
+import { CALC_MAP } from '../calculators/registry'
+import { usePublishedTypes } from '../calculators/usePublished'
 import { CALC_STORAGE_KEY } from '../constants'
 import AppShell from '../components/AppShell'
 import SavedCalculationsSidebar from '../components/SavedCalculationsSidebar'
@@ -25,10 +26,10 @@ export default function CalculatorPage({ auth }) {
   // A type that is unknown OR exists but is unpublished redirects to the landing
   // page — but the redirect is returned only AFTER every hook below has run (see
   // the guard further down), so the hook order is identical on every render
-  // (React's rules-of-hooks). PUBLISHED_TYPES is the public surface; CALC_MAP
-  // still holds all 12 so saved rows for unpublished types remain loadable on
-  // develop. CALC_MAP[type] is undefined for genuinely unknown types, hence ?? {}.
-  const isPublished = PUBLISHED_TYPES.includes(type)
+  // (React's rules-of-hooks). usePublishedTypes() is the runtime public surface;
+  // CALC_MAP still holds all 12 so saved rows for unpublished types remain
+  // loadable. CALC_MAP[type] is undefined for genuinely unknown types, hence ?? {}.
+  const isPublished = usePublishedTypes().includes(type)
   const { component: CalcComponent, label, Icon, color, gradient, explainer } =
     CALC_MAP[type] ?? {}
 

@@ -111,7 +111,9 @@ frontend/
     ├── api/
     │   ├── httpClient.js       # Shared fetch wrapper. createApi(baseUrl) factory + central CSRF injection
     │   ├── authApi.js          # register / login / logout / deleteAccount / getStatus / fetchCsrfToken / forgotPassword / resetPassword / changePassword / changeEmail
-    │   ├── calculatorApi.js    # getAll / create / update / remove
+    │   ├── calculatorApi.js    # getPublished (public runtime publish surface) / getAll / create / update / remove
+    │   ├── adminApi.js         # /api/admin/* — getCalculators / setPublished (admin portal; PATCH via createApi)
+    │   ├── adminApi.test.js    # vitest — admin endpoint verb + path + body wiring
     │   ├── netWorthApi.js      # /api/net-worth/* — assets/liabilities/investments/realEstate CRUD + getSummary + snapshots
     │   ├── incomeExpenseApi.js # /api/income-expense/* — transactions CRUD (year/month filters) + getSummary
     │   └── netWorthApi.test.js # vitest — asserts each endpoint's verb + path + body wiring
@@ -121,7 +123,9 @@ frontend/
     │   ├── migrateCalcData.js  # migrate() / stripVersion() / injectVersion() — saved-data versioning
     │   └── migrateCalcData.test.js # vitest unit tests for the migration engine (sankey v1→v2, idempotency, version guards)
     ├── calculators/
-    │   ├── registry.js                     # ← ONLY file to touch when adding a calculator
+    │   ├── registry.js                     # ← ONLY file to touch when adding a calculator. Exports CALCULATORS/CALC_MAP/VALID_TYPES + DEFAULT_PUBLISHED_* (build-time fallback for the runtime publish surface)
+    │   ├── usePublished.js                 # Runtime publish surface — usePublishedTypes/usePublishedCalculators (reads GET /api/calculators/published; module-store, no Context); registry defaults as fallback. invalidatePublished() after an admin toggle
+    │   ├── usePublished.test.js            # vitest — fallback-to-defaults then adopt-fetched-set
     │   ├── FIRECalculator.jsx
     │   ├── CompoundInterestCalculator.jsx
     │   ├── SankeyDiagram.jsx              # v2: nested income/expense_groups, 4-col diagram, currency+%/permalink. Two-slice state, calls migrate/stripVersion directly
@@ -201,7 +205,12 @@ frontend/
         ├── RegisterPage.jsx       # Thin wrapper around AuthForm
         ├── ForgotPasswordPage.jsx # /forgot-password — email field; always shows the same neutral "check your inbox" state
         ├── ResetPasswordPage.jsx  # /reset-password/:token — new password + confirm; success / generic-invalid-link / weak-password states
-        └── SettingsPage.jsx       # /app/settings (auth-guarded) — account email + change password + change email + danger zone (DeleteAccountModal)
+        ├── SettingsPage.jsx       # /app/settings (auth-guarded) — account email + change password + change email + danger zone (DeleteAccountModal)
+        └── admin/                 # /admin — internal admin-only portal (RequireAdmin gate; invisible to non-admins). Phase 12 — Admin Control Center
+            ├── AdminPage.jsx      # Shell: dark sticky top bar (wordmark + 3 tabs + "internal · /admin" badge + avatar), switches Overview/Analytics/Users
+            ├── AdminOverview.jsx  # Project Status — stat strip + calculator catalog table with live publish toggles (optimistic + rollback; invalidatePublished on success)
+            ├── AdminAnalytics.jsx # Placeholder — GA4 analytics lands in a later phase (#152)
+            └── AdminUsers.jsx     # Placeholder — tier control / suspend / audit log lands in a later phase (#151)
 ```
 
 ### Frontend environment variables (Vercel)
