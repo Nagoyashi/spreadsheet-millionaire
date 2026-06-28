@@ -16,6 +16,28 @@ def login_required(f):
     return decorated
 
 
+def admin_required(f):
+    """
+    Decorator that blocks non-admins from the /admin API.
+
+    Returns 401 when there's no session at all, and 404 (not 403) when a normal
+    logged-in user hits an admin route — the portal must not even acknowledge
+    its own existence to non-admins ("redirect/404 for non-admins, never expose
+    it to a normal logged-in user"). Admin status is read fresh from the DB every
+    request via the user's is_admin column — the single source of truth — so a
+    demotion takes effect immediately, not at next login.
+    """
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get("user_id"):
+            return jsonify({"error": "Authentication required."}), 401
+        user = get_current_user()
+        if user is None or not user.is_admin:
+            return jsonify({"error": "Resource not found."}), 404
+        return f(*args, **kwargs)
+    return decorated
+
+
 def csrf_protect(f):
     """
     Decorator that verifies the X-CSRF-Token header on mutating requests.

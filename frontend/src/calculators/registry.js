@@ -240,14 +240,20 @@ export const CALCULATORS = [
 export const CALC_MAP    = Object.fromEntries(CALCULATORS.map(c => [c.type, c]))
 export const VALID_TYPES = CALCULATORS.map(c => c.type)
 
-// The public MVP surface. Every user-facing enumeration (sidebar nav, landing
-// grid, category tabs, routing guard) derives from this — never re-filter the
-// full CALCULATORS list in a consumer, and never maintain a second list.
-export const PUBLISHED_CALCULATORS = CALCULATORS.filter(c => c.published)
-export const PUBLISHED_TYPES       = PUBLISHED_CALCULATORS.map(c => c.type)
+// Build-time DEFAULT publish surface — the seed/fallback only. Publish state is
+// now RUNTIME (DB-backed, admin-toggleable): consumers read it via usePublished.js
+// (which fetches /api/calculators/published) and fall back to these defaults if
+// the request fails so the app always renders. The `published` field here mirrors
+// the backend seed (calc_types.DEFAULT_PUBLISHED_TYPES). The single-source rule
+// still holds — consumers derive from one published set; the source just moved
+// from compile-time to runtime. See DECISIONS.md § "Runtime publish state".
+export const DEFAULT_PUBLISHED_CALCULATORS = CALCULATORS.filter(c => c.published)
+export const DEFAULT_PUBLISHED_TYPES       = DEFAULT_PUBLISHED_CALCULATORS.map(c => c.type)
 
-// All unique categories among PUBLISHED calculators, in first-appearance order.
-// Deriving from the published set means a category with no published calculator
-// never renders as an empty group. Publishing a calculator in a new category
-// adds that category here automatically.
-export const CATEGORIES = ['All', ...new Set(PUBLISHED_CALCULATORS.map(c => c.category))]
+// Categories for an arbitrary published set, in first-appearance order. Deriving
+// from the published set means a category with no published calculator never
+// renders as an empty group. usePublished.js calls this with the runtime set;
+// DEFAULT_CATEGORIES is the build-time fallback.
+export const categoriesFor = (published) =>
+  ['All', ...new Set(published.map(c => c.category))]
+export const DEFAULT_CATEGORIES = categoriesFor(DEFAULT_PUBLISHED_CALCULATORS)

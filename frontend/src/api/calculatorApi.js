@@ -8,6 +8,11 @@ import { createApi } from './httpClient'
 const api = createApi('/api/calculators')
 
 export const calculatorApi = {
+  // GET /api/calculators/published — the runtime publish surface (public, no
+  // auth). Returns { published: [calcType, ...] }. Drives which calculators the
+  // public app shows; the admin portal toggles it. See usePublished.js.
+  getPublished: () => api.get('/published'),
+
   // GET /api/calculators?type=fire  (type is optional)
   getAll: (type = null) => {
     const query = type ? `?type=${encodeURIComponent(type)}` : ''

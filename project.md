@@ -16,21 +16,23 @@ expanding from calculators into trackers and a freemium tier.
 
 ## Current phase
 
-**Phase 11 — Income & Expense Tracker** shipped as `v0.11.0` (2026-06-21). Next up:
-Phase 12 — Backlog cleanup + Security hardening (`v0.12.0`), not yet opened as a
-milestone. (Roadmap resequenced 2026-06-21 — trackers and a go-live review come
-before the referral engine; see § Future.)
+**Phase 12 — Admin Control Center** (`v0.12.0`) is the open cycle: an internal
+admin-only `/admin` portal (calculator publish toggles, GA4 analytics, user
+tier/suspend management). Built in phases — auth + Overview first, then Users, then
+Analytics. (Roadmap resequenced 2026-06-28 — the admin portal took the `v0.12.0`
+slot and slid the planned cleanup/security + product-review phases one minor each;
+see § Future.)
 
 ## Current cycle
 
 > Canonical cycle state = the single **open GitHub Milestone**. This line mirrors
 > it for at-a-glance reading in the editor; if they disagree, the milestone wins.
 
-**Between cycles.** `v0.11.0` — Income & Expense Tracker shipped (2026-06-21);
-both trackers are now built production-ready but **dark** behind their flags
-(`NET_WORTH_ENABLED` / `INCOME_EXPENSE_ENABLED`), so prod still shows "Coming
-soon". No milestone is currently open. The next cycle is `v0.12.0` — Backlog
-cleanup + Security hardening (see § Future). `v0.8.1` live in production at
+**Cycle `v0.12.0` — Admin Control Center** is open. Building the internal `/admin`
+portal in phases: **auth + Overview** (admin gate + DB-backed publish toggles) is
+landing first, then **Users** (tier/suspend + audit log), then **Analytics** (GA4
+proxy). Both trackers remain built-but-**dark** behind their flags
+(`NET_WORTH_ENABLED` / `INCOME_EXPENSE_ENABLED`). `v0.8.1` live in production at
 www.spreadsheetmillionaire.com · backlog on the
 [Project board](https://github.com/users/Nagoyashi/projects) ↗
 
@@ -75,6 +77,11 @@ issues are the cycle's scope. Patches (`vX.Y.Z`, Z > 0) skip milestones.
 > single phase. Trackers establish patterns and real user value first; the referral
 > engine lands last so its rewards/fraud shape fits the launch posture decided in
 > the product review.
+>
+> Resequenced 2026-06-28: the **Admin Control Center** (internal `/admin` portal —
+> calculator publish toggles, GA4 analytics, user tier/suspend management) takes the
+> `v0.12.0` slot; everything below slides one minor (Backlog cleanup + Security →
+> `v0.13.0`, Product review → `v0.14.0`, Referral engine → `v0.15.0`).
 
 - **Budgets** *(un-slotted backlog)* — per-category budgets (`fintrackr_dev` had
   them); a separate feature with its own UI surface. **Recurring transactions**
@@ -93,16 +100,25 @@ issues are the cycle's scope. Patches (`vX.Y.Z`, Z > 0) skip milestones.
   (one asset's value over time, not just aggregate NW) and snapshot comparison (diff any
   two snapshots per asset class); both need a richer snapshot shape (schema change).
   Auto/scheduled snapshots need a background-job concept that doesn't exist yet.
-- **Backlog cleanup + Security hardening** *(next cycle — targeted at `v0.12.0`)* — one
-  consolidation cycle after the trackers land: sweep accumulated board backlog
-  (tech debt, bugs, small gaps) **and** harden security for finance-app credibility
-  (input-validation hardening, API auth tightening, data-handling review). Scope
-  drawn from the board at the time, not pre-listed here.
-- **Product review & go-live readiness** *(targeted at `v0.13.0`)* — full product
+- **Admin Control Center** *(current cycle — `v0.12.0`)* — an internal, admin-only
+  `/admin` portal (gated by `users.is_admin`; 404 for non-admins). Three tabs:
+  **Overview** (calculator catalog + live publish toggles writing the DB-backed
+  `calculator_publish` state the public `/app` reads at runtime), **Users** (search /
+  tier set Free·Pro·Elite / suspend·reinstate, audit-logged), **Analytics** (GA4 Data
+  API via a server-side proxy — never ship the service-account key to the client).
+  Tiers/billing aren't live (beta): Free→Paid + the Pro/Elite funnel render disabled.
+  See DECISIONS.md §§ "Runtime publish state" / "Admin portal auth". Built in phases:
+  auth + Overview first, then Users, then Analytics.
+- **Backlog cleanup + Security hardening** *(targeted at `v0.13.0`)* — one
+  consolidation cycle: sweep accumulated board backlog (tech debt, bugs, small gaps)
+  **and** harden security for finance-app credibility (input-validation hardening,
+  API auth tightening, data-handling review). Scope drawn from the board at the time,
+  not pre-listed here.
+- **Product review & go-live readiness** *(targeted at `v0.14.0`)* — full product
   audit before committing to a launch shape: what's working/missing, feedback
   synthesis, competitive landscape, and the launch-posture decision (freemium vs.
-  free-only, positioning). Output: clarity on go-live + the v0.14.0+ roadmap.
-- **Referral engine** *(targeted at `v0.14.0`)* — referral codes/links, attribution
+  free-only, positioning). Output: clarity on go-live + the v0.15.0+ roadmap.
+- **Referral engine** *(targeted at `v0.15.0`)* — referral codes/links, attribution
   + reward tracking, abuse/fraud guards, three-layer gating (UI / route / DB), and
   its own DB tables + API namespace. Shape depends on the product-review outcome
   (rewards as Freemium entitlement grants); design decisions recorded in
