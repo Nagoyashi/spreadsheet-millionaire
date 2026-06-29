@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { authApi } from '../api/authApi'
-import { describeError } from '../api/httpClient'
+import { describeError, registerUnauthorizedHandler } from '../api/httpClient'
 
 // Shared auth state across the app.
 // Usage: const { user, loading, isAuthenticated, login, logout, register, deleteAccount } = useAuth()
@@ -17,6 +17,14 @@ export function useAuth() {
     authApi.getStatus().then(({ ok, data }) => {
       if (ok && data.logged_in) setUser(data.user)
     }).finally(() => setLoading(false))
+  }, [])
+
+  // Central 401 handler (#21): when any authenticated request gets a 401 (the
+  // session expired/cleared server-side), drop the user so the app reflects
+  // logged-out and prompts re-auth — instead of every save/load failing with a
+  // generic error while the UI still shows logged-in. setUser is stable.
+  useEffect(() => {
+    registerUnauthorizedHandler(() => setUser(null))
   }, [])
 
   const login = useCallback(async (email, password) => {

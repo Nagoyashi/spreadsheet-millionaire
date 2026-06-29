@@ -94,8 +94,14 @@ def login():
 
     user = User.get_by_email(data["email"])
 
-    # Deliberate vague message — don't reveal whether email exists
-    if not user or not user.check_password(data["password"]):
+    # Deliberate vague message — don't reveal whether the email exists. When the
+    # account is missing, still run a bcrypt comparison (against a dummy hash) so
+    # the response time matches the found-user path — no email-enumeration timing
+    # side channel (#35).
+    if user is None:
+        User.dummy_password_check(data["password"])
+        return jsonify({"error": "Invalid email or password."}), 401
+    if not user.check_password(data["password"]):
         return jsonify({"error": "Invalid email or password."}), 401
 
     # Suspended accounts (set from the admin Users screen) can't log in. Checked

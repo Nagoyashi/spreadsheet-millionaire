@@ -16,23 +16,23 @@ expanding from calculators into trackers and a freemium tier.
 
 ## Current phase
 
-**Phase 12 — Admin Control Center** shipped as `v0.12.0` (2026-06-28). Next up:
-Phase 13 — Backlog cleanup + Security hardening (`v0.13.0`), not yet opened as a
-milestone. (Roadmap resequenced 2026-06-28 — the admin portal took the `v0.12.0`
-slot and slid the planned cleanup/security + product-review phases one minor each;
-see § Future.)
+**Phase 13 — Backlog cleanup + Security hardening** shipped as `v0.13.0`
+(2026-06-29): security headers/CSP, payload bounds + write rate limits, session
+fixation, login timing, bcrypt cap, client resilience (CSRF self-heal, central
+401, error boundary), and three calculator bug fixes — plus the post-v0.12
+dependency bumps and admin-portal cleanups. Next up: Phase 14 — Product review &
+go-live readiness (`v0.14.0`), not yet opened as a milestone.
 
 ## Current cycle
 
 > Canonical cycle state = the single **open GitHub Milestone**. This line mirrors
 > it for at-a-glance reading in the editor; if they disagree, the milestone wins.
 
-**Between cycles.** `v0.12.0` — Admin Control Center shipped (2026-06-28): an
-internal admin-only `/admin` portal (live publish toggles, user tier/suspend +
-audit log, GA4-ready analytics), plus migrate-on-boot. No milestone is currently
-open. The next cycle is `v0.13.0` — Backlog cleanup + Security hardening (see
-§ Future). Both trackers remain built-but-**dark** behind their flags
-(`NET_WORTH_ENABLED` / `INCOME_EXPENSE_ENABLED`). `v0.8.1` live in production at
+**Between cycles.** `v0.13.0` — Backlog cleanup + Security hardening shipped
+(2026-06-29, all 12 issues). No milestone is currently open. The next cycle is
+`v0.14.0` — Product review & go-live readiness (see § Future). Trackers ship
+**dark via runtime publish** (DB-backed, revealed from `/admin` Overview);
+production shows "coming soon" until toggled. `v0.13.0` live in production at
 www.spreadsheetmillionaire.com · backlog on the
 [Project board](https://github.com/users/Nagoyashi/projects) ↗
 
@@ -58,6 +58,7 @@ issues are the cycle's scope. Patches (`vX.Y.Z`, Z > 0) skip milestones.
 | **Phase 10 — Net Worth Tracker** | `v0.10.0` · 2026-06-21 | First tracker: 5 normalised `nw_*` tables, `/api/net-worth/*` (CRUD + summary + snapshots), tabbed Wealth page + category CRUD + recharts dashboard; ships dark behind `NET_WORTH_ENABLED`. → [v0.10.0](docs/releases/v0.10.0.md) |
 | **Phase 11 — Income & Expense Tracker** | `v0.11.0` · 2026-06-21 | Second tracker: `ie_transactions` + `/api/income-expense/*` (CRUD + monthly/yearly summary), transactions panel + recharts cashflow dashboard; ships dark behind `INCOME_EXPENSE_ENABLED`. No shared tracker framework. → [v0.11.0](docs/releases/v0.11.0.md) |
 | **Phase 12 — Admin Control Center** | `v0.12.0` · 2026-06-28 | Internal admin-only `/admin` portal (`users.is_admin`, 404 for non-admins): Overview with **live publish toggles** (publish state moved to a DB-backed `calculator_publish` table the public app reads at runtime), Users (tier `free`/`pro`/`elite` + suspend/reinstate + `admin_audit_log`), Analytics (GA4 server-side proxy + DB-signup empty state). Also: migrate-on-boot (gunicorn `on_starting`) + sidebar brand-link fix. → [v0.12.0](docs/releases/v0.12.0.md) |
+| **Phase 13 — Backlog cleanup + Security hardening** | `v0.13.0` · 2026-06-29 | Security: frontend CSP/headers (Vercel), bounded payloads (`MAX_CONTENT_LENGTH` + `data` caps) + write rate limits, session-id rotation (fixation), login-timing equalisation, 72-byte password cap. Resilience: stale-CSRF self-heal + retry, central 401→logout, render error boundary. Calculator fixes: dividend growth (#77), reachability display (#33), Sankey input validation (#24). Plus dependency bumps + admin-portal cleanups. → [v0.13.0](docs/releases/v0.13.0.md) |
 
 > Phases 1–5 integrated on `develop` (2026-06-11/12) with **no individual
 > release tags**; they first reached production bundled in **`v0.6.0`**.
@@ -102,12 +103,7 @@ issues are the cycle's scope. Patches (`vX.Y.Z`, Z > 0) skip milestones.
   (one asset's value over time, not just aggregate NW) and snapshot comparison (diff any
   two snapshots per asset class); both need a richer snapshot shape (schema change).
   Auto/scheduled snapshots need a background-job concept that doesn't exist yet.
-- **Backlog cleanup + Security hardening** *(next cycle — targeted at `v0.13.0`)* — one
-  consolidation cycle: sweep accumulated board backlog (tech debt, bugs, small gaps)
-  **and** harden security for finance-app credibility (input-validation hardening,
-  API auth tightening, data-handling review). Scope drawn from the board at the time,
-  not pre-listed here.
-- **Product review & go-live readiness** *(targeted at `v0.14.0`)* — full product
+- **Product review & go-live readiness** *(next cycle — targeted at `v0.14.0`)* — full product
   audit before committing to a launch shape: what's working/missing, feedback
   synthesis, competitive landscape, and the launch-posture decision (freemium vs.
   free-only, positioning). Output: clarity on go-live + the v0.15.0+ roadmap.

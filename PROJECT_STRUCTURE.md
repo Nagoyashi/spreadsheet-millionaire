@@ -79,7 +79,8 @@ backend/
     ├── test_db_smoke.py        # DB-path wiring proof (register + truncation isolation); skips without TEST_DATABASE_URL, runs in CI
     ├── test_auth.py            # End-to-end auth-flow tests (register/login/logout/forgot+reset/delete/change-pw/change-email); email mocked, DB-backed
     ├── test_idor.py            # Tenant-isolation tests for saved_calculators (Hard Rule #6) — route + model layer, two users, unauth 401
-    └── test_admin.py           # Admin gate (401/404) + publish toggle + public /published surface; DB-backed
+    ├── test_admin.py           # Admin gate (401/404) + publish toggle + public /published surface; DB-backed
+    └── test_calculators.py     # Saved-calculator write bounds (#20) — MAX_CONTENT_LENGTH 413, data field cap 422, no row on reject
 ```
 
 ### Backend .env variables
@@ -97,7 +98,7 @@ frontend/
 ├── index.html
 ├── package.json
 ├── vite.config.js              # Proxies /api/* → localhost:5000 (local dev only); `test` block sets the vitest jsdom env. `npm test` = vitest run
-├── vercel.json                 # SPA fallback only (/(.*) → /index.html). The /api/* proxy moved to middleware.js
+├── vercel.json                 # SPA fallback (/(.*) → /index.html) + security headers block (CSP, X-Frame-Options DENY, nosniff, Referrer-Policy, HSTS) on document/asset routes. The /api/* proxy is in middleware.js
 ├── middleware.js               # Vercel Edge Middleware — env-driven /api/* proxy. Reads BACKEND_ORIGIN at the edge, rewrites to ${BACKEND_ORIGIN}/api/*. NOT in the client bundle
 ├── tailwind.config.js
 ├── postcss.config.js
@@ -113,7 +114,8 @@ frontend/
     ├── setupTests.js           # vitest setup — jest-dom matchers + a ResizeObserver stub (for recharts in jsdom); wired via vite.config test.setupFiles
     ├── trackers.js             # Published-tracker surface: useLiveTrackers() + useVisibleUpcoming() — runtime hooks over usePublishedTypes (DB-backed publish), replacing the deleted build-time featureFlags.js. Every nav/grid consumer derives from these, never re-filters UPCOMING_FEATURES
     ├── api/
-    │   ├── httpClient.js       # Shared fetch wrapper. createApi(baseUrl) factory + central CSRF injection
+    │   ├── httpClient.js       # Shared fetch wrapper. createApi(baseUrl) + central CSRF injection, stale-CSRF 403 retry (#22), and 401→onUnauthorized hook (#21)
+    │   ├── httpClient.test.js  # vitest — CSRF-403 self-heal retry + central 401 handling
     │   ├── authApi.js          # register / login / logout / deleteAccount / getStatus / fetchCsrfToken / forgotPassword / resetPassword / changePassword / changeEmail
     │   ├── calculatorApi.js    # getPublished (public runtime publish surface) / getAll / create / update / remove
     │   ├── adminApi.js         # /api/admin/* — getCalculators / setPublished / getUsers / updateUser / setUserAdmin (superadmin) / getAnalytics (PATCH via createApi)
@@ -174,6 +176,8 @@ frontend/
     │   ├── SavedCalculationsSidebar.jsx   # List of saved calcs with click-to-deselect on active item (injected into AppSidebar's slot by CalculatorPage)
     │   ├── AuthCardShell.jsx              # Presentational chrome (gray page + top bar + white card + badge/title/subtitle/footer) for the auth family; used by AuthForm + Forgot/Reset pages
     │   ├── AuthForm.jsx                   # Shared email+password form for LoginPage + RegisterPage (renders inside AuthCardShell)
+    │   ├── ErrorBoundary.jsx              # Top-level render-error boundary (wraps Routes in App.jsx) — fallback with Reload + Back-to-calculators instead of a white screen (#23)
+    │   ├── ErrorBoundary.test.jsx         # vitest — fallback on a thrown child, children pass through otherwise
     │   └── UserFooter.jsx                 # Authenticated-user footer (email + Settings link + sign out + delete account modal)
     ├── hooks/
     │   ├── useAuth.js                 # login / logout / register / deleteAccount + session rehydration

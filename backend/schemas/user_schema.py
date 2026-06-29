@@ -2,16 +2,23 @@ import re
 from marshmallow import Schema, fields, validate, validates, ValidationError
 
 MIN_PASSWORD_LENGTH = 8
+# bcrypt silently truncates anything past 72 bytes (models/user.py). Cap here so
+# a long password is rejected with a clear 422 instead of being quietly cut — and
+# so an arbitrarily large password string can't be passed through. Checked in
+# bytes because that's what bcrypt counts (multibyte chars cost >1 byte each).
+MAX_PASSWORD_BYTES = 72
 EMAIL_REGEX = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
 
 def validate_password(value: str):
     """
-    Single source of the password strength rule (8+ chars, 1 letter, 1 number).
+    Single source of the password strength rule (8–72 bytes, 1 letter, 1 number).
     Every schema that accepts a new password reuses this — never redefine it.
     """
     if len(value) < MIN_PASSWORD_LENGTH:
         raise ValidationError(f"Password must be at least {MIN_PASSWORD_LENGTH} characters.")
+    if len(value.encode("utf-8")) > MAX_PASSWORD_BYTES:
+        raise ValidationError(f"Password must be at most {MAX_PASSWORD_BYTES} characters.")
     if not any(c.isdigit() for c in value):
         raise ValidationError("Password must contain at least one number.")
     if not any(c.isalpha() for c in value):

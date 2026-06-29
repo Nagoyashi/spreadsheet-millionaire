@@ -2,6 +2,12 @@ import bcrypt
 import psycopg
 from db import get_db
 
+# Precomputed throwaway hash for login timing equalisation (#35). When an email
+# doesn't exist, login still runs a bcrypt comparison against this so a missing
+# account costs about the same as a real one — no email-enumeration timing side
+# channel. Computed once at import (a few ms, one time).
+_DUMMY_PASSWORD_HASH = bcrypt.hashpw(b"timing-equaliser-not-a-real-password", bcrypt.gensalt())
+
 
 class User:
     """
@@ -68,6 +74,13 @@ class User:
     def check_password(self, plain: str) -> bool:
         return bcrypt.checkpw(plain.encode("utf-8"), self.password_hash.encode("utf-8"))
 
+    @staticmethod
+    def dummy_password_check(plain: str) -> bool:
+        """Run a throwaway bcrypt comparison against a fixed dummy hash so the
+        login path costs about the same whether or not the account exists (#35).
+        Always returns False; the result is discarded."""
+        return bcrypt.checkpw(plain.encode("utf-8"), _DUMMY_PASSWORD_HASH)
+
     # ------------------------------------------------------------------ #
     # Queries
     # ------------------------------------------------------------------ #
@@ -132,16 +145,15 @@ class User:
         """Grant/revoke superadmin. The manual bootstrap lever (DB/shell) — there
         is no UI to grant superadmin. Granting superadmin also grants admin so the
         account has full portal access; revoking superadmin leaves is_admin as-is."""
+        # Granting superadmin also grants admin (superadmin implies admin);
+        # revoking superadmin leaves is_admin as-is. One parameterised statement:
+        # is_admin = (is_admin OR <granting>) — true when granting, unchanged when
+        # revoking. Mirrors set_admin's parameterised style.
         conn = get_db()
-        if is_superadmin:
-            conn.execute(
-                "UPDATE users SET is_superadmin = true, is_admin = true WHERE id = %s",
-                (user_id,),
-            )
-        else:
-            conn.execute(
-                "UPDATE users SET is_superadmin = false WHERE id = %s", (user_id,)
-            )
+        conn.execute(
+            "UPDATE users SET is_superadmin = %s, is_admin = (is_admin OR %s) WHERE id = %s",
+            (bool(is_superadmin), bool(is_superadmin), user_id),
+        )
         conn.commit()
         return cls.get_by_id(user_id)
 

@@ -188,6 +188,16 @@
 **Why:** Two API modules used to define their own near-identical `request()` function with CSRF logic copy-pasted. Easy to forget on a third module. The getter-registration pattern keeps the dependency one-way: `httpClient` knows nothing about auth state, `authApi` owns the token.
 **Adding a new API namespace** is now one file with one import — see `PROJECT_STRUCTURE.md` § "Adding a New API Namespace".
 
+**Central resilience hooks (same one-way registration pattern).** `httpClient` exposes two more registration points alongside the CSRF-token getter, so reliability is handled once for every API module:
+- **Stale-CSRF self-heal (#22):** on a mutating request that 403s with a CSRF error, `httpClient` calls a registered refresher (`authApi.fetchCsrfToken`), then **retries the request once** with the fresh token — so a long-lived tab whose session `csrf_token` expired/evicted self-heals instead of failing every mutation. Retry is capped at one (a persistent 403 surfaces normally). This makes the known "stale CSRF after restart" flake invisible.
+- **Central 401 handling (#21):** on a 401 from any **non-auth** endpoint (session expired/cleared server-side), `httpClient` calls a registered handler that `useAuth` wires to reset the user to `null` — so the UI stops showing logged-in and prompts re-auth, instead of every save/load failing with a generic error. Auth-endpoint 401s (a bad login) are excluded — they aren't session expiry. Dependency stays one-way: `httpClient` knows nothing about auth state; `authApi`/`useAuth` register the behaviour.
+
+## Render-error boundary
+
+**TL;DR:** A top-level `ErrorBoundary` (class component) wraps the route tree so one render throw shows a recoverable fallback instead of white-screening the SPA.
+
+**Decision (#23):** `components/ErrorBoundary.jsx` wraps `<Routes>` in `App.jsx`. A render-time exception (a corrupt saved record, a malformed Sankey permalink) is caught (`getDerivedStateFromError` + `componentDidCatch`) and renders a fallback with **Reload** + **Back to calculators** (hard links — a full navigation resets the boundary and any corrupt state, which a client-side route change wouldn't). `<Suspense>` only covers lazy-load pending state, not thrown renders — this is the missing net. No external error-logging service yet; `componentDidCatch` logs to the console.
+
 ## CSRF token lives in JS memory, not localStorage
 
 **TL;DR:** Token in a module-level variable in `authApi`. Re-fetched on full reload.
@@ -463,9 +473,19 @@
 
 **TL;DR:** bcrypt + 8 chars with letter + number. Reasonable floor without being onerous.
 
-**Decision:** bcrypt for hashing, Marshmallow schema enforces 8+ chars with at least 1 letter and 1 number.
+**Decision:** bcrypt for hashing, Marshmallow schema enforces 8–72 bytes with at least 1 letter and 1 number.
 **Why bcrypt:** Battle-tested, adaptive cost factor, no foot-guns.
 **Why the password rule:** Reasonable floor without being onerous. Long enough to defeat trivial brute-forcing combined with rate limiting; lax enough that a real human can remember their password.
+
+**72-byte maximum (#36).** bcrypt silently truncates past 72 bytes, so `validate_password` now also rejects passwords over 72 bytes with a clear 422 — no quiet truncation surprise, and no arbitrarily large password string accepted. The cap lives in the shared `validate_password`, so register / reset / change-password all inherit it (the single-source rule).
+
+## Auth hardening — session rotation + login timing
+
+**TL;DR:** `set_session` rotates the server-side session id on login/register (session-fixation defence, #34); login runs a dummy bcrypt comparison for non-existent accounts so timing doesn't leak account existence (#35).
+
+**Session fixation (#34):** `set_session` (called on login, register, and email-change) now clears the session and assigns a **fresh `session.sid`** before writing auth state, so the signed session cookie changes across the unauthenticated→authenticated boundary — a sid fixed in a victim's browser pre-auth can't carry over. The CSRF token is preserved across the rotation (same as `clear_session`) so the frontend's in-memory token stays valid. Guarded with `hasattr(session, "sid")` so it's a safe no-op on a backend without server-side sids.
+
+**Login timing (#35):** `login` short-circuited when the email didn't exist, skipping the bcrypt comparison — measurably faster, leaking account existence despite the uniform message. It now runs `User.dummy_password_check` (a `bcrypt.checkpw` against a fixed import-time dummy hash) on the not-found path, so both branches cost about the same. Response message/status unchanged; rate limiting (20/hr, 5/min) already bounds the channel.
 
 ## Account deletion requires password re-confirmation
 
@@ -509,6 +529,14 @@
 
 **Decision:** Talisman enabled in `app.py`. Forces HTTPS in production, sets `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, and a strict `Referrer-Policy`.
 **Why:** Defence in depth. Each header blocks a specific attack class — clickjacking, MIME confusion, referrer leakage. Cheap to add, hard to remember to add later.
+
+**Frontend headers on Vercel — the document the browser loads (#19).** Talisman only covers `/api/*` responses from Render; the HTML/JS/CSS is served by Vercel, which had no header config — so the document itself was framable and had no CSP. `frontend/vercel.json` now carries a `headers` block on `/(.*)` with `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, HSTS, and a **strict Content-Security-Policy**: `default-src 'self'`, `script-src 'self'` (no inline/eval — the production Vite bundle is a single external module script), `style-src 'self' 'unsafe-inline'` (Recharts/React set inline `style` attributes), `img-src 'self' data:`, `connect-src 'self'` (the API is same-origin via the edge proxy), `frame-ancestors 'none'`, `object-src 'none'`, `base-uri`/`form-action 'self'`. The app loads **no external resources** (no CDN/fonts), so the CSP can stay strict. This is the CSP backstop § "CSRF token lives in JS memory" relied on but never had.
+
+## Bounded request payloads + write rate limits
+
+**TL;DR:** `MAX_CONTENT_LENGTH` (256 KB) rejects oversized bodies with 413 before parsing; the saved-calculator `data` blob is capped (64 KB serialized + depth/node bounds → 422); calculator write routes carry per-user rate limits.
+
+**Decision (#20):** `Config.MAX_CONTENT_LENGTH = 256 * 1024` bounds every request body at the Werkzeug layer. The opaque `data` dict (stored as JSONB) is validated by `_bounded_calc_data` in `calculator_schema.py` — JSON-serialisable, ≤ 64 KB serialized, ≤ 24 deep, ≤ 1000 nodes — giving a precise 422 instead of accepting an arbitrary dict. `routes/calculators.py` create/update get `@limiter.limit("60 per minute")`, delete `"120 per minute"`. **Why:** `data` was `fields.Dict()` with no bound — an authenticated user could bloat storage/memory and any client could send oversized bodies to any route. The caps are far above legitimate calculator inputs (a few KB).
 
 ## Config from `.env`, app exits on missing/invalid secret
 
