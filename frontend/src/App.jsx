@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useParams, useLocation } from '
 import { useAuth } from './hooks/useAuth'
 import { authApi } from './api/authApi'
 import MarketingLandingPage from './pages/MarketingLandingPage'
+import MarketingComingSoonPage from './pages/MarketingComingSoonPage'
 import PrivacyPage from './pages/PrivacyPage'
 import TermsPage from './pages/TermsPage'
 import ImprintPage from './pages/ImprintPage'
@@ -96,6 +97,38 @@ export default function App() {
         <Route path="/privacy" element={<PrivacyPage auth={auth} />} />
         <Route path="/terms" element={<TermsPage auth={auth} />} />
         <Route path="/imprint" element={<ImprintPage auth={auth} />} />
+
+        {/* Marketing sections — Beta "coming soon"; full surfaces are later cycles */}
+        <Route
+          path="/guide"
+          element={
+            <MarketingComingSoonPage
+              auth={auth}
+              title="Guide"
+              blurb="Our resource center — in-depth guides and articles on FIRE, investing, debt, and building wealth — is on the way. Until then, jump straight into the calculators."
+            />
+          }
+        />
+        <Route
+          path="/comparison"
+          element={
+            <MarketingComingSoonPage
+              auth={auth}
+              title="Comparison"
+              blurb="Side-by-side comparisons of brokers, accounts, and savings products — so you can pick the right one with confidence — are coming soon."
+            />
+          }
+        />
+        <Route
+          path="/etfs-stocks"
+          element={
+            <MarketingComingSoonPage
+              auth={auth}
+              title="ETFs and Stocks"
+              blurb="A real-time, categorized search of ETFs and stocks is in the works — explore and compare holdings in one place. Coming soon."
+            />
+          }
+        />
 
         {/* ── The app, namespaced under /app ───────────────────────────────── */}
         <Route path="/app" element={<LandingPage auth={auth} />} />

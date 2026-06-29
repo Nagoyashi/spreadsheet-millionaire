@@ -191,7 +191,7 @@ frontend/
     │   └── useDocumentTitle.js        # Sets a distinct document.title per route (SPA SEO); resets to default on unmount
     ├── marketing/                     # Public marketing surface (parallel to calculators/) — consumed only by the landing + legal pages
     │   ├── links.js                   # Single source for GITHUB_URL + CONTACT_EMAIL placeholder (used by nav/strip/footer/legal)
-    │   ├── MarketingNav.jsx           # Sticky top nav; auth-adaptive CTAs (Open app vs Sign in/Get started); mobile disclosure menu
+    │   ├── MarketingNav.jsx           # Sticky 3-col top nav: wordmark left · centered sections (Guide/Calculators/Comparison/ETFs and Stocks) · "Login App" hover-menu (Login/Register) right, or "Open app" when authed; mobile disclosure menu
     │   ├── Hero.jsx                   # Headline + subline + primary CTA → /app, secondary → /register
     │   ├── CalculatorShowcase.jsx     # One card per PUBLISHED_CALCULATORS; links straight to /app/calculator/:type
     │   ├── ComingSoonStrip.jsx        # Trackers from UPCOMING_FEATURES ("More on the way")
@@ -200,6 +200,7 @@ frontend/
     │   └── LegalLayout.jsx            # Shared prose chrome for legal pages (reuses MarketingNav + MarketingFooter)
     └── pages/
         ├── MarketingLandingPage.jsx # / — public marketing landing; composes src/marketing/*; auth-adaptive nav (no redirect for logged-in visitors)
+        ├── MarketingComingSoonPage.jsx # /guide, /comparison, /etfs-stocks — Beta "coming soon" placeholders (one component, title/blurb per route); full surfaces are later cycles (project.md § Future)
         ├── PrivacyPage.jsx        # /privacy — privacy policy on LegalLayout; written against actual data practices
         ├── TermsPage.jsx          # /terms — terms of service on LegalLayout; educational-tools-not-advice disclaimer
         ├── ImprintPage.jsx        # /imprint — imprint/Impressum on LegalLayout; placeholder operator details to complete before launch
