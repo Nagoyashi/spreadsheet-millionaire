@@ -449,3 +449,44 @@ def test_status_exposes_is_superadmin(superadmin_client):
     client, _ = superadmin_client
     user = client.get("/api/auth/status").get_json()["user"]
     assert user["is_superadmin"] is True and user["is_admin"] is True
+
+
+def test_suspended_admin_loses_portal_access(admin_client):
+    """Suspending an admin cuts portal access on the live session, not just at
+    next login — admin_required rejects a suspended account."""
+    client, admin = admin_client
+    with psycopg.connect(_TEST_DB_URL) as conn:
+        conn.execute("UPDATE users SET suspended = true WHERE id = %s", (admin["id"],))
+        conn.commit()
+    assert client.get("/api/admin/calculators").status_code == 404
+
+
+def test_normal_admin_cannot_modify_another_admin(admin_client, app, get_csrf_token):
+    """A non-superadmin admin can't suspend/re-tier another admin (privilege
+    protection) — only a superadmin can act on a privileged account."""
+    client, _ = admin_client
+    other = _register(app, "fellow-admin@example.com")
+    other_id = other.get("/api/auth/status").get_json()["user"]["id"]
+    _promote("fellow-admin@example.com")  # make the target an admin
+    token = get_csrf_token(client)
+    resp = client.patch(
+        f"/api/admin/users/{other_id}",
+        headers={"X-CSRF-Token": token},
+        json={"suspended": True},
+    )
+    assert resp.status_code == 403
+
+
+def test_superadmin_can_modify_an_admin(superadmin_client, app, get_csrf_token):
+    """A superadmin CAN act on an admin account (the protection is non-superadmin-only)."""
+    client, _ = superadmin_client
+    other = _register(app, "managed-admin@example.com")
+    other_id = other.get("/api/auth/status").get_json()["user"]["id"]
+    _promote("managed-admin@example.com")
+    token = get_csrf_token(client)
+    resp = client.patch(
+        f"/api/admin/users/{other_id}",
+        headers={"X-CSRF-Token": token},
+        json={"tier": "pro"},
+    )
+    assert resp.status_code == 200 and resp.get_json()["user"]["tier"] == "pro"

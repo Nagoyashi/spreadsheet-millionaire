@@ -125,6 +125,15 @@ def update_user(user_id):
     if has_suspended and user_id == admin_id and body["suspended"]:
         return jsonify({"error": "You can't suspend your own admin account."}), 400
 
+    # Privilege protection: a normal admin can't suspend or re-tier another
+    # admin/superadmin — otherwise any admin could suspend a superadmin (blocking
+    # their login) and neutralise the top of the hierarchy. Only a superadmin may
+    # act on a privileged account. (Acting on yourself is already handled above.)
+    if target.is_admin and user_id != admin_id:
+        actor = User.get_by_id(admin_id)
+        if actor is None or not actor.is_superadmin:
+            return jsonify({"error": "Only a superadmin can modify an admin account."}), 403
+
     updated = target
     if has_tier and body["tier"] != target.tier:
         updated = User.set_tier(user_id, body["tier"])

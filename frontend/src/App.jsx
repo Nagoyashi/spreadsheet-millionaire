@@ -17,7 +17,7 @@ import SettingsPage from './pages/SettingsPage'
 import WealthPage from './pages/WealthPage'
 import IncomeExpensePage from './pages/IncomeExpensePage'
 import AdminPage from './pages/admin/AdminPage'
-import { usePublishedTypes } from './calculators/usePublished'
+import { usePublishedState } from './calculators/usePublished'
 
 // Authenticated users hitting a guest-only door (login/register) bounce into the
 // app, not the marketing page — they're already past the front door.
@@ -61,7 +61,7 @@ function RedirectComingSoon() {
 
 export default function App() {
   const auth = useAuth()
-  const publishedTypes = usePublishedTypes()
+  const { types: publishedTypes, ready: publishedReady } = usePublishedState()
   const [csrfReady, setCsrfReady] = useState(false)
 
   // Fetch CSRF token on mount and wait for it before rendering.
@@ -72,8 +72,11 @@ export default function App() {
     authApi.fetchCsrfToken().finally(() => setCsrfReady(true))
   }, [])
 
-  // Block rendering until both auth status and CSRF token are ready
-  if (auth.loading || !csrfReady) {
+  // Block rendering until auth status, CSRF token, AND the runtime publish set
+  // are ready. Gating on publishedReady means the route guards never act on the
+  // optimistic default set (which omits anything published beyond the build-time
+  // defaults), so a published tracker/calculator is reachable on direct load.
+  if (auth.loading || !csrfReady || !publishedReady) {
     return (
       <div className="min-h-screen bg-stone-950 flex items-center justify-center">
         <span className="font-mono text-stone-500 text-sm tracking-widest animate-pulse">

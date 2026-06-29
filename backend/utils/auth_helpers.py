@@ -32,7 +32,10 @@ def admin_required(f):
         if not session.get("user_id"):
             return jsonify({"error": "Authentication required."}), 401
         user = get_current_user()
-        if user is None or not user.is_admin:
+        # A suspended account loses portal access immediately, even on a live
+        # session — suspension is read fresh from the DB here, so it's an
+        # effective kill switch, not just a next-login block.
+        if user is None or not user.is_admin or user.suspended:
             return jsonify({"error": "Resource not found."}), 404
         return f(*args, **kwargs)
     return decorated
@@ -50,7 +53,7 @@ def superadmin_required(f):
         if not session.get("user_id"):
             return jsonify({"error": "Authentication required."}), 401
         user = get_current_user()
-        if user is None or not user.is_superadmin:
+        if user is None or not user.is_superadmin or user.suspended:
             return jsonify({"error": "Resource not found."}), 404
         return f(*args, **kwargs)
     return decorated
