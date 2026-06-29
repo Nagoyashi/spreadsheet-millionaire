@@ -381,3 +381,40 @@ class TestChangeEmail:
             json={"password": PASSWORD, "new_email": "taken@example.com"},
         )
         assert resp.status_code == 409
+
+
+class TestAuthHardening:
+    """#34 session fixation, #35 login timing, #36 password cap."""
+
+    def test_login_rotates_session_id(self, app, get_csrf_token):
+        # An account to log into.
+        reg = app.test_client()
+        _register(reg, get_csrf_token(reg), email="rot@example.com")
+        # Fresh client: get-csrf creates an anonymous session cookie; login must
+        # rotate the sid so the cookie value changes across the auth boundary.
+        c = app.test_client()
+        token = get_csrf_token(c)
+        before = c.get_cookie("session")
+        resp = _login(c, token, email="rot@example.com")
+        assert resp.status_code == 200
+        after = c.get_cookie("session")
+        assert before is not None and after is not None
+        assert before.value != after.value
+
+    def test_dummy_password_check_is_false(self):
+        from models.user import User
+        assert User.dummy_password_check("whatever123") is False
+
+    def test_login_unknown_email_still_401(self, client, get_csrf_token):
+        # Behaviour unchanged for a missing account (the dummy bcrypt is internal).
+        resp = _login(client, get_csrf_token(client), email="ghost@example.com")
+        assert resp.status_code == 401
+
+    def test_register_rejects_overlong_password(self, client, get_csrf_token):
+        token = get_csrf_token(client)
+        resp = client.post(
+            "/api/auth/register",
+            headers={"X-CSRF-Token": token},
+            json={"email": "long@example.com", "password": "a1" + "x" * 80},
+        )
+        assert resp.status_code == 422

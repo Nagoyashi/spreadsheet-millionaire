@@ -2,6 +2,12 @@ import bcrypt
 import psycopg
 from db import get_db
 
+# Precomputed throwaway hash for login timing equalisation (#35). When an email
+# doesn't exist, login still runs a bcrypt comparison against this so a missing
+# account costs about the same as a real one — no email-enumeration timing side
+# channel. Computed once at import (a few ms, one time).
+_DUMMY_PASSWORD_HASH = bcrypt.hashpw(b"timing-equaliser-not-a-real-password", bcrypt.gensalt())
+
 
 class User:
     """
@@ -67,6 +73,13 @@ class User:
 
     def check_password(self, plain: str) -> bool:
         return bcrypt.checkpw(plain.encode("utf-8"), self.password_hash.encode("utf-8"))
+
+    @staticmethod
+    def dummy_password_check(plain: str) -> bool:
+        """Run a throwaway bcrypt comparison against a fixed dummy hash so the
+        login path costs about the same whether or not the account exists (#35).
+        Always returns False; the result is discarded."""
+        return bcrypt.checkpw(plain.encode("utf-8"), _DUMMY_PASSWORD_HASH)
 
     # ------------------------------------------------------------------ #
     # Queries
