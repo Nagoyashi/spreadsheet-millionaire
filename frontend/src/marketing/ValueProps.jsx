@@ -39,9 +39,12 @@ export default function ValueProps() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
         {PROPS.map(({ Icon, title, body }) => (
-          <div key={title} className="flex flex-col">
+          <div
+            key={title}
+            className="flex flex-col rounded-xl border border-white/10 bg-white/[0.03] p-5"
+          >
             <div className="inline-flex w-10 h-10 items-center justify-center rounded-lg bg-amber-400/10 mb-4">
               <Icon className="w-5 h-5 text-amber-400" />
             </div>

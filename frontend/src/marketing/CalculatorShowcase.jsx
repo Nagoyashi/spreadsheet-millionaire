@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { ArrowRight } from 'lucide-react'
 import { usePublishedCalculators } from '../calculators/usePublished'
+import CardSlider from './CardSlider'
 
 // One card per published calculator, driven by the runtime published set
 // (usePublishedCalculators) merged with registry metadata — label, subtitle,
@@ -25,12 +26,12 @@ export default function CalculatorShowcase() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+      <CardSlider label="Calculators">
         {publishedCalculators.map(({ type, label, subtitle, description, Icon, gradient }) => (
           <Link
             key={type}
             to={`/app/calculator/${type}`}
-            className="group flex flex-col rounded-xl border border-white/10 bg-white/[0.03] p-5 hover:border-white/25 hover:bg-white/[0.06] transition"
+            className="group shrink-0 snap-start w-[85vw] sm:w-72 lg:w-80 flex flex-col rounded-xl border border-white/10 bg-white/[0.03] p-5 hover:border-white/25 hover:bg-white/[0.06] transition"
           >
             <div className={`h-1 w-full rounded-full bg-gradient-to-r ${gradient} mb-4`} />
             <div className={`inline-flex w-11 h-11 items-center justify-center rounded-lg bg-gradient-to-br ${gradient} mb-4`}>
@@ -44,7 +45,7 @@ export default function CalculatorShowcase() {
             </span>
           </Link>
         ))}
-      </div>
+      </CardSlider>
     </section>
   )
 }

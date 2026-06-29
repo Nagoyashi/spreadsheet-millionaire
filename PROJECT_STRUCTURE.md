@@ -191,7 +191,8 @@ frontend/
     │   └── useDocumentTitle.js        # Sets a distinct document.title per route (SPA SEO); resets to default on unmount
     ├── marketing/                     # Public marketing surface (parallel to calculators/) — consumed only by the landing + legal pages
     │   ├── links.js                   # Single source for GITHUB_URL + CONTACT_EMAIL placeholder (used by nav/strip/footer/legal)
-    │   ├── MarketingNav.jsx           # Sticky 3-col top nav: wordmark left · centered sections (Guide/Calculators/Comparison/ETFs and Stocks) · "Login App" hover-menu (Login/Register) right, or "Open app" when authed; mobile disclosure menu
+    │   ├── MarketingNav.jsx           # Sticky full-width 3-col top nav: wordmark left · centered sections (Guide/Calculators/Comparison/ETFs and Stocks) · "Login App" hover-menu (Login/Register) right, or "Open app" when authed; mobile disclosure menu
+    │   ├── CardSlider.jsx             # Horizontal scroll-snap slider (hover arrows on desktop, native touch scroll) — used by CalculatorShowcase + ComingSoonStrip so card rows scroll sideways instead of wrapping
     │   ├── Hero.jsx                   # Headline + subline + primary CTA → /app, secondary → /register
     │   ├── CalculatorShowcase.jsx     # One card per PUBLISHED_CALCULATORS; links straight to /app/calculator/:type
     │   ├── ComingSoonStrip.jsx        # Trackers from UPCOMING_FEATURES ("More on the way")
