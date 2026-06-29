@@ -11,7 +11,8 @@ import os
 import psycopg
 import pytest
 
-from calc_types import VALID_CALC_TYPES, DEFAULT_PUBLISHED_TYPES
+from calc_types import DEFAULT_PUBLISHED_TYPES
+from publishable import PUBLISHABLE_TYPES
 
 _TEST_DB_URL = os.environ.get("TEST_DATABASE_URL", "").strip()
 
@@ -29,7 +30,7 @@ def _reset_publish_to_defaults() -> None:
     (via the updated_by FK), so we upsert every row rather than UPDATE — the
     table is empty at the start of each DB test."""
     with psycopg.connect(_TEST_DB_URL) as conn:
-        for calc_type in VALID_CALC_TYPES:
+        for calc_type in PUBLISHABLE_TYPES:
             conn.execute(
                 "INSERT INTO calculator_publish (calc_type, published) VALUES (%s, %s) "
                 "ON CONFLICT (calc_type) DO UPDATE SET published = EXCLUDED.published",
@@ -38,11 +39,29 @@ def _reset_publish_to_defaults() -> None:
         conn.commit()
 
 
+def _promote_super(email: str) -> None:
+    with psycopg.connect(_TEST_DB_URL) as conn:
+        conn.execute(
+            "UPDATE users SET is_superadmin = true, is_admin = true WHERE email = %s",
+            (email,),
+        )
+        conn.commit()
+
+
 @pytest.fixture
 def admin_client(auth_client):
     """auth_client's user, promoted to admin. Returns (client, user_dict)."""
     client, user = auth_client
     _promote(user["email"])
+    _reset_publish_to_defaults()
+    return client, user
+
+
+@pytest.fixture
+def superadmin_client(auth_client):
+    """auth_client's user, promoted to superadmin. Returns (client, user_dict)."""
+    client, user = auth_client
+    _promote_super(user["email"])
     _reset_publish_to_defaults()
     return client, user
 
@@ -348,3 +367,85 @@ def test_analytics_empty_state_uses_db_signups(admin_client, app):
     assert body["visitors_over_time"] is None
     assert body["funnel"]["free"] >= 2                  # DB tier counts
     assert body["funnel"]["pro"] == 0 and body["funnel"]["elite"] == 0
+    assert body["kpis"]["revenue"] is None              # MRR placeholder until billing
+
+
+# ---------------------------------------------------------------------------- #
+# Trackers are publishable too (revealed from the portal, not a build flag)
+# ---------------------------------------------------------------------------- #
+def test_tracker_publish_toggle_drives_public(admin_client, get_csrf_token):
+    client, _ = admin_client
+    token = get_csrf_token(client)
+    # Trackers ship dark — unpublished by default.
+    assert "net-worth" not in client.get("/api/calculators/published").get_json()["published"]
+    resp = client.patch(
+        "/api/admin/calculators/net-worth",
+        headers={"X-CSRF-Token": token},
+        json={"published": True},
+    )
+    assert resp.status_code == 200 and resp.get_json()["calculator"]["published"] is True
+    assert "net-worth" in client.get("/api/calculators/published").get_json()["published"]
+
+
+def test_tracker_appears_in_admin_catalog(admin_client):
+    client, _ = admin_client
+    types = {r["calc_type"] for r in client.get("/api/admin/calculators").get_json()["calculators"]}
+    assert {"net-worth", "income-expenses"} <= types
+
+
+# ---------------------------------------------------------------------------- #
+# Admin role grants — superadmin only
+# ---------------------------------------------------------------------------- #
+def test_grant_admin_is_superadmin_only(admin_client, app, get_csrf_token):
+    """A normal admin (not superadmin) can't grant admin — 404 (invisible)."""
+    client, _ = admin_client
+    target = _register(app, "wannabe@example.com")
+    tid = target.get("/api/auth/status").get_json()["user"]["id"]
+    token = get_csrf_token(client)
+    resp = client.patch(
+        f"/api/admin/users/{tid}/admin",
+        headers={"X-CSRF-Token": token},
+        json={"is_admin": True},
+    )
+    assert resp.status_code == 404
+
+
+def test_superadmin_grants_and_revokes_admin(superadmin_client, app, get_csrf_token):
+    client, _ = superadmin_client
+    target = _register(app, "newadmin@example.com")
+    tid = target.get("/api/auth/status").get_json()["user"]["id"]
+
+    token = get_csrf_token(client)
+    grant = client.patch(
+        f"/api/admin/users/{tid}/admin",
+        headers={"X-CSRF-Token": token},
+        json={"is_admin": True},
+    )
+    assert grant.status_code == 200 and grant.get_json()["user"]["is_admin"] is True
+    assert _audit_count("grant_admin", tid) == 1
+
+    token = get_csrf_token(client)
+    revoke = client.patch(
+        f"/api/admin/users/{tid}/admin",
+        headers={"X-CSRF-Token": token},
+        json={"is_admin": False},
+    )
+    assert revoke.get_json()["user"]["is_admin"] is False
+    assert _audit_count("revoke_admin", tid) == 1
+
+
+def test_superadmin_cannot_change_own_admin(superadmin_client, get_csrf_token):
+    client, admin = superadmin_client
+    token = get_csrf_token(client)
+    resp = client.patch(
+        f"/api/admin/users/{admin['id']}/admin",
+        headers={"X-CSRF-Token": token},
+        json={"is_admin": False},
+    )
+    assert resp.status_code == 400
+
+
+def test_status_exposes_is_superadmin(superadmin_client):
+    client, _ = superadmin_client
+    user = client.get("/api/auth/status").get_json()["user"]
+    assert user["is_superadmin"] is True and user["is_admin"] is True

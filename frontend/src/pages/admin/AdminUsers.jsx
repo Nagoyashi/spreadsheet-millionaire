@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Check, ChevronDown, Search } from 'lucide-react'
+import { Check, ChevronDown, Search, Shield } from 'lucide-react'
 import { adminApi } from '../../api/adminApi'
 
 // User Management (Screen 3) — searchable, tier-filterable accounts table with
@@ -54,13 +54,13 @@ function Badge({ label, color, bg }) {
   )
 }
 
-function TierMenu({ user, onPick, onClose }) {
+function TierMenu({ user, isSuperadmin, onPick, onSetAdmin, onClose }) {
   return (
     <>
       {/* backdrop closes on outside click */}
       <div className="fixed inset-0 z-20" onClick={onClose} />
       <div
-        className="absolute right-0 top-full mt-1 z-30 w-[180px] bg-white rounded-xl border border-[#e8ebee] py-1"
+        className="absolute right-0 top-full mt-1 z-30 w-[190px] bg-white rounded-xl border border-[#e8ebee] py-1"
         style={{ boxShadow: '0 10px 28px rgba(15,20,30,.18)' }}
       >
         {TIERS.map((t) => (
@@ -80,12 +80,26 @@ function TierMenu({ user, onPick, onClose }) {
         >
           {user.suspended ? 'Reinstate account' : 'Suspend account'}
         </button>
+        {/* Granting/revoking admin is superadmin-only and not allowed on a
+            superadmin (always an admin). */}
+        {isSuperadmin && !user.is_superadmin && (
+          <>
+            <div className="my-1 border-t border-[#f1f3f5]" />
+            <button
+              onClick={() => onSetAdmin(!user.is_admin)}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[#b8860b] hover:bg-[#fdf3da]"
+            >
+              <Shield className="w-3.5 h-3.5" />
+              {user.is_admin ? 'Revoke admin' : 'Make admin'}
+            </button>
+          </>
+        )}
       </div>
     </>
   )
 }
 
-function UserRow({ user, menuOpen, onMenu, onPick }) {
+function UserRow({ user, menuOpen, onMenu, onPick, onSetAdmin, isSuperadmin }) {
   const tint = tintFor(user.id)
   const pill = TIER_PILL[user.tier] || TIER_PILL.free
   return (
@@ -108,7 +122,11 @@ function UserRow({ user, menuOpen, onMenu, onPick }) {
             <span className="text-[13px] font-bold text-[#15181c] truncate">
               {user.email.split('@')[0]}
             </span>
-            {user.is_admin && <Badge label="ADMIN" color="#b8860b" bg="#fdf3da" />}
+            {user.is_superadmin ? (
+              <Badge label="SUPERADMIN" color="#7c3aed" bg="#f1eafe" />
+            ) : (
+              user.is_admin && <Badge label="ADMIN" color="#b8860b" bg="#fdf3da" />
+            )}
             {user.suspended && <Badge label="SUSPENDED" color="#ef4444" bg="#fdeaea" />}
           </span>
           <span className="block text-[12px] font-medium text-[#9aa0a8] truncate">{user.email}</span>
@@ -132,7 +150,13 @@ function UserRow({ user, menuOpen, onMenu, onPick }) {
           <ChevronDown className="w-3 h-3" />
         </button>
         {menuOpen && (
-          <TierMenu user={user} onPick={(f) => onPick(user, f)} onClose={() => onMenu(null)} />
+          <TierMenu
+            user={user}
+            isSuperadmin={isSuperadmin}
+            onPick={(f) => onPick(user, f)}
+            onSetAdmin={(next) => onSetAdmin(user, next)}
+            onClose={() => onMenu(null)}
+          />
         )}
       </div>
 
@@ -152,7 +176,8 @@ function UserRow({ user, menuOpen, onMenu, onPick }) {
   )
 }
 
-export default function AdminUsers() {
+export default function AdminUsers({ auth }) {
+  const isSuperadmin = !!auth?.user?.is_superadmin
   const [users, setUsers] = useState(null)
   const [counts, setCounts] = useState({})
   const [search, setSearch] = useState('')
@@ -200,6 +225,20 @@ export default function AdminUsers() {
           [fields.tier]: (c[fields.tier] || 0) + 1,
         }))
       }
+    })
+  }
+
+  // Superadmin-only: grant/revoke the admin role via the dedicated endpoint.
+  function setAdmin(user, nextIsAdmin) {
+    setMenuOpen(null)
+    const prev = users
+    setUsers((us) => us.map((u) => (u.id === user.id ? { ...u, is_admin: nextIsAdmin } : u)))
+    adminApi.setUserAdmin(user.id, nextIsAdmin).then(({ ok, data }) => {
+      if (!ok) {
+        setUsers(prev)
+        return
+      }
+      setUsers((us) => us.map((u) => (u.id === user.id ? data.user : u)))
     })
   }
 
@@ -293,6 +332,8 @@ export default function AdminUsers() {
               menuOpen={menuOpen === u.id}
               onMenu={setMenuOpen}
               onPick={update}
+              onSetAdmin={setAdmin}
+              isSuperadmin={isSuperadmin}
             />
           ))}
       </div>

@@ -38,6 +38,24 @@ def admin_required(f):
     return decorated
 
 
+def superadmin_required(f):
+    """
+    Gate for the few superadmin-only actions (granting/revoking the admin role).
+    Same posture as admin_required but requires is_superadmin: 401 with no
+    session, 404 for anyone who isn't a superadmin (including normal admins) — the
+    capability stays invisible. Read live from the DB each request.
+    """
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get("user_id"):
+            return jsonify({"error": "Authentication required."}), 401
+        user = get_current_user()
+        if user is None or not user.is_superadmin:
+            return jsonify({"error": "Resource not found."}), 404
+        return f(*args, **kwargs)
+    return decorated
+
+
 def csrf_protect(f):
     """
     Decorator that verifies the X-CSRF-Token header on mutating requests.

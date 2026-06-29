@@ -14,12 +14,12 @@ Analytics (GA4 proxy) land in later phases of the same cycle.
 from flask import Blueprint, request, jsonify, session
 
 from app import limiter
-from calc_types import VALID_CALC_TYPES
+from publishable import PUBLISHABLE_TYPES
 from user_tiers import USER_TIERS
 from models import calculator_publish, admin_audit
 from models.user import User
 from services import analytics
-from utils.auth_helpers import admin_required, csrf_protect
+from utils.auth_helpers import admin_required, superadmin_required, csrf_protect
 
 bp = Blueprint("admin", __name__, url_prefix="/api/admin")
 
@@ -55,7 +55,7 @@ def set_calculator_published(calc_type):
     404) and requires a real boolean (anything else → 400). Stamps updated_by
     with the acting admin.
     """
-    if calc_type not in VALID_CALC_TYPES:
+    if calc_type not in PUBLISHABLE_TYPES:
         return jsonify({"error": "Unknown calculator."}), 404
 
     body = request.get_json(silent=True) or {}
@@ -140,6 +140,44 @@ def update_user(user_id):
             {"suspended": bool(body["suspended"])},
         )
 
+    return jsonify({"user": updated.to_admin_dict()}), 200
+
+
+@bp.route("/users/<int:user_id>/admin", methods=["PATCH"])
+@superadmin_required
+@csrf_protect
+@limiter.limit("30 per minute")
+def set_user_admin(user_id):
+    """
+    Grant / revoke the admin role. **Superadmin only** (superadmin_required) —
+    normal admins can't make other admins. Body: { "is_admin": <bool> }.
+    Guards: you can't change your own admin flag, and a superadmin's admin can't
+    be revoked here (superadmin implies admin). Audit-logged.
+    """
+    body = request.get_json(silent=True) or {}
+    is_admin = body.get("is_admin")
+    if not isinstance(is_admin, bool):
+        return jsonify({"error": "Field 'is_admin' must be a boolean."}), 400
+
+    target = User.get_by_id(user_id)
+    if target is None:
+        return jsonify({"error": "User not found."}), 404
+
+    if user_id == session["user_id"]:
+        return jsonify({"error": "You can't change your own admin role."}), 400
+    if target.is_superadmin and not is_admin:
+        return jsonify({"error": "A superadmin is always an admin."}), 400
+
+    if is_admin == target.is_admin:
+        return jsonify({"user": target.to_admin_dict()}), 200
+
+    updated = User.set_admin(user_id, is_admin)
+    admin_audit.record(
+        session["user_id"],
+        "grant_admin" if is_admin else "revoke_admin",
+        user_id,
+        {"is_admin": is_admin},
+    )
     return jsonify({"user": updated.to_admin_dict()}), 200
 
 

@@ -16,6 +16,7 @@ class User:
         password_hash: str,
         created_at: str,
         is_admin: bool = False,
+        is_superadmin: bool = False,
         tier: str = "free",
         suspended: bool = False,
         last_login_at=None,
@@ -24,7 +25,9 @@ class User:
         self.email         = email
         self.password_hash = password_hash
         self.created_at    = created_at
-        self.is_admin      = bool(is_admin)
+        self.is_superadmin = bool(is_superadmin)
+        # A superadmin is implicitly an admin — the admin gate treats it as one.
+        self.is_admin      = bool(is_admin) or self.is_superadmin
         self.tier          = tier
         self.suspended     = bool(suspended)
         self.last_login_at = last_login_at
@@ -35,12 +38,13 @@ class User:
     def to_dict(self) -> dict:
         """Safe public representation — never include password_hash."""
         return {
-            "id":         self.id,
-            "email":      self.email,
-            "created_at": self.created_at,
-            "is_admin":   self.is_admin,
-            "tier":       self.tier,
-            "suspended":  self.suspended,
+            "id":            self.id,
+            "email":         self.email,
+            "created_at":    self.created_at,
+            "is_admin":      self.is_admin,
+            "is_superadmin": self.is_superadmin,
+            "tier":          self.tier,
+            "suspended":     self.suspended,
         }
 
     def to_admin_dict(self) -> dict:
@@ -120,6 +124,24 @@ class User:
             "UPDATE users SET is_admin = %s WHERE id = %s",
             (bool(is_admin), user_id),
         )
+        conn.commit()
+        return cls.get_by_id(user_id)
+
+    @classmethod
+    def set_superadmin(cls, user_id: int, is_superadmin: bool) -> "User | None":
+        """Grant/revoke superadmin. The manual bootstrap lever (DB/shell) — there
+        is no UI to grant superadmin. Granting superadmin also grants admin so the
+        account has full portal access; revoking superadmin leaves is_admin as-is."""
+        conn = get_db()
+        if is_superadmin:
+            conn.execute(
+                "UPDATE users SET is_superadmin = true, is_admin = true WHERE id = %s",
+                (user_id,),
+            )
+        else:
+            conn.execute(
+                "UPDATE users SET is_superadmin = false WHERE id = %s", (user_id,)
+            )
         conn.commit()
         return cls.get_by_id(user_id)
 

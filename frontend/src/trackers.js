@@ -1,33 +1,32 @@
 import { Wallet, ArrowRightLeft } from 'lucide-react'
 import { UPCOMING_FEATURES } from './upcomingFeatures'
-import { NET_WORTH_ENABLED, INCOME_EXPENSE_ENABLED } from './featureFlags'
+import { usePublishedTypes } from './calculators/usePublished'
 
-// The published-tracker surface. Mirrors the calculator registry's
-// published/coming-soon split (hard rule #3 spirit): every consumer derives
-// what to show from these two lists — never re-filters UPCOMING_FEATURES itself.
+// The published-tracker surface. Tracker visibility is now RUNTIME (DB-backed,
+// admin-toggleable) — the same publish mechanism as calculators. A tracker's
+// slug (e.g. 'net-worth') is a row in calculator_publish; revealing it out of
+// "coming soon" is an admin toggle in /admin Overview, not a redeploy. This
+// replaces the old build-time NET_WORTH_ENABLED / INCOME_EXPENSE_ENABLED flags.
 //
-// LIVE_TRACKERS  — trackers revealed to the user (real route + nav link).
-// VISIBLE_UPCOMING — the coming-soon teasers, minus anything now live.
+// useLiveTrackers()    — trackers whose slug is published (real route + nav link).
+// useVisibleUpcoming() — the coming-soon teasers (every tracker not yet published).
 //
-// A tracker flips from teaser to live by adding it here behind its flag; until
-// then it stays in the coming-soon teasers (production behaviour).
+// Both derive from the single runtime published set (usePublishedTypes) — hard
+// rule #3's single-source discipline, extended to trackers.
 
-export const LIVE_TRACKERS = [
-  ...(NET_WORTH_ENABLED
-    ? [{ slug: 'net-worth', label: 'Net Worth', Icon: Wallet, to: '/app/net-worth' }]
-    : []),
-  ...(INCOME_EXPENSE_ENABLED
-    ? [
-        {
-          slug: 'income-expenses',
-          label: 'Income & Expenses',
-          Icon: ArrowRightLeft,
-          to: '/app/income-expenses',
-        },
-      ]
-    : []),
+// Nav metadata (short labels for the sidebar/grid). Slugs match upcomingFeatures.js
+// and the /app/<slug> routes.
+const TRACKERS = [
+  { slug: 'net-worth', label: 'Net Worth', Icon: Wallet, to: '/app/net-worth' },
+  { slug: 'income-expenses', label: 'Income & Expenses', Icon: ArrowRightLeft, to: '/app/income-expenses' },
 ]
 
-const LIVE_SLUGS = new Set(LIVE_TRACKERS.map((t) => t.slug))
+export function useLiveTrackers() {
+  const published = new Set(usePublishedTypes())
+  return TRACKERS.filter((t) => published.has(t.slug))
+}
 
-export const VISIBLE_UPCOMING = UPCOMING_FEATURES.filter((f) => !LIVE_SLUGS.has(f.slug))
+export function useVisibleUpcoming() {
+  const published = new Set(usePublishedTypes())
+  return UPCOMING_FEATURES.filter((f) => !published.has(f.slug))
+}
