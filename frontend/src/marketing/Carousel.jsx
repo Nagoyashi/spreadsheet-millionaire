@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
-// Paginated card carousel: shows a full page of N cards (responsive), advances a
-// whole page at a time — auto every `autoMs`, or manually via the side arrows /
-// the dots. No partial/cut-off cards: each page is a grid of exactly `perView`
-// equal columns, so the last (possibly short) page just left-aligns its cards.
+// Continuous one-card-at-a-time carousel. Shows `perView` cards (responsive) and
+// shifts by a SINGLE card each step — the next card slides in from the right, the
+// leftmost slides out. Advances automatically (pause on hover/focus) or manually
+// via the side arrows. Loops seamlessly by cloning `perView` cards on each end and
+// snapping back without animation once a clone set scrolls into view.
 //
 // `items` is the data array; `renderItem(item, index)` returns each card.
 
@@ -27,25 +28,64 @@ function usePerView() {
   return n
 }
 
-export default function Carousel({ items, renderItem, label, autoMs = 5000 }) {
+export default function Carousel({ items, renderItem, label, autoMs = 3500 }) {
   const perView = usePerView()
-  const pageCount = Math.max(1, Math.ceil(items.length / perView))
-  const [page, setPage] = useState(0)
+  const n = items.length
+  const scrollable = n > perView
+  const k = perView // clones per side
+
+  // Track = [lead clones][real items][trail clones]; real items start at index k.
+  const track = scrollable ? [...items.slice(n - k), ...items, ...items.slice(0, k)] : items
+  const L = track.length
+
+  const [pos, setPos] = useState(k)
+  const [animate, setAnimate] = useState(true)
   const [paused, setPaused] = useState(false)
 
-  // Keep the page in range when perView (and thus pageCount) changes on resize.
+  // Reset to the first real card when the clone count (perView) changes.
   useEffect(() => {
-    setPage((p) => Math.min(p, pageCount - 1))
-  }, [pageCount])
+    setAnimate(false)
+    setPos(k)
+  }, [k, n])
 
-  // Autoplay — only with more than one page, paused on hover/focus.
+  // Re-enable the transition on the frame after a non-animated snap.
   useEffect(() => {
-    if (paused || pageCount <= 1) return undefined
-    const id = setInterval(() => setPage((p) => (p + 1) % pageCount), autoMs)
+    if (animate) return undefined
+    const r = requestAnimationFrame(() => setAnimate(true))
+    return () => cancelAnimationFrame(r)
+  }, [animate])
+
+  // Autoplay — one card forward per tick.
+  useEffect(() => {
+    if (!scrollable || paused) return undefined
+    const id = setInterval(() => setPos((p) => p + 1), autoMs)
     return () => clearInterval(id)
-  }, [paused, pageCount, autoMs])
+  }, [scrollable, paused, autoMs])
 
-  const go = (i) => setPage(((i % pageCount) + pageCount) % pageCount)
+  // Seamless wrap: once we've animated into a clone set, snap back by n with the
+  // transition off so it's invisible.
+  const onTransitionEnd = () => {
+    if (!scrollable) return
+    if (pos >= k + n) {
+      setAnimate(false)
+      setPos((p) => p - n)
+    } else if (pos < k) {
+      setAnimate(false)
+      setPos((p) => p + n)
+    }
+  }
+
+  if (!scrollable) {
+    return (
+      <div
+        className="grid gap-4 sm:gap-5"
+        style={{ gridTemplateColumns: `repeat(${Math.max(n, 1)}, minmax(0, 1fr))` }}
+        aria-label={label}
+      >
+        {items.map((it, i) => renderItem(it, i))}
+      </div>
+    )
+  }
 
   return (
     <div
@@ -57,46 +97,30 @@ export default function Carousel({ items, renderItem, label, autoMs = 5000 }) {
       <div className="relative">
         <div className="overflow-hidden" aria-label={label}>
           <div
-            className="flex transition-transform duration-500 ease-out"
-            style={{ transform: `translateX(-${page * 100}%)` }}
+            className="flex items-stretch"
+            style={{
+              width: `${(L / perView) * 100}%`,
+              transform: `translateX(-${pos * (100 / L)}%)`,
+              transition: animate ? 'transform 600ms ease' : 'none',
+            }}
+            onTransitionEnd={onTransitionEnd}
           >
-            {Array.from({ length: pageCount }).map((_, pi) => (
+            {track.map((it, i) => (
               <div
-                key={pi}
-                className="shrink-0 w-full grid gap-4 sm:gap-5"
-                style={{ gridTemplateColumns: `repeat(${perView}, minmax(0, 1fr))` }}
-                aria-hidden={pi !== page}
+                key={i}
+                className="shrink-0 px-2"
+                style={{ width: `${100 / L}%` }}
+                aria-hidden={i < k || i >= k + n}
               >
-                {items.slice(pi * perView, pi * perView + perView).map((item, idx) => renderItem(item, idx))}
+                {renderItem(it, i)}
               </div>
             ))}
           </div>
         </div>
 
-        {pageCount > 1 && (
-          <>
-            <Arrow dir={-1} onClick={() => go(page - 1)} />
-            <Arrow dir={1} onClick={() => go(page + 1)} />
-          </>
-        )}
+        <Arrow dir={-1} onClick={() => setPos((p) => p - 1)} />
+        <Arrow dir={1} onClick={() => setPos((p) => p + 1)} />
       </div>
-
-      {pageCount > 1 && (
-        <div className="flex justify-center gap-2 mt-6">
-          {Array.from({ length: pageCount }).map((_, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => go(i)}
-              aria-label={`Go to page ${i + 1}`}
-              aria-current={i === page}
-              className={`h-2 rounded-full transition-all ${
-                i === page ? 'w-6 bg-amber-400' : 'w-2 bg-white/20 hover:bg-white/40'
-              }`}
-            />
-          ))}
-        </div>
-      )}
     </div>
   )
 }

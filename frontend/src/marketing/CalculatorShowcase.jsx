@@ -18,7 +18,7 @@ function CalculatorCard({ type, label, subtitle, description, Icon, gradient }) 
   return (
     <Link
       to={`/app/calculator/${type}`}
-      className="group flex flex-col rounded-xl border border-white/10 bg-white/[0.03] p-5 hover:border-white/25 hover:bg-white/[0.06] transition"
+      className="group flex flex-col h-full rounded-xl border border-white/10 bg-white/[0.03] p-5 hover:border-white/25 hover:bg-white/[0.06] transition"
     >
       <div className={`h-1 w-full rounded-full bg-gradient-to-r ${gradient} mb-4`} />
       <div className={`inline-flex w-11 h-11 items-center justify-center rounded-lg bg-gradient-to-br ${gradient} mb-4`}>
