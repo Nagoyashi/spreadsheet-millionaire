@@ -16,24 +16,25 @@ expanding from calculators into trackers and a freemium tier.
 
 ## Current phase
 
-**Phase 12 — Admin Control Center** shipped as `v0.12.0` (2026-06-28). Next up:
-Phase 13 — Backlog cleanup + Security hardening (`v0.13.0`), not yet opened as a
-milestone. (Roadmap resequenced 2026-06-28 — the admin portal took the `v0.12.0`
-slot and slid the planned cleanup/security + product-review phases one minor each;
-see § Future.)
+**Phase 13 — Backlog cleanup + Security hardening** (`v0.13.0`) is the open cycle:
+sweep high-value board backlog (bugs, small gaps) and harden security for
+finance-app credibility (security headers/CSP, payload bounds, session fixation,
+login timing, bcrypt cap). Shipped most recently: **Phase 12 — Admin Control
+Center** (`v0.12.0`, 2026-06-28) + patch `v0.12.1` (admin polish — toggleable
+trackers, superadmin role).
 
 ## Current cycle
 
 > Canonical cycle state = the single **open GitHub Milestone**. This line mirrors
 > it for at-a-glance reading in the editor; if they disagree, the milestone wins.
 
-**Between cycles.** `v0.12.0` — Admin Control Center shipped (2026-06-28): an
-internal admin-only `/admin` portal (live publish toggles, user tier/suspend +
-audit log, GA4-ready analytics), plus migrate-on-boot. No milestone is currently
-open. The next cycle is `v0.13.0` — Backlog cleanup + Security hardening (see
-§ Future). Both trackers remain built-but-**dark** behind their flags
-(`NET_WORTH_ENABLED` / `INCOME_EXPENSE_ENABLED`). `v0.8.1` live in production at
-www.spreadsheetmillionaire.com · backlog on the
+**Cycle `v0.13.0` — Backlog cleanup + Security hardening** is open (12 issues:
+the security cluster #19/#20/#34/#35/#36 + high-value bugs/gaps #18/#21/#22/#23/#24/#33/#77).
+Trackers now ship **dark via runtime publish** (DB-backed, revealed from `/admin`
+Overview — the build-time tracker flags were removed in `v0.12.1`); production
+shows "coming soon" until toggled. `develop` is ahead of `main` by the dependency
+bumps + admin-review cleanups (will ship with `v0.13.0`). `v0.12.1` live in
+production at www.spreadsheetmillionaire.com · backlog on the
 [Project board](https://github.com/users/Nagoyashi/projects) ↗
 
 Each release cycle is a Milestone named for its target version (`v0.10.0`); its
