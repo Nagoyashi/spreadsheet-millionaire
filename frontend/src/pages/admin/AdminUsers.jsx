@@ -205,19 +205,26 @@ export default function AdminUsers({ auth }) {
     }
   }, [search, tierFilter])
 
-  function update(user, fields) {
+  // Shared optimistic update: patch the row immediately, reconcile with the
+  // server's echo, roll back on failure. `after` runs only on success.
+  function applyOptimistic(user, patch, call, after) {
     setMenuOpen(null)
-    // Optimistic local update; reconcile with the server's echo (and revert on
-    // failure). Tier-count chips refetch implicitly on the next filter change;
-    // here we adjust them locally for immediate feedback.
     const prev = users
-    setUsers((us) => us.map((u) => (u.id === user.id ? { ...u, ...fields } : u)))
-    adminApi.updateUser(user.id, fields).then(({ ok, data }) => {
+    setUsers((us) => us.map((u) => (u.id === user.id ? { ...u, ...patch } : u)))
+    call().then(({ ok, data }) => {
       if (!ok) {
         setUsers(prev) // rollback
         return
       }
       setUsers((us) => us.map((u) => (u.id === user.id ? data.user : u)))
+      after?.()
+    })
+  }
+
+  function update(user, fields) {
+    // Tier-count chips refetch on the next filter change; adjust locally for
+    // immediate feedback when the tier actually changed.
+    applyOptimistic(user, fields, () => adminApi.updateUser(user.id, fields), () => {
       if ('tier' in fields && fields.tier !== user.tier) {
         setCounts((c) => ({
           ...c,
@@ -230,16 +237,7 @@ export default function AdminUsers({ auth }) {
 
   // Superadmin-only: grant/revoke the admin role via the dedicated endpoint.
   function setAdmin(user, nextIsAdmin) {
-    setMenuOpen(null)
-    const prev = users
-    setUsers((us) => us.map((u) => (u.id === user.id ? { ...u, is_admin: nextIsAdmin } : u)))
-    adminApi.setUserAdmin(user.id, nextIsAdmin).then(({ ok, data }) => {
-      if (!ok) {
-        setUsers(prev)
-        return
-      }
-      setUsers((us) => us.map((u) => (u.id === user.id ? data.user : u)))
-    })
+    applyOptimistic(user, { is_admin: nextIsAdmin }, () => adminApi.setUserAdmin(user.id, nextIsAdmin))
   }
 
   const total = useMemo(() => Object.values(counts).reduce((a, b) => a + b, 0), [counts])

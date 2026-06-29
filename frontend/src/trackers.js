@@ -1,5 +1,4 @@
-import { Wallet, ArrowRightLeft } from 'lucide-react'
-import { UPCOMING_FEATURES } from './upcomingFeatures'
+import { UPCOMING_FEATURES, UPCOMING_MAP } from './upcomingFeatures'
 import { usePublishedTypes } from './calculators/usePublished'
 
 // The published-tracker surface. Tracker visibility is now RUNTIME (DB-backed,
@@ -14,12 +13,13 @@ import { usePublishedTypes } from './calculators/usePublished'
 // Both derive from the single runtime published set (usePublishedTypes) — hard
 // rule #3's single-source discipline, extended to trackers.
 
-// Nav metadata (short labels for the sidebar/grid). Slugs match upcomingFeatures.js
-// and the /app/<slug> routes.
+// Nav metadata: short labels + route. The Icon comes from upcomingFeatures.js
+// (the single source for tracker label/Icon) so it can't drift. Slugs match
+// upcomingFeatures.js and the /app/<slug> routes.
 const TRACKERS = [
-  { slug: 'net-worth', label: 'Net Worth', Icon: Wallet, to: '/app/net-worth' },
-  { slug: 'income-expenses', label: 'Income & Expenses', Icon: ArrowRightLeft, to: '/app/income-expenses' },
-]
+  { slug: 'net-worth', label: 'Net Worth', to: '/app/net-worth' },
+  { slug: 'income-expenses', label: 'Income & Expenses', to: '/app/income-expenses' },
+].map((t) => ({ ...t, Icon: UPCOMING_MAP[t.slug].Icon }))
 
 export function useLiveTrackers() {
   const published = new Set(usePublishedTypes())

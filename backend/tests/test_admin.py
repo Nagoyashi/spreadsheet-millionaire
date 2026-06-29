@@ -451,6 +451,16 @@ def test_status_exposes_is_superadmin(superadmin_client):
     assert user["is_superadmin"] is True and user["is_admin"] is True
 
 
+def test_superadmin_implies_admin_db_constraint(superadmin_client):
+    """The DB CHECK rejects leaving a superadmin with is_admin=false — so even the
+    manual set_admin lever can't diverge the column from the computed value."""
+    _, admin = superadmin_client
+    with psycopg.connect(_TEST_DB_URL) as conn:
+        with pytest.raises(psycopg.errors.CheckViolation):
+            conn.execute("UPDATE users SET is_admin = false WHERE id = %s", (admin["id"],))
+        conn.rollback()
+
+
 def test_suspended_admin_loses_portal_access(admin_client):
     """Suspending an admin cuts portal access on the live session, not just at
     next login — admin_required rejects a suspended account."""
