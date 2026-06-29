@@ -94,7 +94,22 @@ def get_current_user() -> User | None:
 
 
 def set_session(user: User) -> None:
-    """Writes auth payload to session after login/register."""
+    """Writes auth payload to session after login/register, rotating the session
+    id to defeat session fixation (#34): a sid fixed in the browser before auth
+    must not carry over once authenticated. We clear + assign a fresh server-side
+    sid (so the signed session cookie changes across the auth boundary) while
+    preserving the CSRF token, exactly as clear_session does — keeping the
+    frontend's in-memory token valid.
+    """
+    csrf_token = session.get("csrf_token")
+    session.clear()
+    # flask-session server-side sessions carry a `.sid`; assigning a fresh one
+    # makes the interface persist under a new id and emit a new cookie. Guarded
+    # by hasattr so it's a safe no-op on a backend without server-side sids.
+    if hasattr(session, "sid"):
+        session.sid = secrets.token_urlsafe(32)
+    if csrf_token:
+        session["csrf_token"] = csrf_token
     session["user_id"] = user.id
     session["email"]   = user.email
 

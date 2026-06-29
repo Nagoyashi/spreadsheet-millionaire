@@ -463,9 +463,19 @@
 
 **TL;DR:** bcrypt + 8 chars with letter + number. Reasonable floor without being onerous.
 
-**Decision:** bcrypt for hashing, Marshmallow schema enforces 8+ chars with at least 1 letter and 1 number.
+**Decision:** bcrypt for hashing, Marshmallow schema enforces 8–72 bytes with at least 1 letter and 1 number.
 **Why bcrypt:** Battle-tested, adaptive cost factor, no foot-guns.
 **Why the password rule:** Reasonable floor without being onerous. Long enough to defeat trivial brute-forcing combined with rate limiting; lax enough that a real human can remember their password.
+
+**72-byte maximum (#36).** bcrypt silently truncates past 72 bytes, so `validate_password` now also rejects passwords over 72 bytes with a clear 422 — no quiet truncation surprise, and no arbitrarily large password string accepted. The cap lives in the shared `validate_password`, so register / reset / change-password all inherit it (the single-source rule).
+
+## Auth hardening — session rotation + login timing
+
+**TL;DR:** `set_session` rotates the server-side session id on login/register (session-fixation defence, #34); login runs a dummy bcrypt comparison for non-existent accounts so timing doesn't leak account existence (#35).
+
+**Session fixation (#34):** `set_session` (called on login, register, and email-change) now clears the session and assigns a **fresh `session.sid`** before writing auth state, so the signed session cookie changes across the unauthenticated→authenticated boundary — a sid fixed in a victim's browser pre-auth can't carry over. The CSRF token is preserved across the rotation (same as `clear_session`) so the frontend's in-memory token stays valid. Guarded with `hasattr(session, "sid")` so it's a safe no-op on a backend without server-side sids.
+
+**Login timing (#35):** `login` short-circuited when the email didn't exist, skipping the bcrypt comparison — measurably faster, leaking account existence despite the uniform message. It now runs `User.dummy_password_check` (a `bcrypt.checkpw` against a fixed import-time dummy hash) on the not-found path, so both branches cost about the same. Response message/status unchanged; rate limiting (20/hr, 5/min) already bounds the channel.
 
 ## Account deletion requires password re-confirmation
 
