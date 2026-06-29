@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify, session
 from marshmallow import ValidationError
 
+from app import limiter
 from models.calculator import SavedCalculator
 from models import calculator_publish
 from schemas.calculator_schema import SaveCalculatorSchema, UpdateCalculatorSchema
@@ -48,6 +49,7 @@ def list_calculators():
 @bp.route("", methods=["POST"])
 @login_required
 @csrf_protect
+@limiter.limit("60 per minute")
 def save_calculator():
     """
     Save a new calculation.
@@ -73,6 +75,7 @@ def save_calculator():
 @bp.route("/<int:calc_id>", methods=["PUT"])
 @login_required
 @csrf_protect
+@limiter.limit("60 per minute")
 def update_calculator(calc_id: int):
     """
     Update the name and/or data of a saved calculation.
@@ -104,6 +107,7 @@ def update_calculator(calc_id: int):
 @bp.route("/<int:calc_id>", methods=["DELETE"])
 @login_required
 @csrf_protect
+@limiter.limit("120 per minute")
 def delete_calculator(calc_id: int):
     """Delete a saved calculation. Returns 204 on success."""
     user_id = session["user_id"]

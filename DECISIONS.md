@@ -510,6 +510,14 @@
 **Decision:** Talisman enabled in `app.py`. Forces HTTPS in production, sets `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, and a strict `Referrer-Policy`.
 **Why:** Defence in depth. Each header blocks a specific attack class — clickjacking, MIME confusion, referrer leakage. Cheap to add, hard to remember to add later.
 
+**Frontend headers on Vercel — the document the browser loads (#19).** Talisman only covers `/api/*` responses from Render; the HTML/JS/CSS is served by Vercel, which had no header config — so the document itself was framable and had no CSP. `frontend/vercel.json` now carries a `headers` block on `/(.*)` with `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, HSTS, and a **strict Content-Security-Policy**: `default-src 'self'`, `script-src 'self'` (no inline/eval — the production Vite bundle is a single external module script), `style-src 'self' 'unsafe-inline'` (Recharts/React set inline `style` attributes), `img-src 'self' data:`, `connect-src 'self'` (the API is same-origin via the edge proxy), `frame-ancestors 'none'`, `object-src 'none'`, `base-uri`/`form-action 'self'`. The app loads **no external resources** (no CDN/fonts), so the CSP can stay strict. This is the CSP backstop § "CSRF token lives in JS memory" relied on but never had.
+
+## Bounded request payloads + write rate limits
+
+**TL;DR:** `MAX_CONTENT_LENGTH` (256 KB) rejects oversized bodies with 413 before parsing; the saved-calculator `data` blob is capped (64 KB serialized + depth/node bounds → 422); calculator write routes carry per-user rate limits.
+
+**Decision (#20):** `Config.MAX_CONTENT_LENGTH = 256 * 1024` bounds every request body at the Werkzeug layer. The opaque `data` dict (stored as JSONB) is validated by `_bounded_calc_data` in `calculator_schema.py` — JSON-serialisable, ≤ 64 KB serialized, ≤ 24 deep, ≤ 1000 nodes — giving a precise 422 instead of accepting an arbitrary dict. `routes/calculators.py` create/update get `@limiter.limit("60 per minute")`, delete `"120 per minute"`. **Why:** `data` was `fields.Dict()` with no bound — an authenticated user could bloat storage/memory and any client could send oversized bodies to any route. The caps are far above legitimate calculator inputs (a few KB).
+
 ## Config from `.env`, app exits on missing/invalid secret
 
 **TL;DR:** Loud failure beats silent fragility.

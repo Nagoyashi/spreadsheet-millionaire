@@ -115,6 +115,11 @@ class Config:
     # ── Security ──────────────────────────────────────────────────────────────
     SECRET_KEY = _secret_key
 
+    # Reject oversized request bodies before parsing — Flask returns 413 when the
+    # Content-Length exceeds this. 256 KB is far above any legitimate payload
+    # (saved-calculator inputs are a few KB) but bounds memory/storage abuse.
+    MAX_CONTENT_LENGTH = 256 * 1024
+
     # ── Database (Postgres / Neon) ────────────────────────────────────────────
     # Validated above at import time. Points at Neon's pooled (PgBouncer)
     # endpoint — connection pooling happens there, not in-process.
