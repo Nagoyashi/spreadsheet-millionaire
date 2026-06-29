@@ -72,6 +72,7 @@ issues are the cycle's scope. Patches (`vX.Y.Z`, Z > 0) skip milestones.
 | `v0.8.3` | 2026-06-17 | Tag-triggered release workflow; Session protocol + milestone-based cycles; doc-ownership map. → [v0.8.3](docs/releases/v0.8.3.md) |
 | `v0.11.1` | 2026-06-23 | Tracker polish & recurring transactions: one shared collapsible sidebar across the app + both trackers (#137), I&E Overview avg/median + monthly category + **recurring transactions** with a read-time cashflow forecast (#137, #141), Net Worth Overview polish — snapshot delta, debt-to-asset, liabilities breakdown, per-item gain (#140), and a compact app-wide footer. → [v0.11.1](docs/releases/v0.11.1.md) |
 | `v0.12.1` | 2026-06-29 | Admin portal polish: **trackers toggleable from /admin** (publish state moved off the build-time `featureFlags.js`, now runtime via `publishable.py`), **superadmin role** (`users.is_superadmin`; only a superadmin grants/revokes admin, audit-logged), Analytics `Revenue · MRR` placeholder, and a verified data-safe publish toggle. → [v0.12.1](docs/releases/v0.12.1.md) |
+| `v0.13.1` | 2026-06-29 | Marketing header rework: wordmark left · centered sections (Guide / Calculators / Comparison / ETFs and Stocks) · "Login App" hover-menu (Login/Register) right. Guide/Comparison/ETFs route to Beta "coming soon" pages (their full surfaces — SEO resource center, affiliate comparison, real-time ETF/stock search — are later cycles). → [v0.13.1](docs/releases/v0.13.1.md) |
 
 ### ⬜ Future (prose only — not issues yet)
 
@@ -112,6 +113,18 @@ issues are the cycle's scope. Patches (`vX.Y.Z`, Z > 0) skip milestones.
   its own DB tables + API namespace. Shape depends on the product-review outcome
   (rewards as Freemium entitlement grants); design decisions recorded in
   `DECISIONS.md` first.
+
+**Marketing-site sections** (header links live now as Beta "coming soon" pages — `v0.13.1`; full surfaces are their own later cycles):
+- **Guide — resource center / SEO content** *(future cycle)* — in-depth guides and
+  articles (FIRE, investing, debt, wealth-building) as the organic-search growth
+  engine. Likely its own content surface + CMS-ish authoring; the SEO payoff makes
+  this a priority once the product review sets positioning.
+- **Comparison — broker/account comparison (affiliate)** *(future cycle)* — side-by-side
+  comparisons of brokers, accounts, and savings products with **affiliate links** —
+  a planned **income stream**. Needs a data model for products + tracked outbound links.
+- **ETFs & Stocks — real-time categorized search** *(future cycle)* — a searchable,
+  categorized database of ETFs and stocks with **real-time pricing** (external market-data
+  API + caching). Larger build; sequence after the product review.
 - **Re-enable the 8 flag-gated calculators** *(un-slotted backlog — [#91](https://github.com/Nagoyashi/spreadsheet-millionaire/issues/91))*
   one at a time as build-in-public patches: Cash Flow Sankey, Investment Fee Impact,
   Inflation, Dividend, Withdrawal Plan, Mortgage, Coast FIRE, Barista FIRE. Slot
