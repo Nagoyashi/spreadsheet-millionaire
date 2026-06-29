@@ -188,6 +188,16 @@
 **Why:** Two API modules used to define their own near-identical `request()` function with CSRF logic copy-pasted. Easy to forget on a third module. The getter-registration pattern keeps the dependency one-way: `httpClient` knows nothing about auth state, `authApi` owns the token.
 **Adding a new API namespace** is now one file with one import — see `PROJECT_STRUCTURE.md` § "Adding a New API Namespace".
 
+**Central resilience hooks (same one-way registration pattern).** `httpClient` exposes two more registration points alongside the CSRF-token getter, so reliability is handled once for every API module:
+- **Stale-CSRF self-heal (#22):** on a mutating request that 403s with a CSRF error, `httpClient` calls a registered refresher (`authApi.fetchCsrfToken`), then **retries the request once** with the fresh token — so a long-lived tab whose session `csrf_token` expired/evicted self-heals instead of failing every mutation. Retry is capped at one (a persistent 403 surfaces normally). This makes the known "stale CSRF after restart" flake invisible.
+- **Central 401 handling (#21):** on a 401 from any **non-auth** endpoint (session expired/cleared server-side), `httpClient` calls a registered handler that `useAuth` wires to reset the user to `null` — so the UI stops showing logged-in and prompts re-auth, instead of every save/load failing with a generic error. Auth-endpoint 401s (a bad login) are excluded — they aren't session expiry. Dependency stays one-way: `httpClient` knows nothing about auth state; `authApi`/`useAuth` register the behaviour.
+
+## Render-error boundary
+
+**TL;DR:** A top-level `ErrorBoundary` (class component) wraps the route tree so one render throw shows a recoverable fallback instead of white-screening the SPA.
+
+**Decision (#23):** `components/ErrorBoundary.jsx` wraps `<Routes>` in `App.jsx`. A render-time exception (a corrupt saved record, a malformed Sankey permalink) is caught (`getDerivedStateFromError` + `componentDidCatch`) and renders a fallback with **Reload** + **Back to calculators** (hard links — a full navigation resets the boundary and any corrupt state, which a client-side route change wouldn't). `<Suspense>` only covers lazy-load pending state, not thrown renders — this is the missing net. No external error-logging service yet; `componentDidCatch` logs to the console.
+
 ## CSRF token lives in JS memory, not localStorage
 
 **TL;DR:** Token in a module-level variable in `authApi`. Re-fetched on full reload.

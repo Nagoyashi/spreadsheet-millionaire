@@ -33,6 +33,8 @@ const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 const DEFAULT_TIMEOUT_MS = 30_000
 
 let _getCsrfToken = () => null
+let _refreshCsrfToken = async () => {}
+let _onUnauthorized = () => {}
 
 // Called once by authApi at module load to register its token getter.
 // Keeps the dependency one-way: httpClient knows nothing about auth state.
@@ -40,8 +42,21 @@ export function registerCsrfTokenGetter(fn) {
   _getCsrfToken = fn
 }
 
+// Re-fetch a fresh CSRF token (authApi registers its fetchCsrfToken). Used to
+// self-heal a stale-token 403 — see the retry in request().
+export function registerCsrfRefresher(fn) {
+  _refreshCsrfToken = fn
+}
+
+// Called on a 401 from any non-auth endpoint (session expired/cleared server-
+// side). useAuth registers a handler that resets the user to null so the app
+// stops showing a logged-in state and prompts re-authentication.
+export function registerUnauthorizedHandler(fn) {
+  _onUnauthorized = fn
+}
+
 async function request(baseUrl, path, options = {}) {
-  const { timeout = DEFAULT_TIMEOUT_MS, ...fetchOptions } = options
+  const { timeout = DEFAULT_TIMEOUT_MS, _retried, ...fetchOptions } = options
   const method   = (fetchOptions.method || 'GET').toUpperCase()
   const mutating = MUTATING_METHODS.has(method)
   const token    = mutating ? _getCsrfToken() : null
@@ -88,6 +103,30 @@ async function request(baseUrl, path, options = {}) {
       data = null
     }
   }
+
+  // Self-heal a stale/expired CSRF token (#22): the session's csrf_token is gone
+  // (30-day expiry, Redis eviction, or a backend restart), so a mutating request
+  // 403s with "Invalid or missing CSRF token." Re-fetch a fresh token and retry
+  // the request ONCE, transparently — no manual page reload.
+  if (
+    mutating &&
+    res.status === 403 &&
+    !_retried &&
+    /csrf/i.test(data?.error || '')
+  ) {
+    await _refreshCsrfToken()
+    return request(baseUrl, path, { ...options, _retried: true })
+  }
+
+  // Session expired/cleared server-side (#21): a 401 from any non-auth endpoint
+  // means the client's "logged in" state is stale. Reset it centrally so the UI
+  // reflects logged-out and prompts re-auth, instead of every save/load failing
+  // with a generic error. Auth-flow 401s (bad login) are excluded — they aren't
+  // session expiry.
+  if (res.status === 401 && !baseUrl.endsWith('/api/auth')) {
+    _onUnauthorized()
+  }
+
   return { ok: res.ok, status: res.status, data, timedOut: false }
 }
 

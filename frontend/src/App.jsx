@@ -17,6 +17,7 @@ import SettingsPage from './pages/SettingsPage'
 import WealthPage from './pages/WealthPage'
 import IncomeExpensePage from './pages/IncomeExpensePage'
 import AdminPage from './pages/admin/AdminPage'
+import ErrorBoundary from './components/ErrorBoundary'
 import { usePublishedState } from './calculators/usePublished'
 
 // Authenticated users hitting a guest-only door (login/register) bounce into the
@@ -88,6 +89,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <ErrorBoundary>
       <Routes>
         {/* ── Public marketing surface ─────────────────────────────────────── */}
         <Route path="/" element={<MarketingLandingPage auth={auth} />} />
@@ -176,6 +178,7 @@ export default function App() {
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </ErrorBoundary>
     </BrowserRouter>
   )
 }

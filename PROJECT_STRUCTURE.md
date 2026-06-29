@@ -114,7 +114,8 @@ frontend/
     ├── setupTests.js           # vitest setup — jest-dom matchers + a ResizeObserver stub (for recharts in jsdom); wired via vite.config test.setupFiles
     ├── trackers.js             # Published-tracker surface: useLiveTrackers() + useVisibleUpcoming() — runtime hooks over usePublishedTypes (DB-backed publish), replacing the deleted build-time featureFlags.js. Every nav/grid consumer derives from these, never re-filters UPCOMING_FEATURES
     ├── api/
-    │   ├── httpClient.js       # Shared fetch wrapper. createApi(baseUrl) factory + central CSRF injection
+    │   ├── httpClient.js       # Shared fetch wrapper. createApi(baseUrl) + central CSRF injection, stale-CSRF 403 retry (#22), and 401→onUnauthorized hook (#21)
+    │   ├── httpClient.test.js  # vitest — CSRF-403 self-heal retry + central 401 handling
     │   ├── authApi.js          # register / login / logout / deleteAccount / getStatus / fetchCsrfToken / forgotPassword / resetPassword / changePassword / changeEmail
     │   ├── calculatorApi.js    # getPublished (public runtime publish surface) / getAll / create / update / remove
     │   ├── adminApi.js         # /api/admin/* — getCalculators / setPublished / getUsers / updateUser / setUserAdmin (superadmin) / getAnalytics (PATCH via createApi)
@@ -175,6 +176,8 @@ frontend/
     │   ├── SavedCalculationsSidebar.jsx   # List of saved calcs with click-to-deselect on active item (injected into AppSidebar's slot by CalculatorPage)
     │   ├── AuthCardShell.jsx              # Presentational chrome (gray page + top bar + white card + badge/title/subtitle/footer) for the auth family; used by AuthForm + Forgot/Reset pages
     │   ├── AuthForm.jsx                   # Shared email+password form for LoginPage + RegisterPage (renders inside AuthCardShell)
+    │   ├── ErrorBoundary.jsx              # Top-level render-error boundary (wraps Routes in App.jsx) — fallback with Reload + Back-to-calculators instead of a white screen (#23)
+    │   ├── ErrorBoundary.test.jsx         # vitest — fallback on a thrown child, children pass through otherwise
     │   └── UserFooter.jsx                 # Authenticated-user footer (email + Settings link + sign out + delete account modal)
     ├── hooks/
     │   ├── useAuth.js                 # login / logout / register / deleteAccount + session rehydration
