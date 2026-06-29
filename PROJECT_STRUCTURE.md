@@ -79,7 +79,8 @@ backend/
     ├── test_db_smoke.py        # DB-path wiring proof (register + truncation isolation); skips without TEST_DATABASE_URL, runs in CI
     ├── test_auth.py            # End-to-end auth-flow tests (register/login/logout/forgot+reset/delete/change-pw/change-email); email mocked, DB-backed
     ├── test_idor.py            # Tenant-isolation tests for saved_calculators (Hard Rule #6) — route + model layer, two users, unauth 401
-    └── test_admin.py           # Admin gate (401/404) + publish toggle + public /published surface; DB-backed
+    ├── test_admin.py           # Admin gate (401/404) + publish toggle + public /published surface; DB-backed
+    └── test_calculators.py     # Saved-calculator write bounds (#20) — MAX_CONTENT_LENGTH 413, data field cap 422, no row on reject
 ```
 
 ### Backend .env variables
@@ -97,7 +98,7 @@ frontend/
 ├── index.html
 ├── package.json
 ├── vite.config.js              # Proxies /api/* → localhost:5000 (local dev only); `test` block sets the vitest jsdom env. `npm test` = vitest run
-├── vercel.json                 # SPA fallback only (/(.*) → /index.html). The /api/* proxy moved to middleware.js
+├── vercel.json                 # SPA fallback (/(.*) → /index.html) + security headers block (CSP, X-Frame-Options DENY, nosniff, Referrer-Policy, HSTS) on document/asset routes. The /api/* proxy is in middleware.js
 ├── middleware.js               # Vercel Edge Middleware — env-driven /api/* proxy. Reads BACKEND_ORIGIN at the edge, rewrites to ${BACKEND_ORIGIN}/api/*. NOT in the client bundle
 ├── tailwind.config.js
 ├── postcss.config.js
