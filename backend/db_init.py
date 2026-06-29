@@ -168,6 +168,15 @@ def init_db() -> None:
             """)
             _rebuild_check(cur, "users", "users_tier_check", _in_check("tier", USER_TIERS))
 
+            # Invariant: a superadmin is always an admin. Enforced at the DB layer
+            # so no code path (including the manual set_admin lever) can leave a
+            # superadmin with is_admin=false — which would diverge the column from
+            # the model's computed is_admin. See DECISIONS.md § "Superadmin role".
+            _rebuild_check(
+                cur, "users", "users_superadmin_implies_admin",
+                sql.SQL("(NOT is_superadmin OR is_admin)"),
+            )
+
             # ---------------------------------------------------------------- #
             # saved_calculators
             #   data is JSONB; user_id cascades on user deletion.

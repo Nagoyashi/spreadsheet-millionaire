@@ -132,16 +132,15 @@ class User:
         """Grant/revoke superadmin. The manual bootstrap lever (DB/shell) — there
         is no UI to grant superadmin. Granting superadmin also grants admin so the
         account has full portal access; revoking superadmin leaves is_admin as-is."""
+        # Granting superadmin also grants admin (superadmin implies admin);
+        # revoking superadmin leaves is_admin as-is. One parameterised statement:
+        # is_admin = (is_admin OR <granting>) — true when granting, unchanged when
+        # revoking. Mirrors set_admin's parameterised style.
         conn = get_db()
-        if is_superadmin:
-            conn.execute(
-                "UPDATE users SET is_superadmin = true, is_admin = true WHERE id = %s",
-                (user_id,),
-            )
-        else:
-            conn.execute(
-                "UPDATE users SET is_superadmin = false WHERE id = %s", (user_id,)
-            )
+        conn.execute(
+            "UPDATE users SET is_superadmin = %s, is_admin = (is_admin OR %s) WHERE id = %s",
+            (bool(is_superadmin), bool(is_superadmin), user_id),
+        )
         conn.commit()
         return cls.get_by_id(user_id)
 

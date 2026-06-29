@@ -1,17 +1,23 @@
 import { useEffect, useState } from 'react'
-import { Wallet, ArrowRightLeft } from 'lucide-react'
 import { adminApi } from '../../api/adminApi'
 import { CALC_MAP, DEFAULT_PUBLISHED_TYPES } from '../../calculators/registry'
+import { UPCOMING_MAP } from '../../upcomingFeatures'
 import { invalidatePublished } from '../../calculators/usePublished'
 
-// Tracker rows aren't calculators (no registry entry) — their display metadata
-// lives here, keyed by the publish slug. They appear in Overview alongside
-// calculators and toggle through the same mechanism (publishing reveals them on
-// the public app out of "coming soon").
-const TRACKER_META = {
-  'net-worth': { label: 'Net Worth Tracker', subtitle: 'Track assets & liabilities', category: 'Tracker', Icon: Wallet },
-  'income-expenses': { label: 'Income & Expense Tracker', subtitle: 'Cashflow in and out', category: 'Tracker', Icon: ArrowRightLeft },
+// Tracker rows aren't calculators (no registry entry). Their label + Icon come
+// from upcomingFeatures.js (the single source); only the admin-specific subtitle
+// is defined here. They appear in Overview alongside calculators and toggle
+// through the same mechanism (publishing reveals them out of "coming soon").
+const TRACKER_SUBTITLE = {
+  'net-worth': 'Track assets & liabilities',
+  'income-expenses': 'Cashflow in and out',
 }
+const TRACKER_META = Object.fromEntries(
+  Object.entries(TRACKER_SUBTITLE).map(([slug, subtitle]) => [
+    slug,
+    { label: UPCOMING_MAP[slug].label, Icon: UPCOMING_MAP[slug].Icon, subtitle, category: 'Tracker' },
+  ]),
+)
 const metaFor = (calcType) => CALC_MAP[calcType] || TRACKER_META[calcType]
 const isTracker = (calcType) => calcType in TRACKER_META
 
