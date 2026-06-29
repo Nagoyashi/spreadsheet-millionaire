@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { ArrowRight } from 'lucide-react'
 import { usePublishedCalculators } from '../calculators/usePublished'
-import CardSlider from './CardSlider'
+import Carousel from './Carousel'
 
 // One card per published calculator, driven by the runtime published set
 // (usePublishedCalculators) merged with registry metadata — label, subtitle,
@@ -11,7 +11,28 @@ import CardSlider from './CardSlider'
 //
 // Each card links DIRECTLY to /app/calculator/:type, not to a signup wall — the
 // whole pitch is that the calculators work without an account, so the landing
-// page lets a visitor prove that to themselves in one click.
+// page lets a visitor prove that to themselves in one click. A paginated
+// Carousel keeps a full page of cards visible (no cut-off) as more are added.
+
+function CalculatorCard({ type, label, subtitle, description, Icon, gradient }) {
+  return (
+    <Link
+      to={`/app/calculator/${type}`}
+      className="group flex flex-col rounded-xl border border-white/10 bg-white/[0.03] p-5 hover:border-white/25 hover:bg-white/[0.06] transition"
+    >
+      <div className={`h-1 w-full rounded-full bg-gradient-to-r ${gradient} mb-4`} />
+      <div className={`inline-flex w-11 h-11 items-center justify-center rounded-lg bg-gradient-to-br ${gradient} mb-4`}>
+        <Icon className="w-5 h-5 text-white" />
+      </div>
+      <p className="text-xs font-medium uppercase tracking-wide text-stone-500 mb-1">{subtitle}</p>
+      <h3 className="text-base font-bold text-white mb-2">{label}</h3>
+      <p className="text-sm text-stone-400 leading-relaxed flex-1">{description}</p>
+      <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-amber-400 group-hover:gap-2 transition-all">
+        Open <ArrowRight className="w-4 h-4" />
+      </span>
+    </Link>
+  )
+}
 
 export default function CalculatorShowcase() {
   const { publishedCalculators } = usePublishedCalculators()
@@ -26,26 +47,11 @@ export default function CalculatorShowcase() {
         </p>
       </div>
 
-      <CardSlider label="Calculators">
-        {publishedCalculators.map(({ type, label, subtitle, description, Icon, gradient }) => (
-          <Link
-            key={type}
-            to={`/app/calculator/${type}`}
-            className="group shrink-0 snap-start w-[85vw] sm:w-72 lg:w-80 flex flex-col rounded-xl border border-white/10 bg-white/[0.03] p-5 hover:border-white/25 hover:bg-white/[0.06] transition"
-          >
-            <div className={`h-1 w-full rounded-full bg-gradient-to-r ${gradient} mb-4`} />
-            <div className={`inline-flex w-11 h-11 items-center justify-center rounded-lg bg-gradient-to-br ${gradient} mb-4`}>
-              <Icon className="w-5 h-5 text-white" />
-            </div>
-            <p className="text-xs font-medium uppercase tracking-wide text-stone-500 mb-1">{subtitle}</p>
-            <h3 className="text-base font-bold text-white mb-2">{label}</h3>
-            <p className="text-sm text-stone-400 leading-relaxed flex-1">{description}</p>
-            <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-amber-400 group-hover:gap-2 transition-all">
-              Open <ArrowRight className="w-4 h-4" />
-            </span>
-          </Link>
-        ))}
-      </CardSlider>
+      <Carousel
+        label="Calculators"
+        items={publishedCalculators}
+        renderItem={(calc) => <CalculatorCard key={calc.type} {...calc} />}
+      />
     </section>
   )
 }
