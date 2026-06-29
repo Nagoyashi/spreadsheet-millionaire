@@ -64,6 +64,18 @@
 
 **When to revisit:** If publish state ever needs per-environment or scheduling nuance, this table is where it grows. If the admin portal is dropped, fold the boolean back into the registry.
 
+**Trackers join the same mechanism (v0.12.1) — the build-time tracker flags are gone.** The Net Worth + Income & Expense trackers previously shipped dark behind build-time `VITE_NETWORTH_ENABLED` / `VITE_INCOME_EXPENSE_ENABLED` flags (`featureFlags.js`). That file is **deleted**; tracker visibility now rides this same runtime `calculator_publish` mechanism. `backend/publishable.py` defines `PUBLISHABLE_TYPES = VALID_CALC_TYPES + TRACKER_TYPES` (`'net-worth'`, `'income-expenses'` — slugs matching the routes); `db_init` seeds a row per publishable type (trackers default **unpublished** = coming soon). The frontend's `trackers.js` exposes `useLiveTrackers()` / `useVisibleUpcoming()` (runtime hooks over `usePublishedTypes`, replacing the old static `LIVE_TRACKERS`/`VISIBLE_UPCOMING`), and the `/app/net-worth` + `/app/income-expenses` route guards check the published set instead of a flag. Net effect: **revealing a tracker out of "coming soon" is an admin toggle in /admin Overview, not a redeploy** — exactly the eventual waiting-list launch lever. This supersedes the "ships dark behind a feature flag" launch-gating notes in §§ "Net Worth Tracker" / "Income & Expense Tracker".
+
+## Superadmin role — only a superadmin grants admin
+
+**TL;DR:** A second flag, `users.is_superadmin`, sits above `is_admin`. Only a superadmin can grant/revoke the admin role (from the Users screen); normal admins can't make other admins. A superadmin is implicitly an admin.
+
+**Decision:** `users.is_superadmin BOOLEAN DEFAULT false`. The model treats a superadmin as an admin (`is_admin` is `true` whenever `is_superadmin` is), so all admin gates pass. A `superadmin_required` decorator (same 401/404-invisible posture as `admin_required`) guards the one superadmin-only route, `PATCH /api/admin/users/:id/admin { is_admin }` — grant/revoke audited (`grant_admin`/`revoke_admin`), with guards against changing your own role or revoking a superadmin's admin. The Users screen shows the "Make/Revoke admin" action only to a superadmin (gated on `auth.user.is_superadmin`). Like the first admin, **superadmin is bootstrapped manually** (`User.set_superadmin`, a DB/shell lever — no UI grants it), since someone has to be first.
+
+**Why a flag, not a full role system:** same call as § "Admin portal auth" — three levels (user < admin < superadmin) and a handful of privileged accounts. A second boolean expresses the only distinction that matters (who can mint admins) without an RBAC table. Revisit if admin powers ever need finer slices.
+
+**Tiers auto-adjust later via billing (deferred).** Manual tier control stays — it's the beta comp lever and a permanent override. When billing lands, a subscription webhook will set `users.tier` automatically on upgrade/downgrade/cancel; the manual control remains for comps/corrections. The Analytics **Revenue · MRR** KPI is a placeholder (`null` → "—") until billing sums it from active paid subscriptions.
+
 ## Admin portal auth — `is_admin` column + `admin_required` (404, not 403)
 
 **TL;DR:** Admin access is a single `users.is_admin` boolean, checked fresh from the DB on every `/api/admin/*` request by an `admin_required` decorator that returns **404** (not 403) to non-admins. No roles table, no admin self-serve.

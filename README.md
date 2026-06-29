@@ -67,8 +67,7 @@ Create `backend/.env`. The app **will not start** if `FLASK_SECRET_KEY` is missi
 
 | Variable | Dev value | Prod value |
 |----------|-----------|------------|
-| `VITE_NETWORTH_ENABLED` | unset (on under `vite dev`) | unset = **off** (Net Worth tracker ships dark — production shows "Coming soon"). Set `true` on staging to reveal it. |
-| `VITE_INCOME_EXPENSE_ENABLED` | unset (on under `vite dev`) | unset = **off** (Income & Expense tracker ships dark). Set `true` on staging to reveal it. |
+| _(none required)_ | — | The frontend reads config at runtime via the API. Tracker visibility is no longer a build-time flag — it's a runtime publish toggle in the `/admin` portal (see DECISIONS.md § "Runtime publish state"). The removed `VITE_NETWORTH_ENABLED` / `VITE_INCOME_EXPENSE_ENABLED` flags are gone. |
 
 > `DATABASE_URL` must point at Neon's **pooled** (PgBouncer) endpoint — pooling happens there, not in-process; `sslmode=require` is appended automatically if absent. In dev, leaving `REDIS_URL` unset runs with zero extra infrastructure (filesystem sessions + `memory://` rate limiting); the rate limiter derives its store from `REDIS_URL` (there is no separate `RATELIMIT_STORAGE_URI`).
 

@@ -1,7 +1,19 @@
 import { useEffect, useState } from 'react'
+import { Wallet, ArrowRightLeft } from 'lucide-react'
 import { adminApi } from '../../api/adminApi'
 import { CALC_MAP, DEFAULT_PUBLISHED_TYPES } from '../../calculators/registry'
 import { invalidatePublished } from '../../calculators/usePublished'
+
+// Tracker rows aren't calculators (no registry entry) — their display metadata
+// lives here, keyed by the publish slug. They appear in Overview alongside
+// calculators and toggle through the same mechanism (publishing reveals them on
+// the public app out of "coming soon").
+const TRACKER_META = {
+  'net-worth': { label: 'Net Worth Tracker', subtitle: 'Track assets & liabilities', category: 'Tracker', Icon: Wallet },
+  'income-expenses': { label: 'Income & Expense Tracker', subtitle: 'Cashflow in and out', category: 'Tracker', Icon: ArrowRightLeft },
+}
+const metaFor = (calcType) => CALC_MAP[calcType] || TRACKER_META[calcType]
+const isTracker = (calcType) => calcType in TRACKER_META
 
 // Overview (Project Status) — the calculator catalog with live publish toggles.
 // Merges the backend's runtime publish rows (adminApi.getCalculators) with the
@@ -17,15 +29,18 @@ const CATEGORY_STYLE = {
   Investing: { color: '#2563eb', bg: '#e8effd' },
   'Debt & Property': { color: '#ef4444', bg: '#fdeaea' },
   Budgeting: { color: '#16a34a', bg: '#e7f6ec' },
+  Tracker: { color: '#7c3aed', bg: '#f1eafe' },
 }
 const NEUTRAL = { color: '#8b9199', bg: '#eef0f2' }
 
 // Status is derived from the runtime published flag (never stored):
-//   Live   — published now
-//   Hidden — not published, but was in the default live set (taken down)
-//   Draft  — not published and never was (backlog)
+//   Live        — published now
+//   Coming soon — an unpublished tracker (ships dark until revealed)
+//   Hidden      — an unpublished calculator that was in the default live set
+//   Draft       — an unpublished calculator that never was (backlog)
 function statusOf(row) {
   if (row.published) return { label: 'Live', color: '#16a34a', bg: '#e7f6ec' }
+  if (isTracker(row.calc_type)) return { label: 'Coming soon', color: '#e0a712', bg: '#fdf3da' }
   if (DEFAULT_SET.has(row.calc_type)) return { label: 'Hidden', ...NEUTRAL }
   return { label: 'Draft', ...NEUTRAL }
 }
@@ -74,7 +89,7 @@ function StatCard({ label, value, valueColor }) {
 }
 
 function Row({ row, onToggle }) {
-  const meta = CALC_MAP[row.calc_type] || {}
+  const meta = metaFor(row.calc_type) || {}
   const Icon = meta.Icon
   const cat = CATEGORY_STYLE[meta.category] || NEUTRAL
   const status = statusOf(row)
@@ -123,9 +138,9 @@ export default function AdminOverview() {
     adminApi.getCalculators().then(({ ok, data }) => {
       if (!alive) return
       if (ok && Array.isArray(data?.calculators)) {
-        // Only show types the registry knows (it owns the metadata); registry
-        // order keeps the table stable.
-        setRows(data.calculators.filter((r) => CALC_MAP[r.calc_type]))
+        // Only show types we have metadata for (calculators via the registry,
+        // trackers via TRACKER_META); backend order keeps the table stable.
+        setRows(data.calculators.filter((r) => metaFor(r.calc_type)))
       } else {
         setError('Could not load calculators.')
       }

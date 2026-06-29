@@ -203,11 +203,17 @@ export default function AdminAnalytics() {
       )}
 
       {/* KPI cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-[14px] mb-5">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-[14px] mb-5">
         <Kpi label="Total visitors" value={fmtNum(k?.total_visitors)} sub={k?.total_visitors == null ? 'GA4 not connected' : 'sessions'} />
         <Kpi label="New signups" value={fmtNum(k?.new_signups)} sub="from our database" subColor="#16a34a" />
         <Kpi label="Signup rate" value={k?.signup_rate == null ? '—' : `${k.signup_rate}%`} sub="visitor → account" />
         <Kpi label="Free → Paid" value="—" sub="unlocks after beta" subColor="#e0a712" />
+        <Kpi
+          label="Revenue · MRR"
+          value={k?.revenue == null ? '—' : `$${Number(k.revenue).toLocaleString()}`}
+          sub="from tier prices — unlocks after beta"
+          subColor="#e0a712"
+        />
       </div>
 
       {/* Row: visitors over time | traffic sources */}

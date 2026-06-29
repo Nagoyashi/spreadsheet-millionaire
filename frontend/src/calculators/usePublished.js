@@ -19,7 +19,7 @@ let inflight = null
 const listeners = new Set()
 
 function emit() {
-  listeners.forEach((fn) => fn(publishedTypes))
+  listeners.forEach((fn) => fn())
 }
 
 function load() {
@@ -27,15 +27,15 @@ function load() {
   inflight = calculatorApi
     .getPublished()
     .then(({ ok, data }) => {
-      if (ok && Array.isArray(data?.published)) {
-        publishedTypes = data.published
-        fetched = true
-        emit()
-      }
+      if (ok && Array.isArray(data?.published)) publishedTypes = data.published
     })
     .catch(() => {}) // keep the registry defaults on failure — app still renders
     .finally(() => {
+      // Mark ready on BOTH success and failure: on failure we render with the
+      // registry defaults rather than hanging the route guards forever.
+      fetched = true
       inflight = null
+      emit()
     })
   return inflight
 }
@@ -47,16 +47,26 @@ export function invalidatePublished() {
   return load()
 }
 
+// Subscribe to the shared publish store. Returns { types, ready } — `ready` flips
+// true once the initial fetch settles (success OR failure). Route guards must
+// wait for `ready` before redirecting, or they'd act on the optimistic default
+// set (which omits anything published beyond the build-time defaults) and strand
+// a freshly-published calculator/tracker on direct navigation.
+export function usePublishedState() {
+  const [state, setState] = useState({ types: publishedTypes, ready: fetched })
+  useEffect(() => {
+    const sync = () => setState({ types: publishedTypes, ready: fetched })
+    listeners.add(sync)
+    sync() // adopt any value fetched before this mount
+    if (!fetched) load()
+    return () => listeners.delete(sync)
+  }, [])
+  return state
+}
+
 // The raw set of published calc-type strings (e.g. for a route guard).
 export function usePublishedTypes() {
-  const [types, setTypes] = useState(publishedTypes)
-  useEffect(() => {
-    listeners.add(setTypes)
-    setTypes(publishedTypes) // sync to any value fetched before this mount
-    if (!fetched) load()
-    return () => listeners.delete(setTypes)
-  }, [])
-  return types
+  return usePublishedState().types
 }
 
 // The derived published calculators + their categories, for grids and nav.

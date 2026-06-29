@@ -197,6 +197,9 @@ def get_overview(range_days: int = 30) -> dict:
             "new_signups": signups,
             "signup_rate": signup_rate,
             "free_to_paid": None,  # billing not live during beta
+            # Subscription revenue (MRR) from tier prices — placeholder until
+            # billing is wired; then it's summed from active paid subscriptions.
+            "revenue": None,
         },
         "visitors_over_time": ga["visitors_over_time"],
         "traffic_sources": ga["traffic_sources"],

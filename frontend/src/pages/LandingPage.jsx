@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowRight, Star, Menu } from 'lucide-react'
 import { usePublishedCalculators } from '../calculators/usePublished'
-import { LIVE_TRACKERS, VISIBLE_UPCOMING } from '../trackers'
+import { useLiveTrackers, useVisibleUpcoming } from '../trackers'
 import { useFavourites } from '../hooks/useFavourites'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import AppShell from '../components/AppShell'
@@ -24,6 +24,8 @@ export default function LandingPage({ auth }) {
   const [activeCategory, setActiveCategory] = useState('All')
   const { favourites, toggle } = useFavourites(auth)
   const { publishedCalculators, categories } = usePublishedCalculators()
+  const liveTrackers = useLiveTrackers()
+  const visibleUpcoming = useVisibleUpcoming()
   const [showAuthToast, setShowAuthToast] = useState(false)
   const toastTimerRef = useRef(null)
 
@@ -204,7 +206,7 @@ export default function LandingPage({ auth }) {
                   Solid cards that open the tracker. Empty in production while
                   Net Worth ships dark. */}
               {activeCategory === 'All' &&
-                LIVE_TRACKERS.map(({ slug, label, Icon, to }) => (
+                liveTrackers.map(({ slug, label, Icon, to }) => (
                   <div
                     key={slug}
                     onClick={() => navigate(to)}
@@ -231,9 +233,9 @@ export default function LandingPage({ auth }) {
 
               {/* Coming-soon teasers — appended after the calculators on the All
                   tab. Badged and dashed so they don't read as working tools.
-                  VISIBLE_UPCOMING already excludes anything now live. */}
+                  visibleUpcoming already excludes anything now live. */}
               {activeCategory === 'All' &&
-                VISIBLE_UPCOMING.map(({ slug, label, Icon, blurb, eta }) => (
+                visibleUpcoming.map(({ slug, label, Icon, blurb, eta }) => (
                   <div
                     key={slug}
                     onClick={() => navigate(`/app/coming-soon/${slug}`)}

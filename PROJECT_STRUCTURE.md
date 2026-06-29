@@ -42,6 +42,7 @@ backend/
 ├── net_worth_types.py          # Single source of truth for Net Worth enum sets (ASSET_TYPES/LIABILITY_TYPES/ASSET_CLASSES/PROPERTY_TYPES) — imported by nw schema + db_init
 ├── income_expense_types.py     # Single source of truth for Income & Expense enums (TRANSACTION_TYPES/EXPENSE_CATEGORIES/INCOME_CATEGORIES/ALL_CATEGORIES/RECURRENCE_UNITS) — imported by ie schema + db_init
 ├── user_tiers.py               # Single source of truth for account tiers (USER_TIERS = free/pro/elite, DEFAULT_TIER) — imported by admin route + db_init (users.tier CHECK)
+├── publishable.py              # The toggleable surface = VALID_CALC_TYPES + TRACKER_TYPES (net-worth, income-expenses). Seeds calculator_publish (trackers default unpublished); admin publish route validates against it
 ├── db.py                       # Per-request psycopg connection on Flask g, closed on teardown (no in-process pool)
 ├── db_init.py                  # Postgres schema creation + idempotent CHECK-constraint rebuild (users [+is_admin/tier/suspended/last_login_at], saved_calculators, password_reset_tokens, nw_* Net Worth tables, ie_transactions, calculator_publish [seeded from DEFAULT_PUBLISHED_TYPES], admin_audit_log); advisory-locked so concurrent boots serialise
 ├── gunicorn.conf.py            # Auto-loaded by gunicorn (run from backend/) — on_starting hook runs db_init once in the master before workers fork, so every deploy self-migrates (DECISIONS.md § "Schema migrations run on boot")
@@ -58,7 +59,7 @@ backend/
 ├── routes/
 │   ├── auth.py                 # /api/auth/* — register (+welcome email), login, logout, status, delete account, csrf-token, forgot-password, reset-password, change-password, change-email
 │   ├── calculators.py          # /api/calculators/* — CRUD for saved calculations + GET /published (public runtime publish surface)
-│   ├── admin.py                # /api/admin/* — admin-only (admin_required, 404 for non-admins). Overview: GET /calculators, PATCH /calculators/:type {published}. Users: GET /users (search/tier), PATCH /users/:id {tier?,suspended?} (audit-logged; self-suspend guarded). Analytics: GET /analytics?range= (DB signups + GA4 proxy)
+│   ├── admin.py                # /api/admin/* — admin-only (admin_required, 404 for non-admins). Overview: GET /calculators, PATCH /calculators/:type {published} (calcs + trackers). Users: GET /users (search/tier), PATCH /users/:id {tier?,suspended?}, PATCH /users/:id/admin {is_admin} (superadmin_required) — all audit-logged. Analytics: GET /analytics?range= (DB signups + GA4 proxy)
 │   ├── net_worth.py            # /api/net-worth/* — CRUD for assets/liabilities/investments/real-estate + /summary + /snapshots (login_required, CSRF, rate-limited writes)
 │   ├── income_expense.py       # /api/income-expense/* — transactions CRUD (year/month filters) + /summary (login_required, CSRF, rate-limited writes)
 │   └── health.py               # GET /api/health — liveness probe, rate-limit exempt, no DB/Redis
@@ -110,13 +111,12 @@ frontend/
     ├── constants.js            # Shared storage key generators (CALC_STORAGE_KEY, FAVOURITES_KEY)
     ├── upcomingFeatures.js     # UPCOMING_FEATURES tracker teasers (Net Worth, Income/Expense) — deliberately NOT in the calculator registry; raw source for trackers.js
     ├── setupTests.js           # vitest setup — jest-dom matchers + a ResizeObserver stub (for recharts in jsdom); wired via vite.config test.setupFiles
-    ├── featureFlags.js         # Build-time flags. NET_WORTH_ENABLED / INCOME_EXPENSE_ENABLED (env VITE_NETWORTH_ENABLED / VITE_INCOME_EXPENSE_ENABLED, default import.meta.env.DEV) — trackers ship dark in prod
-    ├── trackers.js             # Published-tracker surface: LIVE_TRACKERS + VISIBLE_UPCOMING (derived from the flag); every nav/grid consumer derives from these, never re-filters UPCOMING_FEATURES
+    ├── trackers.js             # Published-tracker surface: useLiveTrackers() + useVisibleUpcoming() — runtime hooks over usePublishedTypes (DB-backed publish), replacing the deleted build-time featureFlags.js. Every nav/grid consumer derives from these, never re-filters UPCOMING_FEATURES
     ├── api/
     │   ├── httpClient.js       # Shared fetch wrapper. createApi(baseUrl) factory + central CSRF injection
     │   ├── authApi.js          # register / login / logout / deleteAccount / getStatus / fetchCsrfToken / forgotPassword / resetPassword / changePassword / changeEmail
     │   ├── calculatorApi.js    # getPublished (public runtime publish surface) / getAll / create / update / remove
-    │   ├── adminApi.js         # /api/admin/* — getCalculators / setPublished (admin portal; PATCH via createApi)
+    │   ├── adminApi.js         # /api/admin/* — getCalculators / setPublished / getUsers / updateUser / setUserAdmin (superadmin) / getAnalytics (PATCH via createApi)
     │   ├── adminApi.test.js    # vitest — admin endpoint verb + path + body wiring
     │   ├── netWorthApi.js      # /api/net-worth/* — assets/liabilities/investments/realEstate CRUD + getSummary + snapshots
     │   ├── incomeExpenseApi.js # /api/income-expense/* — transactions CRUD (year/month filters) + getSummary
