@@ -17,7 +17,7 @@ import SettingsPage from './pages/SettingsPage'
 import WealthPage from './pages/WealthPage'
 import IncomeExpensePage from './pages/IncomeExpensePage'
 import AdminPage from './pages/admin/AdminPage'
-import { NET_WORTH_ENABLED, INCOME_EXPENSE_ENABLED } from './featureFlags'
+import { usePublishedState } from './calculators/usePublished'
 
 // Authenticated users hitting a guest-only door (login/register) bounce into the
 // app, not the marketing page — they're already past the front door.
@@ -61,6 +61,7 @@ function RedirectComingSoon() {
 
 export default function App() {
   const auth = useAuth()
+  const { types: publishedTypes, ready: publishedReady } = usePublishedState()
   const [csrfReady, setCsrfReady] = useState(false)
 
   // Fetch CSRF token on mount and wait for it before rendering.
@@ -71,8 +72,11 @@ export default function App() {
     authApi.fetchCsrfToken().finally(() => setCsrfReady(true))
   }, [])
 
-  // Block rendering until both auth status and CSRF token are ready
-  if (auth.loading || !csrfReady) {
+  // Block rendering until auth status, CSRF token, AND the runtime publish set
+  // are ready. Gating on publishedReady means the route guards never act on the
+  // optimistic default set (which omits anything published beyond the build-time
+  // defaults), so a published tracker/calculator is reachable on direct load.
+  if (auth.loading || !csrfReady || !publishedReady) {
     return (
       <div className="min-h-screen bg-stone-950 flex items-center justify-center">
         <span className="font-mono text-stone-500 text-sm tracking-widest animate-pulse">
@@ -98,10 +102,11 @@ export default function App() {
         <Route
           path="/app/net-worth"
           element={
-            // Ships dark: when the flag is off (production), the tracker is not
-            // reachable — fall back to its "coming soon" teaser. Enabled in
-            // dev/staging. See featureFlags.js / DECISIONS.md.
-            NET_WORTH_ENABLED ? (
+            // Runtime publish: reachable only when an admin has published the
+            // tracker (DB-backed, via /admin Overview); otherwise fall back to its
+            // "coming soon" teaser. Replaces the old build-time flag. See
+            // trackers.js / DECISIONS.md § "Runtime publish state".
+            publishedTypes.includes('net-worth') ? (
               <RequireAuth isAuthenticated={auth.isAuthenticated}>
                 <WealthPage auth={auth} />
               </RequireAuth>
@@ -113,8 +118,8 @@ export default function App() {
         <Route
           path="/app/income-expenses"
           element={
-            // Ships dark like Net Worth — teaser fallback when the flag is off.
-            INCOME_EXPENSE_ENABLED ? (
+            // Runtime publish like Net Worth — teaser fallback until published.
+            publishedTypes.includes('income-expenses') ? (
               <RequireAuth isAuthenticated={auth.isAuthenticated}>
                 <IncomeExpensePage auth={auth} />
               </RequireAuth>

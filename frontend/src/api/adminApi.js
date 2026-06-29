@@ -31,6 +31,10 @@ export const adminApi = {
   // suspend/reinstate (audit-logged server-side).
   updateUser: (id, fields) => api.patch(`/users/${id}`, fields),
 
+  // PATCH /api/admin/users/:id/admin { is_admin } — grant/revoke the admin role.
+  // Superadmin-only server-side (returns 404 for non-superadmins).
+  setUserAdmin: (id, isAdmin) => api.patch(`/users/${id}/admin`, { is_admin: isAdmin }),
+
   // GET /api/admin/analytics?range=30d — DB signups + GA4 (when configured).
   getAnalytics: (range = '30d') => api.get(`/analytics?range=${encodeURIComponent(range)}`),
 }

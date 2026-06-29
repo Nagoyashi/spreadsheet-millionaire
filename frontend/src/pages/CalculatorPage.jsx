@@ -26,12 +26,16 @@ export default function CalculatorPage({ auth }) {
   // A type that is unknown OR exists but is unpublished redirects to the landing
   // page — but the redirect is returned only AFTER every hook below has run (see
   // the guard further down), so the hook order is identical on every render
-  // (React's rules-of-hooks). usePublishedTypes() is the runtime public surface;
-  // CALC_MAP still holds all 12 so saved rows for unpublished types remain
-  // loadable. CALC_MAP[type] is undefined for genuinely unknown types, hence ?? {}.
-  const isPublished = usePublishedTypes().includes(type)
-  const { component: CalcComponent, label, Icon, color, gradient, explainer } =
-    CALC_MAP[type] ?? {}
+  // (React's rules-of-hooks). The published set can now include TRACKER slugs
+  // (e.g. 'net-worth'), which are NOT calculators — so a type only counts as
+  // published-here when it's a real calculator (CALC_MAP[type]) AND in the set.
+  // Otherwise a published tracker slug at /app/calculator/net-worth would slip
+  // past the guard and render with an undefined component. CALC_MAP still holds
+  // all 12 calculators so saved rows for unpublished types remain loadable.
+  const publishedTypes = usePublishedTypes()
+  const calc = CALC_MAP[type]
+  const isPublished = !!calc && publishedTypes.includes(type)
+  const { component: CalcComponent, label, Icon, color, gradient, explainer } = calc ?? {}
 
   useDocumentTitle(label ? `${label} — SpreadsheetMillionaire` : 'SpreadsheetMillionaire')
 

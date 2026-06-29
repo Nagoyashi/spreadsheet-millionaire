@@ -28,6 +28,7 @@ from psycopg import sql
 
 from config import Config
 from calc_types import VALID_CALC_TYPES, DEFAULT_PUBLISHED_TYPES
+from publishable import PUBLISHABLE_TYPES
 from user_tiers import USER_TIERS, DEFAULT_TIER
 from net_worth_types import (
     ASSET_TYPES,
@@ -136,6 +137,16 @@ def init_db() -> None:
                     ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT false
             """)
 
+            # is_superadmin is the top role: only a superadmin can grant/revoke the
+            # admin role from the portal (admins can't make other admins). A
+            # superadmin is implicitly an admin (the gate treats it as one). Set
+            # manually (User.set_superadmin) to bootstrap — there is no UI to grant
+            # superadmin. See DECISIONS.md § "Superadmin role".
+            cur.execute("""
+                ALTER TABLE users
+                    ADD COLUMN IF NOT EXISTS is_superadmin BOOLEAN NOT NULL DEFAULT false
+            """)
+
             # Account tier (freemium) + suspension + last-login — managed from the
             # admin Users screen (Phase 12). All additive/idempotent. tier defaults
             # to 'free' (beta: everyone free, billing off); the tier CHECK is
@@ -205,7 +216,7 @@ def init_db() -> None:
             # ON CONFLICT DO NOTHING makes this idempotent and — crucially —
             # non-destructive: a later run never resets an admin's live toggle,
             # it only backfills rows for newly-added calc types.
-            for _calc_type in VALID_CALC_TYPES:
+            for _calc_type in PUBLISHABLE_TYPES:
                 cur.execute(
                     "INSERT INTO calculator_publish (calc_type, published) "
                     "VALUES (%s, %s) ON CONFLICT (calc_type) DO NOTHING",

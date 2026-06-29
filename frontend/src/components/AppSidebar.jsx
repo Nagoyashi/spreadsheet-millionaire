@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { BarChart2, ChevronDown, ChevronsLeft, ChevronsRight, X } from 'lucide-react'
 import { usePublishedCalculators } from '../calculators/usePublished'
-import { LIVE_TRACKERS, VISIBLE_UPCOMING } from '../trackers'
+import { useLiveTrackers, useVisibleUpcoming } from '../trackers'
 import { useSidebarCollapse } from '../hooks/useSidebarCollapse'
 import UserFooter from './UserFooter'
 
@@ -12,10 +12,11 @@ import UserFooter from './UserFooter'
 //
 // Structure: three SIBLING top-level categories, each white + icon, same tier:
 //   📊 Calculators        — expandable; its calculators render muted (sub-items)
-//   📈 Net Worth          — top-level link (only when its flag reveals it)
-//   💰 Income & Expenses  — top-level link (only when its flag reveals it)
-// Trackers still ship dark: they appear here only via LIVE_TRACKERS, and stay in
-// the muted "Coming soon" section (VISIBLE_UPCOMING) until revealed.
+//   📈 Net Worth          — top-level link (only when published)
+//   💰 Income & Expenses  — top-level link (only when published)
+// Tracker visibility is runtime (DB-backed): they appear here via useLiveTrackers()
+// once an admin publishes them, and stay in the muted "Coming soon" section
+// (useVisibleUpcoming()) until then.
 //
 // Collapsible: useSidebarCollapse drives a full (w-64) vs icon-rail (w-16) view;
 // the choice persists across navigation. The optional `children` slot renders
@@ -28,6 +29,8 @@ export default function AppSidebar({ auth, onClose, children }) {
   const [collapsed, toggleCollapsed] = useSidebarCollapse()
   const { pathname } = useLocation()
   const { publishedCalculators } = usePublishedCalculators()
+  const liveTrackers = useLiveTrackers()
+  const visibleUpcoming = useVisibleUpcoming()
 
   const onCalculators = pathname === '/app' || pathname.startsWith('/app/calculator/')
   const activeCalcType = pathname.startsWith('/app/calculator/')
@@ -65,7 +68,7 @@ export default function AppSidebar({ auth, onClose, children }) {
             <BarChart2 className={railIcon} />
           </Link>
 
-          {LIVE_TRACKERS.map(({ slug, label, Icon, to }) => {
+          {liveTrackers.map(({ slug, label, Icon, to }) => {
             const active = pathname.startsWith(to)
             return (
               <Link
@@ -156,7 +159,7 @@ export default function AppSidebar({ auth, onClose, children }) {
         )}
 
         {/* 📈 / 💰 Trackers — top-level siblings, same tier as Calculators */}
-        {LIVE_TRACKERS.map(({ slug, label, Icon, to }) => {
+        {liveTrackers.map(({ slug, label, Icon, to }) => {
           const active = pathname.startsWith(to)
           return (
             <Link
@@ -174,12 +177,12 @@ export default function AppSidebar({ auth, onClose, children }) {
         })}
 
         {/* Coming soon — teasers for not-yet-revealed trackers (production). */}
-        {VISIBLE_UPCOMING.length > 0 && (
+        {visibleUpcoming.length > 0 && (
           <div className="mt-3 pt-3 border-t border-white/10">
             <p className="px-3 mb-1 text-xs font-semibold uppercase tracking-wider text-gray-600">
               Coming soon
             </p>
-            {VISIBLE_UPCOMING.map(({ slug, label, Icon }) => (
+            {visibleUpcoming.map(({ slug, label, Icon }) => (
               <Link
                 key={slug}
                 to={`/app/coming-soon/${slug}`}

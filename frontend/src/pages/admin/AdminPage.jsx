@@ -84,7 +84,7 @@ export default function AdminPage({ auth }) {
       <main className="max-w-[1360px] mx-auto px-6 sm:px-8 pt-[30px] pb-16">
         {tab === 'overview' && <AdminOverview />}
         {tab === 'analytics' && <AdminAnalytics />}
-        {tab === 'users' && <AdminUsers />}
+        {tab === 'users' && <AdminUsers auth={auth} />}
       </main>
     </div>
   )
