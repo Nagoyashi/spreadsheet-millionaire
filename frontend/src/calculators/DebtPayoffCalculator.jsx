@@ -63,7 +63,12 @@ function simulate(debts, extraPayment, strategy) {
     if (months > 600) break
   }
 
-  return { months, totalInterest }
+  // reached = all balances cleared. If the loop hit the 600-month cap with debt
+  // still outstanding, the minimum payments don't cover interest — the debt
+  // isn't payable at this budget, so the UI shows "Not payable" rather than the
+  // raw cap (mirrors FIRE's "100+"). #33
+  const reached = !remaining.some(d => d.balance > 0)
+  return { months, totalInterest, reached }
 }
 
 function calculate(inputs) {
@@ -135,16 +140,16 @@ export default function DebtPayoffCalculator({ initialData, onDataChange }) {
         />
         <StatCard
           label="Avalanche Time"
-          value={`${results.avalanche.months} mo`}
-          sub={`${fmt(results.avalanche.totalInterest)} interest`}
+          value={results.avalanche.reached ? `${results.avalanche.months} mo` : 'Not payable'}
+          sub={results.avalanche.reached ? `${fmt(results.avalanche.totalInterest)} interest` : 'Raise your payments'}
           Icon={TrendingDown}
           iconClass="text-emerald-500"
           gradientClass="from-emerald-500 to-teal-600"
         />
         <StatCard
           label="Snowball Time"
-          value={`${results.snowball.months} mo`}
-          sub={`${fmt(results.snowball.totalInterest)} interest`}
+          value={results.snowball.reached ? `${results.snowball.months} mo` : 'Not payable'}
+          sub={results.snowball.reached ? `${fmt(results.snowball.totalInterest)} interest` : 'Raise your payments'}
           Icon={Calendar}
           iconClass="text-blue-500"
           gradientClass="from-blue-500 to-indigo-600"
@@ -170,7 +175,11 @@ export default function DebtPayoffCalculator({ initialData, onDataChange }) {
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-gray-500">Payoff time</span>
-              <span className="font-semibold text-gray-800">{results.avalanche.months} months ({(results.avalanche.months / 12).toFixed(1)} yrs)</span>
+              <span className="font-semibold text-gray-800">
+                {results.avalanche.reached
+                  ? `${results.avalanche.months} months (${(results.avalanche.months / 12).toFixed(1)} yrs)`
+                  : 'Not payable at this budget'}
+              </span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-500">Total interest</span>
@@ -188,7 +197,11 @@ export default function DebtPayoffCalculator({ initialData, onDataChange }) {
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-gray-500">Payoff time</span>
-              <span className="font-semibold text-gray-800">{results.snowball.months} months ({(results.snowball.months / 12).toFixed(1)} yrs)</span>
+              <span className="font-semibold text-gray-800">
+                {results.snowball.reached
+                  ? `${results.snowball.months} months (${(results.snowball.months / 12).toFixed(1)} yrs)`
+                  : 'Not payable at this budget'}
+              </span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-500">Total interest</span>

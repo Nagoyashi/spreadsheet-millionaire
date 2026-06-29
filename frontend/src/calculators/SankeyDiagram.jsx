@@ -339,10 +339,9 @@ function buildInitialSlices(initialData) {
     }
   }
   const migrated = migrate('sankey', initialData, CURRENT_VERSION)
-  return {
-    income_sources: migrated.income_sources ?? DEFAULTS.income_sources,
-    expense_groups: migrated.expense_groups ?? DEFAULTS.expense_groups,
-  }
+  // Normalise the loaded record too — a corrupt saved blob (e.g. a group missing
+  // its items array) must fall back to a safe shape, not crash the renderer (#24).
+  return normalizeSlices(migrated)
 }
 
 // Permalink: encode/decode full state as base64 in the URL (?data=...).
@@ -355,14 +354,43 @@ function encodeState(state) {
     return null
   }
 }
+// Normalise an untrusted state object (a decoded permalink or a loaded saved
+// record) into the exact shape the renderer assumes: income_sources is an array
+// of {id,label,value}, and EVERY expense group has an `items` array of the same.
+// Malformed entries are dropped; a missing/non-array field falls back to the
+// default. This is the guard that stops a crafted `?data=` or a corrupt saved
+// record from reaching `g.items.reduce(...)` on undefined and white-screening
+// the app (#24). Always returns a valid object — never throws.
+function _normItem(it) {
+  if (!it || typeof it !== 'object') return null
+  const value = parseFloat(it.value)
+  return { id: it.id ?? uid(), label: String(it.label ?? ''), value: Number.isFinite(value) ? value : 0 }
+}
+
+export function normalizeSlices(obj) {
+  const src = obj && typeof obj === 'object' ? obj : {}
+  return {
+    income_sources: Array.isArray(src.income_sources)
+      ? src.income_sources.map(_normItem).filter(Boolean)
+      : DEFAULTS.income_sources,
+    expense_groups: Array.isArray(src.expense_groups)
+      ? src.expense_groups
+          .filter(g => g && typeof g === 'object')
+          .map(g => ({
+            id: g.id ?? uid(),
+            label: String(g.label ?? ''),
+            items: Array.isArray(g.items) ? g.items.map(_normItem).filter(Boolean) : [],
+          }))
+      : DEFAULTS.expense_groups,
+  }
+}
+
 function decodeState(param) {
   try {
-    const json = decodeURIComponent(atob(param))
-    const parsed = JSON.parse(json)
-    if (parsed && Array.isArray(parsed.income_sources) && Array.isArray(parsed.expense_groups)) {
-      return parsed
-    }
-    return null
+    const parsed = JSON.parse(decodeURIComponent(atob(param)))
+    // Normalise rather than trust: a parseable-but-malformed payload renders the
+    // default diagram instead of crashing. Only an undecodable param → null.
+    return normalizeSlices(parsed)
   } catch {
     return null
   }

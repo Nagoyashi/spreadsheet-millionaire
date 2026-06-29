@@ -15,7 +15,7 @@ const DEFAULTS = {
   interest_rate: 4.5,
 }
 
-function calculate(inputs) {
+export function calculate(inputs) {
   const expenses      = parseFloat(inputs.monthly_expenses) || 0
   const months        = parseFloat(inputs.target_months) || 0
   const current       = parseFloat(inputs.current_savings) || 0
@@ -27,17 +27,21 @@ function calculate(inputs) {
   const progressPct   = targetAmount > 0 ? Math.min(100, finiteOr((current / targetAmount) * 100, 0)) : 0
   const alreadyFunded = current >= targetAmount
 
-  // Months to reach target with contributions + interest
+  // Months to reach target with contributions + interest. Capped at 600 months
+  // (50 years) as a safety bound — if the loop hits the cap without reaching the
+  // target, the goal is unreachable at this contribution (mirrors FIRE's null →
+  // "100+" rather than showing the raw cap as if it were the answer). #33
   let monthsToGoal = 0
   let bal = current
   while (bal < targetAmount && monthsToGoal < 600) {
     bal = bal * (1 + rate) + contribution
     monthsToGoal++
   }
+  const reached = bal >= targetAmount
 
   const interestEarned = alreadyFunded ? 0 : (bal - current - contribution * monthsToGoal)
 
-  return { targetAmount, gap, progressPct, alreadyFunded, monthsToGoal, interestEarned }
+  return { targetAmount, gap, progressPct, alreadyFunded, monthsToGoal, reached, interestEarned }
 }
 
 export default function EmergencyFundCalculator({ initialData, onDataChange }) {
@@ -73,8 +77,16 @@ export default function EmergencyFundCalculator({ initialData, onDataChange }) {
         />
         <StatCard
           label="Time to Goal"
-          value={results.alreadyFunded ? '0 months' : `${results.monthsToGoal} mo`}
-          sub={results.alreadyFunded ? 'Already there' : `~${(results.monthsToGoal / 12).toFixed(1)} years`}
+          value={
+            results.alreadyFunded ? '0 months' : results.reached ? `${results.monthsToGoal} mo` : 'Not reachable'
+          }
+          sub={
+            results.alreadyFunded
+              ? 'Already there'
+              : results.reached
+                ? `~${(results.monthsToGoal / 12).toFixed(1)} years`
+                : 'Increase your contribution'
+          }
           Icon={Calendar}
           iconClass="text-blue-500"
           gradientClass="from-blue-500 to-indigo-600"
@@ -149,10 +161,14 @@ export default function EmergencyFundCalculator({ initialData, onDataChange }) {
             <p className="text-sm text-gray-600 leading-relaxed">
               {results.alreadyFunded ? (
                 <>Your emergency fund is fully funded. Consider investing surplus savings for long-term growth.</>
-              ) : (
+              ) : results.reached ? (
                 <>Save <strong className="text-gray-800">{fmt(parseFloat(inputs.monthly_contribution))}/month</strong> and
                    you'll reach your <strong className="text-gray-800">{fmt(results.targetAmount)}</strong> target
                    in <strong className="text-gray-800">{results.monthsToGoal} months</strong>.</>
+              ) : (
+                <>At <strong className="text-gray-800">{fmt(parseFloat(inputs.monthly_contribution))}/month</strong> you
+                   won't reach your <strong className="text-gray-800">{fmt(results.targetAmount)}</strong> target within
+                   50 years. Increase your monthly contribution to make it achievable.</>
               )}
             </p>
           </div>

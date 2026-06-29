@@ -19,9 +19,10 @@ const DEFAULTS = {
   tax_rate: 15,
 }
 
-function calculate(inputs) {
+export function calculate(inputs) {
   const portfolio     = parseFloat(inputs.portfolio_value) || 0
   const yieldRate     = parseFloat(inputs.dividend_yield) / 100 || 0
+  const growthRate    = parseFloat(inputs.dividend_growth) / 100 || 0
   const contribution  = parseFloat(inputs.annual_contribution) || 0
   const years         = parseFloat(inputs.years) || 0
   const taxRate       = parseFloat(inputs.tax_rate) / 100 || 0
@@ -31,7 +32,9 @@ function calculate(inputs) {
   const afterTaxAnnual     = annualDividend * (1 - taxRate)
   const afterTaxMonthly    = afterTaxAnnual / 12
 
-  // Project portfolio growth with reinvested dividends + contributions
+  // Project portfolio growth with reinvested dividends + contributions. The
+  // effective yield compounds by `dividend_growth` each year (dividends grow
+  // faster than the portfolio value) — so the input actually drives the result.
   const chartData = []
   let currentPortfolio = portfolio
   let currentYield = yieldRate
@@ -43,7 +46,7 @@ function calculate(inputs) {
       annualIncome: Math.round(yearDividend * (1 - taxRate)),
     })
     currentPortfolio = currentPortfolio + yearDividend + contribution
-    currentYield = yieldRate // yield stays constant; portfolio grows
+    currentYield = currentYield * (1 + growthRate) // dividend growth compounds
   }
 
   const finalPortfolio   = chartData[chartData.length - 1]?.portfolio || 0
