@@ -97,7 +97,7 @@ export default function MarketingNav({ auth }) {
 
   return (
     <header className="sticky top-0 z-40 bg-stone-950/80 backdrop-blur border-b border-white/10">
-      <nav className="max-w-6xl mx-auto px-4 sm:px-6 h-16 grid grid-cols-2 md:grid-cols-[1fr_auto_1fr] items-center">
+      <nav className="w-full px-5 sm:px-8 lg:px-12 h-16 grid grid-cols-2 md:grid-cols-[1fr_auto_1fr] items-center">
         {/* Left — wordmark */}
         <Link to="/" onClick={close} className="justify-self-start flex items-center" aria-label="SpreadsheetMillionaire home">
           <Wordmark />
