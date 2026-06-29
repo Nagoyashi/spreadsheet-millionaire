@@ -10,7 +10,7 @@
 //   on every app mount. It also means an attacker's page can never read
 //   it (no cookie, no localStorage — just a JS variable in our module).
 
-import { createApi, registerCsrfTokenGetter } from './httpClient'
+import { createApi, registerCsrfTokenGetter, registerCsrfRefresher } from './httpClient'
 
 const api = createApi('/api/auth')
 
@@ -21,20 +21,25 @@ export function getCsrfToken() {
   return _csrfToken
 }
 
-// Hand httpClient our getter so it can attach X-CSRF-Token automatically
-// on every mutating request from any API module (auth, calculators, future
-// modules). One-way dependency — httpClient never pulls auth state itself.
+// Re-fetch + store a fresh CSRF token. Awaited in App.jsx on mount, and used by
+// httpClient to self-heal a stale-token 403.
+async function fetchCsrfToken() {
+  const { ok, data } = await api.get('/csrf-token')
+  if (ok && data?.csrf_token) {
+    _csrfToken = data.csrf_token
+  }
+}
+
+// Hand httpClient our getter (so it attaches X-CSRF-Token automatically on every
+// mutating request) and our refresher (so it can re-fetch a fresh token and retry
+// once on a stale-token 403). One-way dependency — httpClient never pulls auth
+// state itself.
 registerCsrfTokenGetter(getCsrfToken)
+registerCsrfRefresher(fetchCsrfToken)
 
 export const authApi = {
-  // Fetch a CSRF token and store it in memory.
-  // Awaited in App.jsx before rendering so the token is always ready.
-  fetchCsrfToken: async () => {
-    const { ok, data } = await api.get('/csrf-token')
-    if (ok && data?.csrf_token) {
-      _csrfToken = data.csrf_token
-    }
-  },
+  // Fetch a CSRF token and store it in memory. Awaited in App.jsx on mount.
+  fetchCsrfToken,
 
   register: (email, password) => api.post('/register', { email, password }),
   login:    (email, password) => api.post('/login',    { email, password }),
