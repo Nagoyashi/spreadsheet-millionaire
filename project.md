@@ -28,12 +28,15 @@ go-live readiness (`v0.14.0`), not yet opened as a milestone.
 > Canonical cycle state = the single **open GitHub Milestone**. This line mirrors
 > it for at-a-glance reading in the editor; if they disagree, the milestone wins.
 
-**Between cycles.** `v0.13.0` — Backlog cleanup + Security hardening shipped
-(2026-06-29, all 12 issues). No milestone is currently open. The next cycle is
-`v0.14.0` — Product review & go-live readiness (see § Future). Trackers ship
-**dark via runtime publish** (DB-backed, revealed from `/admin` Overview);
-production shows "coming soon" until toggled. `v0.13.0` live in production at
-www.spreadsheetmillionaire.com · backlog on the
+**`v0.14.0` — Phase 14: Go-live readiness + instrumentation** (open milestone,
+16 issues). Make the *existing* product observable, legally shippable, and
+tested on the load-bearing paths; no new monetization. Spans three sub-releases:
+v0.14.0 observability + analytics (Sentry, structured logging, uptime, PostHog
+funnel), v0.14.1 data lifecycle + legal (account deletion cascade, data export,
+privacy/ToS), v0.14.2 CI confidence + scale sanity (pytest harness, Neon pooling,
+auth rate-limit audit). Trackers stay **dark via runtime publish** (DB-backed,
+revealed from `/admin` Overview); production shows "coming soon" until toggled.
+`v0.13.2` live in production at www.spreadsheetmillionaire.com · backlog on the
 [Project board](https://github.com/users/Nagoyashi/projects) ↗
 
 Each release cycle is a Milestone named for its target version (`v0.10.0`); its
