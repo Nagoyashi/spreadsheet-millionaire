@@ -108,6 +108,18 @@
 - The **`calc_run` custom event** the "Most-used calculators" ranking depends on. Emitting it means adding GA4 (gtag) to the **public** site, which is a privacy decision (the app currently declines non-essential cookies and has a privacy policy) — out of scope for the empty-state phase and not done without that review.
 - `Free → Paid` KPI + the Pro/Elite funnel stages stay disabled ("activate after beta") until billing exists.
 
+## Error monitoring via Sentry (backend)
+
+**TL;DR:** Unhandled backend errors report to **Sentry**, but the whole integration is **DSN-gated** — no `SENTRY_DSN`, no init, no network calls. So dev, CI, and a fresh checkout run with monitoring off and zero config; production sets the DSN and gets error capture. A missing DSN in production is a **startup warning, not an exit** — monitoring must never be load-bearing for availability.
+
+**Decision:** `app._init_sentry()` runs at the very top of `create_app()`, *before* the Flask app is built, so `FlaskIntegration` wraps request handling from the first request and each gunicorn worker (which calls the factory after fork) gets its own client. It returns early when `Config.SENTRY_DSN` is empty, so the call is a no-op without a DSN. Config lives in `config.py`: `SENTRY_DSN` (the gate), `SENTRY_TRACES_SAMPLE_RATE` (cost knob, default 0.1 — set 0 for errors-only), `SENTRY_ENVIRONMENT` (defaults to `FLASK_ENV`), `SENTRY_RELEASE` (optional deploy/commit tag). The existing `@app.errorhandler(500)` does **not** suppress capture — Sentry hooks Flask's `got_request_exception` signal, which fires before error handlers.
+
+**Why `send_default_pii=False` (privacy invariant 8):** Sentry defaults to attaching request bodies, cookies, and user identifiers to events. This is a personal-finance app; those payloads carry financial inputs and session material. Disabling default PII keeps events to stack traces + non-sensitive request metadata. Pair with a **Sentry EU-region DSN** so the event data that *is* sent stays in the EU. Both are posture, not a hard gate — but they're the intended production configuration.
+
+**Why DSN-gated rather than a separate `SENTRY_ENABLED` flag:** the DSN is both the switch and the credential — there is nothing to enable without one, and a stray `SENTRY_ENABLED=true` with no DSN would be a silent no-op anyway. One env var, one meaning. Mirrors the `RESEND_API_KEY` / GA4 "absent key disables the feature" pattern already in `config.py`.
+
+**Frontend Sentry (#174)** is a separate integration wired into the central 401-logout path and the render-error boundary — tracked apart from this backend decision.
+
 ## Tracker teasers outside the calculator registry
 
 **TL;DR:** The two upcoming trackers live in their own `upcomingFeatures.js` module, not in `registry.js`. The registry stays calculators-only.

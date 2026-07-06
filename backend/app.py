@@ -1,5 +1,7 @@
 import os
 import sys
+import sentry_sdk
+from sentry_sdk.integrations.flask import FlaskIntegration
 from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_session import Session
@@ -12,6 +14,28 @@ import db
 from config import Config, STARTUP_WARNINGS
 from db_init import init_db
 
+
+def _init_sentry() -> None:
+    """
+    Initialise Sentry error monitoring — DSN-gated, so a no-op without SENTRY_DSN.
+
+    Called once at the top of create_app() (before the Flask app is built) so the
+    FlaskIntegration wraps request handling from the start, and so each gunicorn
+    worker — which calls the factory after fork — gets its own client. Privacy
+    invariant 8: send_default_pii=False keeps request bodies, cookies, and user
+    identifiers out of events (an EU-region DSN keeps the rest in the EU).
+    """
+    if not Config.SENTRY_DSN:
+        return
+    sentry_sdk.init(
+        dsn=Config.SENTRY_DSN,
+        integrations=[FlaskIntegration()],
+        environment=Config.SENTRY_ENVIRONMENT,
+        release=Config.SENTRY_RELEASE,
+        traces_sample_rate=Config.SENTRY_TRACES_SAMPLE_RATE,
+        send_default_pii=False,
+    )
+
 # ── Rate limiter — shared instance imported by route files ────────────────────
 # get_remote_address uses X-Forwarded-For when behind a proxy (Railway, Render etc.)
 limiter = Limiter(
@@ -22,6 +46,9 @@ limiter = Limiter(
 
 
 def create_app() -> Flask:
+    # ── Error monitoring — before the app exists so it wraps request handling ──
+    _init_sentry()
+
     app = Flask(__name__)
     app.config.from_object(Config)
 

@@ -113,6 +113,10 @@ here.** The two services must **not** share the secret key, database, or Redis.
 | `SESSION_COOKIE_SECURE` | `True` | `True` | Both are HTTPS. |
 | `GA4_PROPERTY_ID` | *(optional)* GA4 property id | *(optional)* | Admin **Analytics** tab. Unset → the tab shows an empty "connect GA4" state (signup KPIs still render from the DB). Needs the commented `google-analytics-data` dep uncommented. |
 | `GA4_CREDENTIALS_JSON` | *(optional)* service-account JSON or key-file path | *(optional)* | Server-side only — never `VITE_`-prefixed; the key must not reach the client. Pairs with `GA4_PROPERTY_ID`. |
+| `SENTRY_DSN` | Sentry **EU-region** DSN | *(optional)* — own project or unset | Gates backend error monitoring. Unset → Sentry never inits (warning in prod, no network calls). Use an EU-region DSN so event data stays in the EU. |
+| `SENTRY_TRACES_SAMPLE_RATE` | *(optional)* `0.0`–`1.0` | *(optional)* | Fraction of requests carrying a performance trace. Defaults to `0.1`; set `0` for errors-only. |
+| `SENTRY_ENVIRONMENT` | *(optional)* tag, e.g. `production` | *(optional)* e.g. `staging` | Tags events by environment. Defaults to `FLASK_ENV` (`production` for both services) — set explicitly to tell prod and staging apart in Sentry. |
+| `SENTRY_RELEASE` | *(optional)* version/commit tag | *(optional)* | Pins an error spike to a deploy. Set to the release tag or commit SHA if you want per-deploy tracking. |
 
 **Schema — migrates automatically on every deploy.** `backend/gunicorn.conf.py`
 runs the idempotent `db_init.init_db()` in the gunicorn **master, before any

@@ -10,6 +10,7 @@ psycopg[binary]==3.3.4
 redis==8.0.1
 resend==2.32.2
 gunicorn==26.0.0
+sentry-sdk[flask]==2.64.0
 
 # Optional — only needed to enable the admin Analytics tab's live GA4 numbers.
 # Until GA4 is configured (GA4_PROPERTY_ID + GA4_CREDENTIALS_JSON), the endpoint
