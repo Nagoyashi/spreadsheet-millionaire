@@ -111,6 +111,35 @@ if _is_production and "localhost" in _app_base_url:
     )
 
 
+# ── Error monitoring (Sentry) ─────────────────────────────────────────────────
+# Best-effort, DSN-gated: a missing SENTRY_DSN disables Sentry entirely (dev AND
+# prod) rather than failing startup — error monitoring must never be load-bearing
+# for availability. app.py only calls sentry_sdk.init() when the DSN is present.
+# In production a missing DSN is a warning (we ship blind to errors), not an exit.
+# Use a Sentry EU-region DSN to keep event data in the EU (privacy invariant 8).
+_sentry_dsn = os.getenv("SENTRY_DSN", "").strip()
+
+if _is_production and not _sentry_dsn:
+    STARTUP_WARNINGS.append(
+        "SENTRY_DSN not set while FLASK_ENV=production — backend error monitoring "
+        "is disabled. Set it (use an EU-region DSN) to capture unhandled errors."
+    )
+
+
+def _float_env(name: str, default: float) -> float:
+    """Read a float env var, falling back to default on absence or bad value."""
+    raw = os.getenv(name, "").strip()
+    if not raw:
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        STARTUP_WARNINGS.append(
+            f"{name}={raw!r} is not a valid float — using default {default}."
+        )
+        return default
+
+
 class Config:
     # ── Security ──────────────────────────────────────────────────────────────
     SECRET_KEY = _secret_key
@@ -172,6 +201,17 @@ class Config:
     GA4_PROPERTY_ID       = os.getenv("GA4_PROPERTY_ID", "").strip()
     GA4_CREDENTIALS_JSON  = os.getenv("GA4_CREDENTIALS_JSON", "").strip()
     GA4_CONFIGURED        = bool(GA4_PROPERTY_ID and GA4_CREDENTIALS_JSON)
+
+    # ── Error monitoring (Sentry) ─────────────────────────────────────────────
+    # SENTRY_DSN gates the whole integration (see app.py). Traces sampling is a
+    # cost/volume knob — default 10% of requests carry a performance trace; set
+    # SENTRY_TRACES_SAMPLE_RATE=0 to disable tracing and keep error capture only.
+    # SENTRY_ENVIRONMENT tags events (defaults to FLASK_ENV); SENTRY_RELEASE is an
+    # optional version/commit tag so a spike can be pinned to a deploy.
+    SENTRY_DSN                = _sentry_dsn
+    SENTRY_TRACES_SAMPLE_RATE = _float_env("SENTRY_TRACES_SAMPLE_RATE", 0.1)
+    SENTRY_ENVIRONMENT        = os.getenv("SENTRY_ENVIRONMENT", "").strip() or _flask_env
+    SENTRY_RELEASE            = os.getenv("SENTRY_RELEASE", "").strip() or None
 
     # ── Environment ───────────────────────────────────────────────────────────
     FLASK_ENV   = _flask_env
