@@ -14,9 +14,14 @@ export default function MarketingFooter() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
           <div>
-            <Link to="/" className="text-lg font-bold text-white tracking-tight">
-              Spreadsheet<span className="text-amber-400">Millionaire</span>
-            </Link>
+            <div className="flex items-center gap-2">
+              <Link to="/" className="text-lg font-bold text-white tracking-tight">
+                Spreadsheet<span className="text-amber-400">Millionaire</span>
+              </Link>
+              <span className="px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider rounded-full bg-amber-400/10 text-amber-300">
+                Beta
+              </span>
+            </div>
             <p className="mt-2 text-xs text-stone-500 max-w-sm leading-relaxed">
               Calculators are educational tools, not financial advice.
             </p>
