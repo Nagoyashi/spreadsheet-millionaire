@@ -19,7 +19,7 @@ export default function Hero() {
 
       <div className="relative max-w-3xl mx-auto px-4 sm:px-6 pt-20 pb-16 sm:pt-28 sm:pb-24 text-center">
         <span className="inline-block px-3 py-1 mb-6 text-xs font-semibold uppercase tracking-wider rounded-full bg-white/5 border border-white/10 text-amber-300">
-          Free while in beta
+          Free · Open source
         </span>
 
         <h1 className="text-4xl sm:text-6xl font-bold tracking-tight text-white leading-[1.1]">
@@ -29,9 +29,9 @@ export default function Hero() {
         </h1>
 
         <p className="mt-6 text-base sm:text-lg text-stone-300 leading-relaxed max-w-2xl mx-auto">
-          Free planning calculators for FIRE, compound growth, debt payoff, and the
-          emergency fund that comes first. No signup needed to run any of them —
-          create an account only when you want to save your work.
+          Free personal finance tools and calculators for FIRE, compound growth,
+          debt payoff, and more. Calculate and plan financial scenarios, and track
+          your net worth, income and expenses to keep control over your financial life.
         </p>
 
         <div className="mt-9 flex flex-col sm:flex-row items-center justify-center gap-3">
@@ -46,7 +46,7 @@ export default function Hero() {
             to="/register"
             className="w-full sm:w-auto inline-flex items-center justify-center min-h-[48px] px-6 rounded-lg border border-white/15 text-sm font-semibold text-white hover:bg-white/5 transition"
           >
-            Create an account
+            Create an account to save
           </Link>
         </div>
       </div>
