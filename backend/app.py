@@ -13,6 +13,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 import db
 from config import Config, STARTUP_WARNINGS
 from db_init import init_db
+from logging_config import configure_logging, install_request_logging
 
 
 def _init_sentry() -> None:
@@ -46,6 +47,9 @@ limiter = Limiter(
 
 
 def create_app() -> Flask:
+    # ── Structured logging — configure before anything logs (idempotent) ──────
+    configure_logging()
+
     # ── Error monitoring — before the app exists so it wraps request handling ──
     _init_sentry()
 
@@ -116,6 +120,9 @@ def create_app() -> Flask:
     app.register_blueprint(net_worth_bp)
     app.register_blueprint(income_expense_bp)
     app.register_blueprint(admin_bp)
+
+    # ── Structured per-request logging (request id, timing, status→level) ─────
+    install_request_logging(app)
 
     # ── Global error handlers ─────────────────────────────────────────────────
     @app.errorhandler(404)

@@ -132,6 +132,18 @@
 
 **Config (build-time, `VITE_`-prefixed so Vite inlines them):** `VITE_SENTRY_DSN` (the gate — use an EU-region DSN), `VITE_SENTRY_ENVIRONMENT` (defaults to Vite's `MODE`), `VITE_SENTRY_RELEASE` (optional), `VITE_SENTRY_TRACES_SAMPLE_RATE` (defaults 0). Being `VITE_`-prefixed, the DSN reaches the client — that's expected for a browser SDK (a Sentry DSN is a public ingest key, not a secret), unlike the server-side GA4 credentials which must never be `VITE_`-prefixed.
 
+## Structured request logging
+
+**TL;DR:** One structured log line per request (method, path, status, duration) via Flask before/after hooks, JSON to stdout in production and a readable line in dev. Each request gets an id echoed on `X-Request-ID` and tagged onto the Sentry scope, so a log line, a support report, and a Sentry event for the same request correlate. **Stdlib only** — no logging dependency added.
+
+**Decision:** `backend/logging_config.py` owns both halves. `configure_logging()` installs a single stdout handler on the root logger (idempotent via a marker attribute, since the test suite builds the app many times) — a `JsonFormatter` in production, a plain `%(asctime)s …` line in dev, chosen by `LOG_FORMAT` (defaults per environment, overridable). `install_request_logging(app)` registers a `before_request` that stamps `g.request_id` (honouring an upstream `X-Request-ID` if present) and a start time, and an `after_request` that emits the line and sets the response header. Status maps to level: 5xx → ERROR, 4xx → WARNING, else INFO, so error dashboards filter for free. Wired from `create_app()`: `configure_logging()` first (before anything logs), `install_request_logging()` after blueprints.
+
+**Why stdlib and not `structlog` / `python-json-logger`:** the whole need is "emit a JSON object per request." A ~30-line `JsonFormatter` that serialises the base record plus any `extra` fields covers it, keeping with the "deliberately boring, justify deps against the problem size" rule. The formatter treats any non-standard `LogRecord` attribute as a structured field, so `logger.log(level, "request", extra={...})` is the whole call site.
+
+**Privacy (invariant 8):** a request line carries method, **path without query string**, status, and duration — deliberately **not** the client IP, the user id, the request body, or headers. The goal is knowing which endpoints are slow or erroring, not who called them, which keeps the access log free of personal data by construction. It complements Sentry's `send_default_pii=False`: same posture, different signal.
+
+**Why `/api/health` is skipped:** Render's health check and the keepalive pinger (and uptime monitoring, #176) poll it every few minutes. Logging every poll would bury the real request signal, so the health path is excluded from the log line — but it still gets a request id and the `X-Request-ID` header.
+
 ## Tracker teasers outside the calculator registry
 
 **TL;DR:** The two upcoming trackers live in their own `upcomingFeatures.js` module, not in `registry.js`. The registry stays calculators-only.

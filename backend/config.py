@@ -213,6 +213,18 @@ class Config:
     SENTRY_ENVIRONMENT        = os.getenv("SENTRY_ENVIRONMENT", "").strip() or _flask_env
     SENTRY_RELEASE            = os.getenv("SENTRY_RELEASE", "").strip() or None
 
+    # ── Logging ───────────────────────────────────────────────────────────────
+    # Structured request logging (logging_config.py). LOG_LEVEL sets the root
+    # threshold. LOG_FORMAT picks the stdout shape: JSON for machine-readable
+    # production logs (Render captures stdout), a readable line in development —
+    # defaulting per environment but overridable (e.g. LOG_FORMAT=json locally to
+    # eyeball prod output).
+    LOG_LEVEL  = os.getenv("LOG_LEVEL", "INFO").upper()
+    LOG_FORMAT = (
+        os.getenv("LOG_FORMAT", "").strip().lower()
+        or ("json" if _is_production else "plain")
+    )
+
     # ── Environment ───────────────────────────────────────────────────────────
     FLASK_ENV   = _flask_env
     FLASK_DEBUG = _flask_env == "development"
