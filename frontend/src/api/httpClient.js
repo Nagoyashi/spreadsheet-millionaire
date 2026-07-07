@@ -23,6 +23,8 @@
 //   httpClient must not pull in authApi at load time, since authApi
 //   itself uses httpClient.
 
+import { Sentry } from '../sentry'
+
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 
 // Default per-request timeout. Render's free tier cold-starts in 30–60s; this
@@ -124,6 +126,15 @@ async function request(baseUrl, path, options = {}) {
   // with a generic error. Auth-flow 401s (bad login) are excluded — they aren't
   // session expiry.
   if (res.status === 401 && !baseUrl.endsWith('/api/auth')) {
+    // Leave a diagnostic breadcrumb (attached only to a later error report, not
+    // sent on its own) and clear any Sentry user scope so events after logout
+    // aren't tied to the expired session. Both no-op without a configured DSN.
+    Sentry.addBreadcrumb({
+      category: 'auth',
+      level: 'info',
+      message: 'Session expired (401) — clearing client auth state',
+    })
+    Sentry.setUser(null)
     _onUnauthorized()
   }
 

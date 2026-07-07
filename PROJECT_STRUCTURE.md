@@ -107,7 +107,9 @@ frontend/
 ├── .prettierignore             # dist, node_modules, package-lock.json
 └── src/
     ├── App.jsx                 # BrowserRouter + full route map. Marketing at / (+ /privacy, /terms); app namespaced under /app/*; RequireGuest (login/register) + RequireAuth (/app/settings) wrappers; param-preserving redirects from old top-level app paths. See "Route map" below
-    ├── main.jsx                # React root mount
+    ├── main.jsx                # React root mount — calls initSentry() before render
+    ├── sentry.js               # Sentry (@sentry/react) init + Sentry re-export — DSN-gated on VITE_SENTRY_DSN, no PII/replay/tracing (DECISIONS.md § "Error monitoring via Sentry (frontend)")
+    ├── sentry.test.js          # vitest — initSentry() no-ops without a DSN
     ├── index.css               # Tailwind directives + base styles
     ├── constants.js            # Shared storage key generators (CALC_STORAGE_KEY, FAVOURITES_KEY)
     ├── upcomingFeatures.js     # UPCOMING_FEATURES tracker teasers (Net Worth, Income/Expense) — deliberately NOT in the calculator registry; raw source for trackers.js
@@ -176,8 +178,8 @@ frontend/
     │   ├── SavedCalculationsSidebar.jsx   # List of saved calcs with click-to-deselect on active item (injected into AppSidebar's slot by CalculatorPage)
     │   ├── AuthCardShell.jsx              # Presentational chrome (gray page + top bar + white card + badge/title/subtitle/footer) for the auth family; used by AuthForm + Forgot/Reset pages
     │   ├── AuthForm.jsx                   # Shared email+password form for LoginPage + RegisterPage (renders inside AuthCardShell)
-    │   ├── ErrorBoundary.jsx              # Top-level render-error boundary (wraps Routes in App.jsx) — fallback with Reload + Back-to-calculators instead of a white screen (#23)
-    │   ├── ErrorBoundary.test.jsx         # vitest — fallback on a thrown child, children pass through otherwise
+    │   ├── ErrorBoundary.jsx              # Top-level render-error boundary (wraps Routes in App.jsx) — fallback with Reload + Back-to-calculators instead of a white screen (#23); reports the crash to Sentry (#174)
+    │   ├── ErrorBoundary.test.jsx         # vitest — fallback on a thrown child, children pass through otherwise, and the crash is reported to Sentry
     │   └── UserFooter.jsx                 # Authenticated-user footer (email + Settings link + sign out + delete account modal)
     ├── hooks/
     │   ├── useAuth.js                 # login / logout / register / deleteAccount + session rehydration

@@ -118,7 +118,19 @@
 
 **Why DSN-gated rather than a separate `SENTRY_ENABLED` flag:** the DSN is both the switch and the credential — there is nothing to enable without one, and a stray `SENTRY_ENABLED=true` with no DSN would be a silent no-op anyway. One env var, one meaning. Mirrors the `RESEND_API_KEY` / GA4 "absent key disables the feature" pattern already in `config.py`.
 
-**Frontend Sentry (#174)** is a separate integration wired into the central 401-logout path and the render-error boundary — tracked apart from this backend decision.
+**Frontend Sentry (#174)** is the browser half — see the next section.
+
+## Error monitoring via Sentry (frontend)
+
+**TL;DR:** `@sentry/react` reports browser crashes, but is **DSN-gated on `VITE_SENTRY_DSN`** exactly like the backend — no DSN, no init, no third-party SDK phoning home. So dev, CI, and a fresh checkout run with it off; only a build that inlines a real DSN activates it. Privacy-maximal: no PII, no inferred IP, no Session Replay, no user-behaviour tracing.
+
+**Decision:** `src/sentry.js` owns `initSentry()` (called once in `main.jsx` before first render) and re-exports the `Sentry` static API. Two wiring points, named in the issue:
+- **Render-error boundary** — `ErrorBoundary.componentDidCatch` calls `Sentry.captureException(error, { contexts: { react: { componentStack } } })` alongside the existing `console.error`. This is the one place a render crash is already caught.
+- **Central 401-logout path** — in `httpClient`'s 401 branch (the single place a session-expiry logout is detected, #21) we drop a diagnostic breadcrumb and `Sentry.setUser(null)` so post-logout events aren't tied to the expired session. The `Sentry` static API no-ops without an active client, so neither call needs its own DSN guard.
+
+**Privacy posture (invariant 8; the privacy page lists Sentry as a diagnostics sub-processor):** `sendDefaultPii: false` keeps cookies, headers, and the inferred IP address off events. `tracesSampleRate` defaults to **0** (errors only) and **Session Replay is never added** — both would profile usage, which the "no behavioural tracking" promise forbids. Breadcrumbs ride along *inside* a crash report, not as standalone telemetry. The privacy page (`PrivacyPage.jsx`) names Sentry in the sub-processor list with a crash-diagnostics-only description; the "no third-party analytics or behavioural tracking" line stays true because error monitoring is neither.
+
+**Config (build-time, `VITE_`-prefixed so Vite inlines them):** `VITE_SENTRY_DSN` (the gate — use an EU-region DSN), `VITE_SENTRY_ENVIRONMENT` (defaults to Vite's `MODE`), `VITE_SENTRY_RELEASE` (optional), `VITE_SENTRY_TRACES_SAMPLE_RATE` (defaults 0). Being `VITE_`-prefixed, the DSN reaches the client — that's expected for a browser SDK (a Sentry DSN is a public ingest key, not a secret), unlike the server-side GA4 credentials which must never be `VITE_`-prefixed.
 
 ## Tracker teasers outside the calculator registry
 
