@@ -15,7 +15,7 @@ import MarketingFooter from '../marketing/MarketingFooter'
 // the page stays quiet and lets them carry the colour.
 
 export default function MarketingLandingPage({ auth }) {
-  useDocumentTitle('SpreadsheetMillionaire — Free financial planning calculators')
+  useDocumentTitle('SpreadsheetMillionaire — Free personal finance tools and calculators')
 
   return (
     <div className="min-h-screen bg-stone-950 text-white">

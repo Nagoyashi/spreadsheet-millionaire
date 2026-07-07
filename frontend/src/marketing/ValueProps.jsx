@@ -8,7 +8,7 @@ const PROPS = [
   {
     Icon: Zap,
     title: 'Free to use',
-    body: 'Every published calculator is free, with no usage limit. Free while in beta, and the calculators stay free.',
+    body: 'Every published calculator is free, with no usage limit — and the calculators stay free.',
   },
   {
     Icon: UserCheck,
@@ -18,7 +18,7 @@ const PROPS = [
   {
     Icon: Save,
     title: 'Save with an account',
-    body: 'Create a free account to save, rename, and revisit your scenarios. Your inputs are stored privately, per account.',
+    body: 'Create a free account to save, rename, and come back to your scenarios as your plans change. Your inputs are stored privately, per account.',
   },
   {
     Icon: ShieldCheck,

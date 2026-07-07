@@ -72,10 +72,14 @@ export default function ComingSoonStrip() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
         <div className="text-center mb-10">
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-            More on the way
+            Where this is going
           </h2>
-          <p className="mt-3 text-sm sm:text-base text-stone-400 max-w-xl mx-auto">
-            Trackers, more calculators, guides, comparisons, and a stock & ETF search — and the whole project is open source.
+          <p className="mt-3 text-sm sm:text-base text-stone-400 max-w-2xl mx-auto">
+            The calculators show you the plan. Net-worth and income &amp; expense
+            trackers are coming next — so you can see where you actually are, not just
+            where the math says you could be. More calculators, a guide, side-by-side
+            comparisons, and a stock &amp; ETF search are on the way too, and the whole
+            project is open source.
           </p>
         </div>
 
