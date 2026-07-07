@@ -1,4 +1,5 @@
 import { Component } from 'react'
+import { Sentry } from '../sentry'
 
 // Catches render-time exceptions anywhere below it (a corrupt saved record, a
 // malformed Sankey permalink, an unexpected null) so one throw shows a
@@ -13,8 +14,13 @@ export default class ErrorBoundary extends Component {
   }
 
   componentDidCatch(error, info) {
-    // No external logging service yet — surface to the console for debugging.
+    // Always surface to the console for local debugging.
     console.error('Render error caught by ErrorBoundary:', error, info)
+    // Report the render crash to Sentry with the React component stack as
+    // context. A no-op when Sentry isn't configured (no VITE_SENTRY_DSN).
+    Sentry.captureException(error, {
+      contexts: { react: { componentStack: info?.componentStack } },
+    })
   }
 
   render() {

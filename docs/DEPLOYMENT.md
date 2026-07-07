@@ -173,6 +173,15 @@ How the proxy is wired (no dashboard rewrite config needed):
   API calls never get rewritten to `index.html`.
 - Set `BACKEND_ORIGIN` for **both** scopes — this is § 1, the crux. Don't skip it.
 
+**Frontend env vars** — all `VITE_`-prefixed, so they're inlined into the client bundle at build time (set them in Vercel, then redeploy so the build picks them up):
+
+| Var | Production | Preview | Notes |
+|---|---|---|---|
+| `VITE_SENTRY_DSN` | Sentry **EU-region** DSN (browser project) | *(optional)* own project or unset | Gates frontend error monitoring. Unset → `@sentry/react` never inits, no SDK phones home. A Sentry DSN is a public ingest key, not a secret — safe to inline (unlike the server-side GA4 credentials). Sentry is already named in `PrivacyPage.jsx`'s sub-processor list, so enabling it keeps the privacy page accurate. |
+| `VITE_SENTRY_ENVIRONMENT` | *(optional)* e.g. `production` | *(optional)* e.g. `preview` | Defaults to Vite's `MODE`. Set explicitly to tell prod and preview apart in Sentry. |
+| `VITE_SENTRY_TRACES_SAMPLE_RATE` | *(optional)* `0`–`1` | *(optional)* | Defaults to `0` (errors only — no performance tracing). Raise only deliberately. |
+| `VITE_SENTRY_RELEASE` | *(optional)* version/commit | *(optional)* | Pins a frontend error to a deploy. |
+
 After the frontend origins are known, set each Render service's `CORS_ORIGINS`
 (§ 2) to the matching frontend origin and let Render redeploy.
 

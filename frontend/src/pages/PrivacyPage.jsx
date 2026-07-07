@@ -64,6 +64,10 @@ export default function PrivacyPage({ auth }) {
           list to join.</li>
         <li><strong>Render</strong> and <strong>Vercel</strong> — run the application server
           and serve the site.</li>
+        <li><strong>Sentry</strong> — captures crash and error diagnostics so we can fix
+          bugs. It receives technical details of an error (stack trace, browser and page)
+          — never your IP address, saved calculations, or account details — and only when
+          something breaks. It is not analytics and does not track your behaviour.</li>
       </ul>
 
       <h2>What we don't do</h2>
