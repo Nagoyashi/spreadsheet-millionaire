@@ -117,6 +117,8 @@ here.** The two services must **not** share the secret key, database, or Redis.
 | `SENTRY_TRACES_SAMPLE_RATE` | *(optional)* `0.0`–`1.0` | *(optional)* | Fraction of requests carrying a performance trace. Defaults to `0.1`; set `0` for errors-only. |
 | `SENTRY_ENVIRONMENT` | *(optional)* tag, e.g. `production` | *(optional)* e.g. `staging` | Tags events by environment. Defaults to `FLASK_ENV` (`production` for both services) — set explicitly to tell prod and staging apart in Sentry. |
 | `SENTRY_RELEASE` | *(optional)* version/commit tag | *(optional)* | Pins an error spike to a deploy. Set to the release tag or commit SHA if you want per-deploy tracking. |
+| `LOG_LEVEL` | *(optional)* `INFO` | *(optional)* | Root log threshold for the structured request log. Defaults to `INFO`; set `DEBUG` to troubleshoot, `WARNING` to quieten. |
+| `LOG_FORMAT` | *(optional)* `json` | *(optional)* | Stdout log shape. Defaults to `json` in production (`FLASK_ENV=production`) and `plain` in dev; override to force either. Render captures stdout, so JSON logs are queryable there. |
 
 **Schema — migrates automatically on every deploy.** `backend/gunicorn.conf.py`
 runs the idempotent `db_init.init_db()` in the gunicorn **master, before any

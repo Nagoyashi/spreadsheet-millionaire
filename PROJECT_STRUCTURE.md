@@ -36,8 +36,9 @@ backend/
 ├── requirements.txt            # flask, flask-cors, flask-session, flask-limiter, flask-talisman, bcrypt, marshmallow, python-dotenv, psycopg, redis, resend, gunicorn
 ├── requirements-dev.txt        # Test deps (pytest) — pulls in requirements.txt; never installed in prod
 ├── pytest.ini                  # pytest config — testpaths=tests; run as `cd backend && pytest`
-├── app.py                      # Flask app factory — Sentry init (DSN-gated), ProxyFix, db teardown, limiter + Talisman, startup warnings
+├── app.py                      # Flask app factory — structured logging + Sentry init (DSN-gated), ProxyFix, db teardown, limiter + Talisman, startup warnings, per-request logging hooks
 ├── config.py                   # All config read from .env — exits if SECRET_KEY/DATABASE_URL invalid (and REDIS_URL in prod)
+├── logging_config.py           # Structured request logging (stdlib) — configure_logging() (JSON in prod / plain in dev) + install_request_logging() (request id, timing, status→level, X-Request-ID header, skips /api/health). DECISIONS.md § "Structured request logging"
 ├── calc_types.py               # Single source of truth for VALID_CALC_TYPES (imported by schema + db_init)
 ├── net_worth_types.py          # Single source of truth for Net Worth enum sets (ASSET_TYPES/LIABILITY_TYPES/ASSET_CLASSES/PROPERTY_TYPES) — imported by nw schema + db_init
 ├── income_expense_types.py     # Single source of truth for Income & Expense enums (TRANSACTION_TYPES/EXPENSE_CATEGORIES/INCOME_CATEGORIES/ALL_CATEGORIES/RECURRENCE_UNITS) — imported by ie schema + db_init
@@ -80,7 +81,9 @@ backend/
     ├── test_auth.py            # End-to-end auth-flow tests (register/login/logout/forgot+reset/delete/change-pw/change-email); email mocked, DB-backed
     ├── test_idor.py            # Tenant-isolation tests for saved_calculators (Hard Rule #6) — route + model layer, two users, unauth 401
     ├── test_admin.py           # Admin gate (401/404) + publish toggle + public /published surface; DB-backed
-    └── test_calculators.py     # Saved-calculator write bounds (#20) — MAX_CONTENT_LENGTH 413, data field cap 422, no row on reject
+    ├── test_calculators.py     # Saved-calculator write bounds (#20) — MAX_CONTENT_LENGTH 413, data field cap 422, no row on reject
+    ├── test_sentry.py          # Sentry backend guard — DSN gate (no init without DSN) + privacy defaults; no DB
+    └── test_request_logging.py # Structured request logging (#175) — request-id header, structured fields, status→level, /api/health skip, JSON formatter; no DB
 ```
 
 ### Backend .env variables
