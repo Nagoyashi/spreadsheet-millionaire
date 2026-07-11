@@ -355,19 +355,66 @@ def test_analytics_requires_admin(auth_client):
 
 
 def test_analytics_empty_state_uses_db_signups(admin_client, app):
-    """With GA4 unconfigured (tests never set it), the endpoint reports
-    configured=false but still returns real DB-sourced signups + tier funnel."""
+    """With GA4 + PostHog unconfigured (tests never set them), the endpoint
+    reports both false but still returns real DB-sourced signups + tier funnel."""
     client, _ = admin_client
     _register(app, "newbie@example.com")
     body = client.get("/api/admin/analytics?range=30d").get_json()
 
     assert body["configured"] is False
+    assert body["posthog_configured"] is False          # PostHog also unconfigured
+    assert body["activation_funnel"] is None            # PostHog-sourced → null
     assert body["kpis"]["total_visitors"] is None       # GA-sourced → null
     assert body["kpis"]["new_signups"] >= 2             # admin + newbie, from DB
     assert body["visitors_over_time"] is None
     assert body["funnel"]["free"] >= 2                  # DB tier counts
     assert body["funnel"]["pro"] == 0 and body["funnel"]["elite"] == 0
     assert body["kpis"]["revenue"] is None              # MRR placeholder until billing
+
+
+def test_analytics_surfaces_posthog_funnel_when_configured(admin_client, monkeypatch):
+    """When PostHog is configured, the activation funnel + per-calculator usage
+    come from it (independently of GA4, which stays unconfigured here)."""
+    from services import posthog_analytics
+
+    monkeypatch.setattr(posthog_analytics, "is_configured", lambda: True)
+    monkeypatch.setattr(
+        posthog_analytics,
+        "fetch",
+        lambda range_days: {
+            "activation_funnel": {e: 0 for e in posthog_analytics.FUNNEL_EVENTS}
+            | {"calculator_used": 42, "account_created": 9},
+            "top_calculators": [{"calc_type": "fire", "runs": 42}],
+        },
+    )
+
+    client, _ = admin_client
+    body = client.get("/api/admin/analytics?range=30d").get_json()
+
+    assert body["posthog_configured"] is True
+    assert body["posthog_error"] is None
+    assert body["activation_funnel"]["calculator_used"] == 42
+    assert body["activation_funnel"]["account_created"] == 9
+    assert body["top_calculators"] == [{"calc_type": "fire", "runs": 42}]
+    assert body["configured"] is False                  # GA4 still off, independent
+
+
+def test_analytics_labels_posthog_error_without_500(admin_client, monkeypatch):
+    """A configured-but-broken PostHog surfaces in posthog_error, not a 500."""
+    from services import posthog_analytics
+
+    def _boom(_range):
+        raise posthog_analytics.PostHogError("bad key")
+
+    monkeypatch.setattr(posthog_analytics, "is_configured", lambda: True)
+    monkeypatch.setattr(posthog_analytics, "fetch", _boom)
+
+    client, _ = admin_client
+    resp = client.get("/api/admin/analytics?range=30d")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["posthog_error"] == "bad key"
+    assert body["activation_funnel"] is None
 
 
 # ---------------------------------------------------------------------------- #

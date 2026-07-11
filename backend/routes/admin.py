@@ -198,10 +198,12 @@ def set_user_admin(user_id):
 def analytics_overview():
     """
     Usage & conversion for the Analytics screen. Signups + the tier funnel come
-    from our DB (always present); visitors / sources / per-calculator runs come
-    from GA4 when configured (server-side; the service-account key never reaches
-    the client). When GA4 is unset, `configured` is false and the GA fields are
-    null — the UI shows an empty "connect GA4" state. GET — read-only, no CSRF.
+    from our DB (always present); visitors / traffic sources come from GA4 when
+    configured; the activation funnel + per-calculator usage come from PostHog
+    when configured (both server-side — neither vendor key reaches the client).
+    Each vendor is gated independently: `configured` (GA4) and
+    `posthog_configured` flag which sections are live, and the UI shows an empty
+    state for whichever is unset. GET — read-only, no CSRF.
     """
     try:
         range_days = int(request.args.get("range", "30").rstrip("d"))

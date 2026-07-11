@@ -71,7 +71,8 @@ backend/
 │   └── income_expense_schema.py # TransactionSchema — enums from income_expense_types.py; per-type category validation
 ├── services/
 │   ├── email.py                # Resend wrapper — send_email + send_welcome_email + send_password_reset_email; disabled (no-op) without RESEND_API_KEY
-│   └── analytics.py            # Admin Analytics — DB signups/funnel (always) + GA4 Data API proxy (optional, lazy SDK import); empty-state when GA4 unconfigured
+│   ├── analytics.py            # Admin Analytics assembler — DB signups/funnel (always) + GA4 traffic proxy (optional) + PostHog activation funnel/top-calculators (optional, #178); per-vendor empty-state
+│   └── posthog_analytics.py    # PostHog read-back (#178) — HogQL Query API via stdlib urllib, personal API key (secret, server-side); fetch()=activation_funnel + top_calculators; PostHogError on failure
 ├── utils/
 │   └── auth_helpers.py         # login_required, admin_required (404 for non-admins), csrf_protect, set/clear session, generate_csrf_token
 └── tests/
@@ -80,7 +81,8 @@ backend/
     ├── test_db_smoke.py        # DB-path wiring proof (register + truncation isolation); skips without TEST_DATABASE_URL, runs in CI
     ├── test_auth.py            # End-to-end auth-flow tests (register/login/logout/forgot+reset/delete/change-pw/change-email); email mocked, DB-backed
     ├── test_idor.py            # Tenant-isolation tests for saved_calculators (Hard Rule #6) — route + model layer, two users, unauth 401
-    ├── test_admin.py           # Admin gate (401/404) + publish toggle + public /published surface; DB-backed
+    ├── test_admin.py           # Admin gate (401/404) + publish toggle + public /published surface + Analytics (GA4/PostHog empty-state, PostHog funnel when configured, posthog_error labelling); DB-backed
+    ├── test_posthog_analytics.py # PostHog read-back unit tests (#178) — fetch() shaping, HTTP-error → PostHogError; DB-free (urllib mocked)
     ├── test_calculators.py     # Saved-calculator write bounds (#20) — MAX_CONTENT_LENGTH 413, data field cap 422, no row on reject
     ├── test_sentry.py          # Sentry backend guard — DSN gate (no init without DSN) + privacy defaults; no DB
     └── test_request_logging.py # Structured request logging (#175) — request-id header, structured fields, status→level, /api/health skip, JSON formatter; no DB
@@ -228,7 +230,7 @@ frontend/
         └── admin/                 # /admin — internal admin-only portal (RequireAdmin gate; invisible to non-admins). Phase 12 — Admin Control Center
             ├── AdminPage.jsx      # Shell: dark sticky top bar (wordmark + 3 tabs + "internal · /admin" badge + avatar), switches Overview/Analytics/Users
             ├── AdminOverview.jsx  # Project Status — stat strip + calculator catalog table with live publish toggles (optimistic + rollback; invalidatePublished on success)
-            ├── AdminAnalytics.jsx # Placeholder — GA4 analytics lands in a later phase (#152)
+            ├── AdminAnalytics.jsx # Analytics screen — DB signup KPIs + GA4 traffic (VendorStatus-gated) + PostHog activation funnel & most-used calculators (#178), per-vendor empty states
             └── AdminUsers.jsx     # Placeholder — tier control / suspend / audit log lands in a later phase (#151)
 ```
 

@@ -3,12 +3,17 @@ services/analytics.py
 ---------------------
 Admin Analytics data — assembles the payload the /admin Analytics screen renders.
 
-Two sources:
+Three sources, each independently gated:
   - Our own DB (always available): signups (total + in-range) and the tier
     breakdown that backs the funnel's Free/Pro/Elite stages.
-  - Google Analytics 4 (optional): visitors, traffic sources, and per-calculator
-    runs (from a `calc_run` custom event). GA4 is reached server-side via the
-    Data API with a service-account key — credentials never touch the client.
+  - Google Analytics 4 (optional): visitors + traffic sources. GA4 is reached
+    server-side via the Data API with a service-account key — credentials never
+    touch the client.
+  - PostHog (optional, #178): the activation funnel (calculator_used → … →
+    upgrade_clicked, the events #177 emits) and real per-calculator usage. Read
+    server-side via the HogQL Query API with a personal API key (see
+    services/posthog_analytics.py). It's the source of truth for per-calculator
+    usage — the GA4 `calc_run` event was never emitted.
 
 Empty-state design: when GA4 isn't configured (no property id / credentials), the
 GA-sourced fields come back null and `configured` is false; the UI shows a
@@ -22,6 +27,7 @@ from datetime import datetime, timezone
 
 from config import Config
 from db import get_db
+from services import posthog_analytics
 
 
 class AnalyticsError(Exception):
@@ -183,6 +189,27 @@ def get_overview(range_days: int = 30) -> dict:
         except AnalyticsError as e:
             ga_error = str(e)
 
+    # PostHog product events (#178): the activation funnel + real per-calculator
+    # usage. Independently gated from GA4 — either, both, or neither may be wired.
+    # PostHog is the source of truth for calculator usage (the GA4 calc_run event
+    # was never emitted), so its top_calculators wins when present.
+    posthog_configured = posthog_analytics.is_configured()
+    activation_funnel = None
+    posthog_error = None
+    posthog_top_calculators = None
+    if posthog_configured:
+        try:
+            ph = posthog_analytics.fetch(range_days)
+            activation_funnel = ph["activation_funnel"]
+            posthog_top_calculators = ph["top_calculators"]
+        except posthog_analytics.PostHogError as e:
+            posthog_error = str(e)
+
+    top_calculators = (
+        posthog_top_calculators if posthog_top_calculators is not None
+        else ga["top_calculators"]
+    )
+
     visitors = ga["total_visitors"]
     signups = db["new_signups"]
     signup_rate = round(100 * signups / visitors, 1) if visitors else None
@@ -190,6 +217,8 @@ def get_overview(range_days: int = 30) -> dict:
     return {
         "configured": configured,
         "ga_error": ga_error,
+        "posthog_configured": posthog_configured,
+        "posthog_error": posthog_error,
         "range_days": range_days,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "kpis": {
@@ -203,7 +232,10 @@ def get_overview(range_days: int = 30) -> dict:
         },
         "visitors_over_time": ga["visitors_over_time"],
         "traffic_sources": ga["traffic_sources"],
-        "top_calculators": ga["top_calculators"],
+        "top_calculators": top_calculators,
+        # The activation funnel (#177 events, read via PostHog) — null until
+        # PostHog is configured; the admin card shows an empty state.
+        "activation_funnel": activation_funnel,
         "funnel": {
             "visitors": visitors,
             "signups": db["total_accounts"],
