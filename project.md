@@ -21,22 +21,24 @@ sub-releases. **`v0.14.0` — Observability + analytics foundation** shipped
 (2026-07-11): Sentry (Flask + React), structured request logging, the
 `/api/health/ready` uptime probe, and a PostHog (EU cloud) activation funnel
 wired end-to-end into `/admin`. All credential-gated — off until keys are set.
-Next up: **`v0.14.1` — data lifecycle + legal** (account-deletion cascade, data
-export, privacy/ToS), not yet opened as a milestone.
+Now underway: **`v0.14.1` — data lifecycle + legal** (account-deletion cascade,
+data export, privacy/ToS, admin deletion/export trigger), open as the current
+milestone.
 
 ## Current cycle
 
 > Canonical cycle state = the single **open GitHub Milestone**. This line mirrors
 > it for at-a-glance reading in the editor; if they disagree, the milestone wins.
 
-**Between cycles.** `v0.14.0` (Phase 14 — Observability + analytics foundation)
-shipped 2026-07-11 and its milestone is closed; no milestone is open. **Next up:
-`v0.14.1` — data lifecycle + legal** (account-deletion cascade #179, data export
-#180, privacy/ToS #181, admin trigger deletion/export #182) — to be opened as the
-next milestone. Phase 14's third sub-release, `v0.14.2` (CI confidence + scale
-sanity: #183–188), follows. Those issues are on the board (backlog), not yet in a
-milestone. Trackers stay **dark via runtime publish** (DB-backed, revealed from
-`/admin` Overview). `v0.14.0` staged to production; backlog on the
+**`v0.14.1` — Phase 14, sub-release 2: Data lifecycle + legal** (open milestone,
+4 issues). Account deletion with a hard-delete cascade across **every**
+user-scoped table (#179 — ⚠ destructive/security-sensitive; enumerate tables
+before writing), data export "download my data" (#180), privacy policy + ToS
+filling the v0.13.1 marketing placeholders (#181), and admin-triggered
+deletion/export for support (#182). Invariants 5 + 7. Phase 14's third
+sub-release, `v0.14.2` (CI confidence + scale sanity: #183–188), follows — those
+issues stay on the board, unmilestoned. Trackers stay **dark via runtime
+publish**. `v0.14.0` shipped 2026-07-11; backlog on the
 [Project board](https://github.com/users/Nagoyashi/projects) ↗
 
 Each release cycle is a Milestone named for its target version (`v0.10.0`); its
