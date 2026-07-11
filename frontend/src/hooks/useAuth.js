@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { authApi } from '../api/authApi'
 import { describeError, registerUnauthorizedHandler } from '../api/httpClient'
+import { analytics } from '../api/analytics'
 
 // Shared auth state across the app.
 // Usage: const { user, loading, isAuthenticated, login, logout, register, deleteAccount } = useAuth()
@@ -15,7 +16,11 @@ export function useAuth() {
   // On mount: check if there's an existing session (page refresh, returning user)
   useEffect(() => {
     authApi.getStatus().then(({ ok, data }) => {
-      if (ok && data.logged_in) setUser(data.user)
+      if (ok && data.logged_in) {
+        setUser(data.user)
+        // Identify a returning session so its funnel events attach to the account.
+        analytics.identify(data.user?.id)
+      }
     }).finally(() => setLoading(false))
   }, [])
 
@@ -31,6 +36,7 @@ export function useAuth() {
     const res = await authApi.login(email, password)
     if (res.ok) {
       setUser(res.data.user)
+      analytics.identify(res.data.user?.id)
       return { success: true }
     }
     // data is null on a transport failure — guard the access and let
@@ -42,6 +48,9 @@ export function useAuth() {
     const res = await authApi.register(email, password)
     if (res.ok) {
       setUser(res.data.user)
+      // Funnel: identify the new account, then mark the activation milestone.
+      analytics.identify(res.data.user?.id)
+      analytics.accountCreated()
       return { success: true }
     }
     return { success: false, error: describeError(res), errors: res.data?.errors }
@@ -50,6 +59,9 @@ export function useAuth() {
   const logout = useCallback(async () => {
     await authApi.logout()
     setUser(null)
+    // Unlink the PostHog distinct id so post-logout events aren't tied to the
+    // account (mirrors the Sentry setUser(null) on the 401 path).
+    analytics.reset()
   }, [])
 
   // Replace the cached user with a fresh server copy (e.g. after an email

@@ -110,17 +110,21 @@ frontend/
 ├── .prettierignore             # dist, node_modules, package-lock.json
 └── src/
     ├── App.jsx                 # BrowserRouter + full route map. Marketing at / (+ /privacy, /terms); app namespaced under /app/*; RequireGuest (login/register) + RequireAuth (/app/settings) wrappers; param-preserving redirects from old top-level app paths. See "Route map" below
-    ├── main.jsx                # React root mount — calls initSentry() before render
+    ├── main.jsx                # React root mount — calls initSentry(), then initPostHog() + analytics.trackSession(), before render
     ├── sentry.js               # Sentry (@sentry/react) init + Sentry re-export — DSN-gated on VITE_SENTRY_DSN, no PII/replay/tracing (DECISIONS.md § "Error monitoring via Sentry (frontend)")
     ├── sentry.test.js          # vitest — initSentry() no-ops without a DSN
+    ├── posthog.js              # PostHog (posthog-js) init + re-export — key-gated on VITE_POSTHOG_KEY, EU cloud, autocapture/replay/pageview OFF (DECISIONS.md § "Product analytics via PostHog (EU cloud)")
+    ├── posthog.test.js         # vitest — initPostHog() no-ops without a key
     ├── index.css               # Tailwind directives + base styles
-    ├── constants.js            # Shared storage key generators (CALC_STORAGE_KEY, FAVOURITES_KEY)
+    ├── constants.js            # Shared storage key generators (CALC_STORAGE_KEY, FAVOURITES_KEY, ANALYTICS_SESSION_KEY, ANALYTICS_ONCE_KEY)
     ├── upcomingFeatures.js     # UPCOMING_FEATURES tracker teasers (Net Worth, Income/Expense) — deliberately NOT in the calculator registry; raw source for trackers.js
     ├── setupTests.js           # vitest setup — jest-dom matchers + a ResizeObserver stub (for recharts in jsdom); wired via vite.config test.setupFiles
     ├── trackers.js             # Published-tracker surface: useLiveTrackers() + useVisibleUpcoming() — runtime hooks over usePublishedTypes (DB-backed publish), replacing the deleted build-time featureFlags.js. Every nav/grid consumer derives from these, never re-filters UPCOMING_FEATURES
     ├── api/
     │   ├── httpClient.js       # Shared fetch wrapper. createApi(baseUrl) + central CSRF injection, stale-CSRF 403 retry (#22), and 401→onUnauthorized hook (#21)
     │   ├── httpClient.test.js  # vitest — CSRF-403 self-heal retry + central 401 handling
+    │   ├── analytics.js        # PostHog activation-funnel instrumentation (#177) — one helper per event (calculatorUsed/accountCreated/trackerFirstEntry/secondSession/upgradeViewed/upgradeClicked) + identify/reset/trackSession; no-ops until posthog loads (DECISIONS.md § "Product analytics via PostHog (EU cloud)")
+    │   ├── analytics.test.js   # vitest — funnel events, one-shot tracker_first_entry, second_session session-counter
     │   ├── authApi.js          # register / login / logout / deleteAccount / getStatus / fetchCsrfToken / forgotPassword / resetPassword / changePassword / changeEmail
     │   ├── calculatorApi.js    # getPublished (public runtime publish surface) / getAll / create / update / remove
     │   ├── adminApi.js         # /api/admin/* — getCalculators / setPublished / getUsers / updateUser / setUserAdmin (superadmin) / getAnalytics (PATCH via createApi)
