@@ -63,7 +63,7 @@ backend/
 │   ├── admin.py                # /api/admin/* — admin-only (admin_required, 404 for non-admins). Overview: GET /calculators, PATCH /calculators/:type {published} (calcs + trackers). Users: GET /users (search/tier), PATCH /users/:id {tier?,suspended?}, PATCH /users/:id/admin {is_admin} (superadmin_required) — all audit-logged. Analytics: GET /analytics?range= (DB signups + GA4 proxy)
 │   ├── net_worth.py            # /api/net-worth/* — CRUD for assets/liabilities/investments/real-estate + /summary + /snapshots (login_required, CSRF, rate-limited writes)
 │   ├── income_expense.py       # /api/income-expense/* — transactions CRUD (year/month filters) + /summary (login_required, CSRF, rate-limited writes)
-│   └── health.py               # GET /api/health — liveness probe, rate-limit exempt, no DB/Redis
+│   └── health.py               # GET /api/health — dumb liveness probe (no DB/Redis) · GET /api/health/ready — readiness probe (SELECT 1 → 200 / 503 degraded) for external uptime monitoring; both rate-limit exempt. DECISIONS.md § "Liveness vs readiness health probes"
 ├── schemas/
 │   ├── user_schema.py          # Shared validate_password (8+ chars, 1 letter, 1 number) + Register/Login/ResetPassword/ChangePassword/ChangeEmail schemas
 │   ├── calculator_schema.py    # Imports VALID_CALC_TYPES from calc_types.py
@@ -76,7 +76,7 @@ backend/
 │   └── auth_helpers.py         # login_required, admin_required (404 for non-admins), csrf_protect, set/clear session, generate_csrf_token
 └── tests/
     ├── conftest.py             # Hermetic test env (forced before import) + app/client/get_csrf_token fixtures; db/auth_client skip without TEST_DATABASE_URL
-    ├── test_health.py          # GET /api/health smoke test (no DB)
+    ├── test_health.py          # /api/health liveness smoke test + /api/health/ready readiness (DB-up 200 needs TEST_DATABASE_URL; DB-down 503 + failure-logging via monkeypatch, no DB)
     ├── test_db_smoke.py        # DB-path wiring proof (register + truncation isolation); skips without TEST_DATABASE_URL, runs in CI
     ├── test_auth.py            # End-to-end auth-flow tests (register/login/logout/forgot+reset/delete/change-pw/change-email); email mocked, DB-backed
     ├── test_idor.py            # Tenant-isolation tests for saved_calculators (Hard Rule #6) — route + model layer, two users, unauth 401

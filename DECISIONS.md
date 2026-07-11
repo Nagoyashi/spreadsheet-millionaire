@@ -142,7 +142,17 @@
 
 **Privacy (invariant 8):** a request line carries method, **path without query string**, status, and duration — deliberately **not** the client IP, the user id, the request body, or headers. The goal is knowing which endpoints are slow or erroring, not who called them, which keeps the access log free of personal data by construction. It complements Sentry's `send_default_pii=False`: same posture, different signal.
 
-**Why `/api/health` is skipped:** Render's health check and the keepalive pinger (and uptime monitoring, #176) poll it every few minutes. Logging every poll would bury the real request signal, so the health path is excluded from the log line — but it still gets a request id and the `X-Request-ID` header.
+**Why the health/readiness paths are skipped:** Render's health check, the keepalive pinger, and the external uptime monitor poll `/api/health` and `/api/health/ready` every few minutes. Logging every *successful* poll would bury the real request signal, so those paths are excluded from the log line — but a **failing** probe (status ≥ 400) still logs, since a `503` from readiness is exactly the outage signal worth keeping. Every request, skipped or not, still gets a request id and the `X-Request-ID` header. See § "Liveness vs readiness health probes".
+
+## Liveness vs readiness health probes
+
+**TL;DR:** Two probes, not one. `GET /api/health` is a **dumb liveness** check (no dependencies) and `GET /api/health/ready` is a **readiness** check that verifies Postgres. Render's restart logic points at liveness; external uptime monitoring points at readiness. Conflating them either restarts the service on a transient DB blip or leaves a DB outage invisible.
+
+**Decision (#176):** `routes/health.py` exposes both, both rate-limit-exempt.
+- **Liveness** (`/api/health`) does zero dependency work and always returns `200 {"status":"ok"}`. Render's health-check path uses it, because a failed health check triggers an instance **restart** — a database blip must never look like a dead process and cause a restart loop. The keepalive pinger (free-tier cold-start mitigation) also targets it.
+- **Readiness** (`/api/health/ready`) runs `SELECT 1` on the per-request connection: `200 {"status":"ok","checks":{"db":"ok"}}` when Postgres answers, else `503 {"status":"degraded","checks":{"db":"down"}}`. This is the endpoint an external monitor (UptimeRobot / Better Stack / cron-job.org) polls and **alerts** on — "process up but can't serve" is a state liveness deliberately hides. The failure path logs the DB error with a traceback (via `app.health`) on top of the middleware's `503` request line.
+
+**Why Redis is excluded from readiness:** sessions fall back to the filesystem and the rate limiter to in-memory when Upstash is down (see `config.py`'s startup warnings), so an unreachable Redis is a soft degradation, not an outage. Failing readiness on it would page on-call for a state the app still serves through. Postgres has no such fallback — it is the one hard dependency, so it is the only thing readiness gates on.
 
 ## Tracker teasers outside the calculator registry
 

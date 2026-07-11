@@ -89,6 +89,11 @@ service.
 | Health check path | `/api/health` | `/api/health` |
 | Instance type | **paid (always-on)** at launch | Free (keepalive, § 4) |
 
+> **Keep Render's health-check path on `/api/health`** (the dumb liveness probe),
+> **not** `/api/health/ready`. Render restarts an instance whose health check
+> fails; pointing it at the readiness probe would restart the whole service on a
+> transient DB blip. Readiness is for *external* monitoring/alerting only (§ 4).
+
 Notes (apply to both):
 - The **start command runs from the root directory** (`backend/`), so
   `app:create_app()` and all intra-backend imports resolve. Never add a
@@ -189,19 +194,52 @@ After the frontend origins are known, set each Render service's `CORS_ORIGINS`
 
 ---
 
-## 4. Keepalive (free-tier cold-start mitigation — staging)
+## 4. Health monitoring (two probes, two jobs)
+
+The backend exposes two probes, and they are **not interchangeable**:
+
+| Probe | Checks | Who polls it | On failure |
+|---|---|---|---|
+| `GET /api/health` | process is up (no DB/Redis) | Render health check + keepalive | Render restarts the instance |
+| `GET /api/health/ready` | Postgres reachable (`SELECT 1`) | **external uptime monitor** | monitor alerts you |
+
+Both are rate-limit-exempt. Successful polls of either are skipped from the
+request log; a **failing** readiness probe is logged (with the DB error) and
+`503 {"status":"degraded","checks":{"db":"down"}}` is returned.
+
+### Keepalive (free-tier cold-start mitigation — staging)
 
 Render's **free** instance sleeps after 15 idle minutes; the next request pays a
 multi-second cold start that can exceed the Vercel proxy timeout. Keep the
 **staging** service warm:
 
 - Create a job on **cron-job.org** (or any uptime pinger).
-- URL: `GET https://<staging-render-url>.onrender.com/api/health`
+- URL: `GET https://<staging-render-url>.onrender.com/api/health` (the dumb
+  liveness probe — do **not** point the keepalive at readiness).
 - Interval: **every 10 minutes**.
 - `/api/health` is rate-limit-exempt and does no DB/Redis work — safe to ping.
 
 The **production** service runs on the paid always-on instance at launch, so it
 never sleeps and the keepalive is optional there.
+
+### Uptime monitoring + alerting (both environments)
+
+Liveness only proves the process answers; it stays green even when the database
+is down. To catch "up but can't serve", point an external monitor at the
+**readiness** probe and turn on alerting:
+
+- Use **UptimeRobot**, **Better Stack**, **cron-job.org**, or any HTTP monitor.
+- URL: `GET https://<render-url>.onrender.com/api/health/ready`
+- Interval: **every 1–5 minutes**; alert after 2 consecutive failures (avoids
+  paging on a single blip).
+- **Treat a non-`200` as down** — a `503` from this endpoint is a real degradation
+  (Postgres unreachable), which never surfaces on `/api/health`.
+- Wire the monitor's alert channel (email / SMS / Slack) to whoever is on call.
+
+Redis is deliberately **not** part of readiness: sessions fall back to the
+filesystem and rate limiting to in-memory when Upstash is down, so an unreachable
+Redis is a soft degradation, not an outage — see `DECISIONS.md` § "Liveness vs
+readiness health probes".
 
 ---
 
@@ -245,6 +283,10 @@ preview URL), pointed at that environment's backend.
 Backend, directly on Render (bypasses Vercel):
 
 - [ ] `curl https://<render-url>.onrender.com/api/health` → `200 {"status":"ok"}`
+- [ ] `curl https://<render-url>.onrender.com/api/health/ready` →
+      `200 {"status":"ok","checks":{"db":"ok"}}` (proves the DB is reachable from
+      the deployed instance — a `503` means the `DATABASE_URL` is wrong or Neon is
+      unreachable)
 
 Then on the **frontend origin** (exercises the full single-origin path):
 
