@@ -1,3 +1,5 @@
+from datetime import date
+
 from flask import Blueprint, request, jsonify, session
 from marshmallow import ValidationError
 
@@ -9,7 +11,7 @@ from schemas.user_schema import (
     RegisterSchema, LoginSchema,
     ResetPasswordSchema, ChangePasswordSchema, ChangeEmailSchema,
 )
-from services import account_deletion
+from services import account_deletion, data_export
 from services.email import send_welcome_email, send_password_reset_email
 from utils.auth_helpers import (
     set_session, clear_session, get_current_user,
@@ -158,6 +160,30 @@ def delete_account():
     clear_session()
 
     return jsonify({"message": "Account deleted."}), 200
+
+
+@bp.route("/account/export", methods=["GET"])
+@login_required
+@limiter.limit("5 per hour")
+def export_account():
+    """
+    Download my data (#180) — the complete JSON export of everything stored for
+    the authenticated user (GDPR Art. 15/20; the read counterpart of deletion).
+
+    GET + login only: no CSRF (read-only) and no password re-confirmation — a
+    hijacked session can already read all of this through the normal APIs, so a
+    password gate here would be friction without a boundary. Rate-limited: it's
+    one SELECT per user-scoped table. Served as an attachment so the browser
+    downloads a file instead of rendering the JSON.
+    """
+    payload = data_export.export_account(session["user_id"])
+    if payload is None:
+        return jsonify({"error": "User not found."}), 404
+
+    resp = jsonify(payload)
+    filename = f"spreadsheetmillionaire-export-{date.today().isoformat()}.json"
+    resp.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return resp, 200
 
 
 @bp.route("/forgot-password", methods=["POST"])
