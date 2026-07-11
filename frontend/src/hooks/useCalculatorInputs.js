@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { migrate, stripVersion } from '../utils/migrateCalcData'
+import { analytics } from '../api/analytics'
 
 // Encapsulates the input-state plumbing every calculator used to duplicate.
 //
@@ -57,9 +58,20 @@ export function useCalculatorInputs({ defaults, initialData, onDataChange, calcT
     onDataChangeRef.current?.(stripVersion(inputs))
   }, [inputs])
 
+  // Funnel: emit calculator_used once per mount, on the first real user edit.
+  // Guarded by a ref so it fires once (not per keystroke); loading a saved record
+  // re-seeds via setInputs without calling set(), so it never fires a false use.
+  const usedRef = useRef(false)
+
   const set = useCallback(
-    (key) => (val) => setInputs(prev => ({ ...prev, [key]: val })),
-    []
+    (key) => (val) => {
+      if (!usedRef.current) {
+        usedRef.current = true
+        analytics.calculatorUsed(calcType)
+      }
+      setInputs(prev => ({ ...prev, [key]: val }))
+    },
+    [calcType]
   )
 
   return { inputs, set, setInputs }

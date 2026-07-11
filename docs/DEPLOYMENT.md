@@ -188,6 +188,8 @@ How the proxy is wired (no dashboard rewrite config needed):
 | `VITE_SENTRY_ENVIRONMENT` | *(optional)* e.g. `production` | *(optional)* e.g. `preview` | Defaults to Vite's `MODE`. Set explicitly to tell prod and preview apart in Sentry. |
 | `VITE_SENTRY_TRACES_SAMPLE_RATE` | *(optional)* `0`–`1` | *(optional)* | Defaults to `0` (errors only — no performance tracing). Raise only deliberately. |
 | `VITE_SENTRY_RELEASE` | *(optional)* version/commit | *(optional)* | Pins a frontend error to a deploy. |
+| `VITE_POSTHOG_KEY` | PostHog **EU Cloud** project API key | *(optional)* own project or unset | Gates the activation-funnel analytics. Unset → `posthog-js` never inits, no SDK phones home (dev/CI/fresh checkout run with analytics off). A PostHog project key is a public ingest key, not a secret — safe to inline. PostHog is named in `PrivacyPage.jsx`'s sub-processor list, so enabling it keeps the privacy page accurate. |
+| `VITE_POSTHOG_HOST` | *(optional)* `https://eu.i.posthog.com` | *(optional)* | Defaults to the EU cloud host. Set only to pin a self-hosted or reverse-proxy origin; **must stay EU** (privacy invariant 8). |
 
 After the frontend origins are known, set each Render service's `CORS_ORIGINS`
 (§ 2) to the matching frontend origin and let Render redeploy.
