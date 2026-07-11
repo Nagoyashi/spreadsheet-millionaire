@@ -549,11 +549,20 @@
 
 ## Account deletion requires password re-confirmation
 
-**TL;DR:** `DELETE /api/auth/account` checks the password. Cascades via `ON DELETE CASCADE`.
+**TL;DR:** `DELETE /api/auth/account` checks the password. Deletion itself goes through the explicit service below (§ "Account deletion — explicit, verified cascade").
 
-**Decision:** `DELETE /api/auth/account` rejects the request unless the request body contains the user's current password (verified via bcrypt). Cascades via `ON DELETE CASCADE` on `saved_calculators`.
+**Decision:** `DELETE /api/auth/account` rejects the request unless the request body contains the user's current password (verified via bcrypt).
 **Why:** Hijacked session shouldn't be able to nuke the account silently. Requiring the password means an attacker would also need the credentials — at which point they could log into a fresh session anyway, but the friction stops casual session-hijack scenarios.
-**Next phase note:** The new tracker tables will need `ON DELETE CASCADE` to `users` for the same reason.
+
+## Account deletion — explicit, verified cascade (the single deletion path)
+
+**TL;DR:** Every user-scoped table already carries `ON DELETE CASCADE`, but an *implicit* cascade is a liability: nothing owned the enumeration, nothing verified it, and a future table added without the FK clause would silently orphan financial rows. `services/account_deletion.py` (#179) makes the contract explicit — an authoritative `USER_SCOPED_TABLES` registry (8 tables), `delete_account()` that counts → deletes → **verifies every table is empty before committing**, and `verify_cascade_coverage()`, an `information_schema` drift guard. There is deliberately **no `User.delete`** — the service is the only deletion path.
+
+**Decision:** `delete_account(user_id)` runs in one transaction: per-table row counts first (the erasure report — what #182's admin surface shows and what the no-PII log line records), then `DELETE FROM users`, then a re-count of every registry table. Any surviving row → **rollback + `CascadeIntegrityError`** — we fail the deletion loudly (a 500, captured by Sentry) rather than commit a half-wipe. `verify_cascade_coverage()` cross-checks the live schema against the registry in both directions (a cascade table missing from the registry; a registry table missing its CASCADE) and knows the two deliberate non-cascade referencers: `admin_audit_log` (`SET NULL`, detail payloads carry tier/flag values, never emails — GDPR-clean retention) and `calculator_publish.updated_by` (`SET NULL`, config table).
+
+**Consumers:** #180 data export and #182 admin deletion/export derive their table lists from `USER_SCOPED_TABLES` — never a second list (single-source rule). The #186 cascade test (v0.14.2) builds on `verify_cascade_coverage()` + the service tests in `tests/test_account_deletion.py` (which also pin the registry to conftest's truncation list, so the two can't drift). **Adding a user-scoped table** means adding it to `db_init.py` (with `ON DELETE CASCADE`), the registry, and conftest's `_USER_TABLES` in the same PR — the guard test fails otherwise.
+
+**Sessions after deletion:** the route clears the current session; any other live session dies on its next request (user row gone → `get_current_user()` → None → 401 → the client's central 401 logout). No session enumeration needed.
 
 ## Password reset via hashed single-use tokens
 

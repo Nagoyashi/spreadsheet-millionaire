@@ -50,7 +50,7 @@ backend/
 ├── __pycache__/
 ├── venv/                       # Python virtual environment — never committed
 ├── models/
-│   ├── user.py                 # User model — bcrypt hashing, create/get/delete, update_password/update_email, set_admin; admin Users screen: list_for_admin/tier_counts/set_tier/set_suspended/touch_last_login (is_admin/tier/suspended/last_login_at)
+│   ├── user.py                 # User model — bcrypt hashing, create/get, update_password/update_email, set_admin; admin Users screen: list_for_admin/tier_counts/set_tier/set_suspended/touch_last_login. NO delete — deletion is services/account_deletion.py (#179)
 │   ├── calculator.py           # SavedCalculator model — all queries include AND user_id = %s
 │   ├── calculator_publish.py   # Runtime publish-state access (global, not user-scoped) — list_all/published_types/set_published; admin portal writes it, public /app reads it
 │   ├── admin_audit.py          # Append-only admin audit trail — record(admin_id, action, target_user_id, detail JSONB); written on tier/suspend changes
@@ -70,6 +70,7 @@ backend/
 │   ├── net_worth_schema.py     # Asset/Liability/Investment/RealEstate/Snapshot schemas — enums from net_worth_types.py
 │   └── income_expense_schema.py # TransactionSchema — enums from income_expense_types.py; per-type category validation
 ├── services/
+│   ├── account_deletion.py     # The single account-deletion path (#179) — USER_SCOPED_TABLES registry (8 tables), delete_account() (count → delete → verify-empty → commit; CascadeIntegrityError + rollback on survivors), verify_cascade_coverage() drift guard. DECISIONS.md § "Account deletion — explicit, verified cascade"
 │   ├── email.py                # Resend wrapper — send_email + send_welcome_email + send_password_reset_email; disabled (no-op) without RESEND_API_KEY
 │   ├── analytics.py            # Admin Analytics assembler — DB signups/funnel (always) + GA4 traffic proxy (optional) + PostHog activation funnel/top-calculators (optional, #178); per-vendor empty-state
 │   └── posthog_analytics.py    # PostHog read-back (#178) — HogQL Query API via stdlib urllib, personal API key (secret, server-side); fetch()=activation_funnel + top_calculators; PostHogError on failure
@@ -83,6 +84,7 @@ backend/
     ├── test_idor.py            # Tenant-isolation tests for saved_calculators (Hard Rule #6) — route + model layer, two users, unauth 401
     ├── test_admin.py           # Admin gate (401/404) + publish toggle + public /published surface + Analytics (GA4/PostHog empty-state, PostHog funnel when configured, posthog_error labelling); DB-backed
     ├── test_posthog_analytics.py # PostHog read-back unit tests (#178) — fetch() shaping, HTTP-error → PostHogError; DB-free (urllib mocked)
+    ├── test_account_deletion.py # Cascade contract (#179) — seeds every USER_SCOPED_TABLE for two users, full wipe + bystander isolation + erasure report + drift guard + route-uses-service spy; DB-backed
     ├── test_calculators.py     # Saved-calculator write bounds (#20) — MAX_CONTENT_LENGTH 413, data field cap 422, no row on reject
     ├── test_sentry.py          # Sentry backend guard — DSN gate (no init without DSN) + privacy defaults; no DB
     └── test_request_logging.py # Structured request logging (#175) — request-id header, structured fields, status→level, /api/health skip, JSON formatter; no DB

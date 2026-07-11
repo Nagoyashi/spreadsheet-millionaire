@@ -9,6 +9,7 @@ from schemas.user_schema import (
     RegisterSchema, LoginSchema,
     ResetPasswordSchema, ChangePasswordSchema, ChangeEmailSchema,
 )
+from services import account_deletion
 from services.email import send_welcome_email, send_password_reset_email
 from utils.auth_helpers import (
     set_session, clear_session, get_current_user,
@@ -135,7 +136,9 @@ def delete_account():
     left open on a shared machine, and satisfies GDPR Article 17 (right
     to erasure) by ensuring the deletion is intentional.
 
-    ON DELETE CASCADE on saved_calculators handles data cleanup automatically.
+    Deletion goes through services/account_deletion.delete_account — the single
+    deletion path (#179): explicit cascade across every user-scoped table,
+    verified before commit, with a no-PII erasure report in the log.
     """
     user_id  = session["user_id"]
     body     = request.get_json(silent=True) or {}
@@ -151,7 +154,7 @@ def delete_account():
     if not user.check_password(password):
         return jsonify({"error": "Incorrect password."}), 401
 
-    User.delete(user_id)
+    account_deletion.delete_account(user_id)
     clear_session()
 
     return jsonify({"message": "Account deleted."}), 200

@@ -238,16 +238,6 @@ class User:
             raise ValueError("An account with that email already exists.")
         return cls.get_by_id(user_id)
 
-    @classmethod
-    def delete(cls, user_id: int) -> bool:
-        """
-        Permanently deletes a user and all their saved calculations.
-        The ON DELETE CASCADE on saved_calculators handles the cascade.
-        Returns True if a row was deleted, False if user not found.
-        """
-        conn = get_db()
-        cursor = conn.execute(
-            "DELETE FROM users WHERE id = %s", (user_id,)
-        )
-        conn.commit()
-        return cursor.rowcount > 0
+    # NOTE: there is deliberately no User.delete — account deletion goes through
+    # services/account_deletion.delete_account (#179), the single deletion path
+    # with an explicit, verified cascade across every user-scoped table.
