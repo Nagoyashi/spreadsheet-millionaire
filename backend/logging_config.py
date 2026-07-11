@@ -21,8 +21,10 @@ Privacy (invariant 8): a request line carries method, path (no query string),
 status, and duration — deliberately NOT the client IP, the user id, the request
 body, or headers. We want to know which endpoints are slow or erroring, not who
 called them; that keeps the access log free of personal data by construction.
-The /api/health probe is polled every few minutes by Render + the keepalive
-pinger (and soon uptime monitoring), so it is skipped to keep the log signal.
+The /api/health liveness probe and /api/health/ready readiness probe are polled
+every few minutes by Render, the keepalive pinger, and the external uptime
+monitor, so their *successful* hits are skipped to keep the log signal; a failing
+readiness probe still logs (see `_SKIP_LOG_PATHS`).
 """
 
 import json
@@ -51,8 +53,10 @@ _STANDARD_LOGRECORD_ATTRS = {
     "processName", "process", "taskName", "message", "asctime",
 }
 
-# Health is polled constantly; logging it would drown the signal. See module doc.
-_SKIP_LOG_PATHS = {"/api/health"}
+# Health/readiness probes are polled constantly; logging every successful poll
+# would drown the signal. A *failing* probe (4xx/5xx) is the signal we want, so
+# the skip below only suppresses successful (<400) hits on these paths. See doc.
+_SKIP_LOG_PATHS = {"/api/health", "/api/health/ready"}
 
 # Marker so configure_logging() only installs the handler once per process.
 _HANDLER_MARKER = "_sm_structured_handler"
@@ -140,7 +144,9 @@ def install_request_logging(app) -> None:
         if request_id:
             response.headers["X-Request-ID"] = request_id
 
-        if request.path in _SKIP_LOG_PATHS:
+        # Suppress the constant successful health/readiness polls, but always log
+        # a failing probe (>=400) — that's the outage signal worth keeping.
+        if request.path in _SKIP_LOG_PATHS and response.status_code < 400:
             return response
 
         start = getattr(g, "request_start", None)
