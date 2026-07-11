@@ -125,6 +125,18 @@ if _is_production and not _sentry_dsn:
         "is disabled. Set it (use an EU-region DSN) to capture unhandled errors."
     )
 
+# PostHog read-back for the admin Analytics funnel is optional; a missing key in
+# production just means the funnel card shows its empty state (signups still
+# render from our DB). Warn, don't exit — analytics is never load-bearing.
+if _is_production and not (
+    os.getenv("POSTHOG_API_KEY", "").strip() and os.getenv("POSTHOG_PROJECT_ID", "").strip()
+):
+    STARTUP_WARNINGS.append(
+        "POSTHOG_API_KEY / POSTHOG_PROJECT_ID not set while FLASK_ENV=production — "
+        "the admin activation-funnel card will show an empty state. Set both (use "
+        "an EU-region personal API key) to read product-event data."
+    )
+
 
 def _float_env(name: str, default: float) -> float:
     """Read a float env var, falling back to default on absence or bad value."""
@@ -201,6 +213,21 @@ class Config:
     GA4_PROPERTY_ID       = os.getenv("GA4_PROPERTY_ID", "").strip()
     GA4_CREDENTIALS_JSON  = os.getenv("GA4_CREDENTIALS_JSON", "").strip()
     GA4_CONFIGURED        = bool(GA4_PROPERTY_ID and GA4_CREDENTIALS_JSON)
+
+    # ── Product analytics read-back (PostHog Query API — admin portal) ─────────
+    # The admin Analytics screen reads the activation funnel + per-calculator
+    # usage from PostHog via its server-side Query API. POSTHOG_API_KEY is a
+    # *personal API key* with read scope — a SECRET, kept server-side, never
+    # VITE_-prefixed (unlike the public browser ingest key VITE_POSTHOG_KEY that
+    # #177 writes with). Both the key and the project id must be set for live
+    # numbers; until then the endpoint reports posthog_configured=false and the
+    # funnel card shows an empty state. POSTHOG_HOST is the API host (EU by
+    # default) — note it's the app host eu.posthog.com, NOT the ingest host
+    # eu.i.posthog.com the browser SDK posts to.
+    POSTHOG_API_KEY     = os.getenv("POSTHOG_API_KEY", "").strip()
+    POSTHOG_PROJECT_ID  = os.getenv("POSTHOG_PROJECT_ID", "").strip()
+    POSTHOG_HOST        = os.getenv("POSTHOG_HOST", "").strip() or "https://eu.posthog.com"
+    POSTHOG_CONFIGURED  = bool(POSTHOG_API_KEY and POSTHOG_PROJECT_ID)
 
     # ── Error monitoring (Sentry) ─────────────────────────────────────────────
     # SENTRY_DSN gates the whole integration (see app.py). Traces sampling is a

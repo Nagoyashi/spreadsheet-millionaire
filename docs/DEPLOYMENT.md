@@ -118,6 +118,9 @@ here.** The two services must **not** share the secret key, database, or Redis.
 | `SESSION_COOKIE_SECURE` | `True` | `True` | Both are HTTPS. |
 | `GA4_PROPERTY_ID` | *(optional)* GA4 property id | *(optional)* | Admin **Analytics** tab. Unset → the tab shows an empty "connect GA4" state (signup KPIs still render from the DB). Needs the commented `google-analytics-data` dep uncommented. |
 | `GA4_CREDENTIALS_JSON` | *(optional)* service-account JSON or key-file path | *(optional)* | Server-side only — never `VITE_`-prefixed; the key must not reach the client. Pairs with `GA4_PROPERTY_ID`. |
+| `POSTHOG_API_KEY` | *(optional)* PostHog **personal API key** (read scope) | *(optional)* | Admin **Analytics** → activation funnel + per-calculator usage (#178). A **secret** — server-side only, never `VITE_`-prefixed (distinct from the public browser ingest key `VITE_POSTHOG_KEY`). Unset → the funnel card shows a "connect PostHog" empty state. |
+| `POSTHOG_PROJECT_ID` | *(optional)* PostHog project id | *(optional)* | Pairs with `POSTHOG_API_KEY`; both required for live numbers. |
+| `POSTHOG_HOST` | *(optional)* `https://eu.posthog.com` | *(optional)* | The read **API** host, EU by default. Note this is the app host, **not** the ingest host `eu.i.posthog.com` the browser SDK posts to. |
 | `SENTRY_DSN` | Sentry **EU-region** DSN | *(optional)* — own project or unset | Gates backend error monitoring. Unset → Sentry never inits (warning in prod, no network calls). Use an EU-region DSN so event data stays in the EU. |
 | `SENTRY_TRACES_SAMPLE_RATE` | *(optional)* `0.0`–`1.0` | *(optional)* | Fraction of requests carrying a performance trace. Defaults to `0.1`; set `0` for errors-only. |
 | `SENTRY_ENVIRONMENT` | *(optional)* tag, e.g. `production` | *(optional)* e.g. `staging` | Tags events by environment. Defaults to `FLASK_ENV` (`production` for both services) — set explicitly to tell prod and staging apart in Sentry. |
