@@ -10,7 +10,7 @@ Every calculator is robust to extreme or invalid input: numeric fields are bound
 
 ## Stack
 
-Flask 3 · React 18 + Vite · PostgreSQL on Neon (raw SQL via psycopg, no ORM) · Redis on Upstash (sessions + rate limiting) · Resend (transactional email) · Tailwind CSS · Recharts + d3-sankey · Marshmallow · bcrypt · Flask-Session · Flask-Limiter · Flask-Talisman
+Flask 3 · React 18 + Vite · PostgreSQL on Neon (raw SQL via psycopg, no ORM) · Redis on Upstash (sessions + rate limiting) · Resend (transactional email) · Tailwind CSS · Recharts + d3-sankey · Marshmallow · bcrypt · Flask-Session · Flask-Limiter · Flask-Talisman · Sentry (error monitoring, gated) · PostHog EU (product analytics, gated)
 
 ---
 
