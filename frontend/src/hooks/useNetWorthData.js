@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { netWorthApi } from '../api/netWorthApi'
 import { describeError } from '../api/httpClient'
+import { analytics } from '../api/analytics'
 
 // Net Worth data layer — fetches all four resources + the aggregated summary +
 // snapshots, and exposes CRUD methods that refetch on success so the summary
@@ -71,6 +72,14 @@ export function useNetWorthData(isAuthenticated) {
     [fetchAll]
   )
 
+  // Funnel: the first successful add of any resource is this tracker's activation
+  // moment. trackerFirstEntry is one-shot (localStorage-guarded), so tagging every
+  // add is safe — only the first ever fires. Updates/deletes are not "entries".
+  const firstEntry = (result) => {
+    if (result.success) analytics.trackerFirstEntry('net-worth')
+    return result
+  }
+
   return {
     // Data
     assets,
@@ -87,22 +96,22 @@ export function useNetWorthData(isAuthenticated) {
     refresh: fetchAll,
 
     // Assets
-    addAsset: (body) => mutate(() => netWorthApi.assets.create(body)),
+    addAsset: (body) => mutate(() => netWorthApi.assets.create(body)).then(firstEntry),
     updateAsset: (id, body) => mutate(() => netWorthApi.assets.update(id, body)),
     deleteAsset: (id) => mutate(() => netWorthApi.assets.remove(id)),
 
     // Liabilities
-    addLiability: (body) => mutate(() => netWorthApi.liabilities.create(body)),
+    addLiability: (body) => mutate(() => netWorthApi.liabilities.create(body)).then(firstEntry),
     updateLiability: (id, body) => mutate(() => netWorthApi.liabilities.update(id, body)),
     deleteLiability: (id) => mutate(() => netWorthApi.liabilities.remove(id)),
 
     // Investments
-    addInvestment: (body) => mutate(() => netWorthApi.investments.create(body)),
+    addInvestment: (body) => mutate(() => netWorthApi.investments.create(body)).then(firstEntry),
     updateInvestment: (id, body) => mutate(() => netWorthApi.investments.update(id, body)),
     deleteInvestment: (id) => mutate(() => netWorthApi.investments.remove(id)),
 
     // Real estate
-    addProperty: (body) => mutate(() => netWorthApi.realEstate.create(body)),
+    addProperty: (body) => mutate(() => netWorthApi.realEstate.create(body)).then(firstEntry),
     updateProperty: (id, body) => mutate(() => netWorthApi.realEstate.update(id, body)),
     deleteProperty: (id) => mutate(() => netWorthApi.realEstate.remove(id)),
 

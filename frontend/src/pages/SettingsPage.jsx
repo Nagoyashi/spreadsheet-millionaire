@@ -1,16 +1,18 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, AlertTriangle, Sparkles } from 'lucide-react'
 import { authApi } from '../api/authApi'
+import { analytics } from '../api/analytics'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import DeleteAccountModal from '../components/ui/DeleteAccountModal'
 
 // /settings — account management only (auth-guarded in App.jsx via RequireAuth).
 //
-// One page, sections stacked: account email, change password, change email
-// (password-confirmed), and a danger zone hosting the existing
-// DeleteAccountModal flow. Deliberately minimal this phase — no language,
-// currency, tier, or email-verification settings (see DECISIONS.md).
+// One page, sections stacked: account email, a Premium teaser (the funnel's
+// upgrade surface, #177 — premium isn't live yet), change password, change email
+// (password-confirmed), and a danger zone hosting the existing DeleteAccountModal
+// flow. Deliberately minimal this phase — no language, currency, tier, or
+// email-verification settings (see DECISIONS.md).
 
 function SectionCard({ title, description, children }) {
   return (
@@ -33,6 +35,43 @@ function Banner({ kind, children }) {
     ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
     : 'text-red-700 bg-red-50 border-red-200'
   return <div className={`text-sm border px-3 py-2 rounded-lg ${styles}`}>{children}</div>
+}
+
+// Premium teaser — the funnel's upgrade surface (#177). Premium isn't built yet
+// (monetization is a later phase), so the CTA just registers interest: mounting
+// fires upgrade_viewed, clicking fires upgrade_clicked and swaps in a stay-tuned
+// note. When real pricing lands, this becomes (or links to) the checkout entry.
+function PremiumSection() {
+  const [clicked, setClicked] = useState(false)
+
+  useEffect(() => {
+    analytics.upgradeViewed('settings')
+  }, [])
+
+  return (
+    <SectionCard
+      title="Premium"
+      description="More powerful trackers and saved dashboards are on the way."
+    >
+      {clicked ? (
+        <Banner kind="success">
+          Thanks for your interest — Premium is coming soon. We'll let you know the
+          moment it's ready.
+        </Banner>
+      ) : (
+        <button
+          onClick={() => {
+            analytics.upgradeClicked('settings')
+            setClicked(true)
+          }}
+          className={`${btnCls} inline-flex items-center gap-2`}
+        >
+          <Sparkles className="w-4 h-4" />
+          Upgrade to Premium
+        </button>
+      )}
+    </SectionCard>
+  )
 }
 
 function ChangePasswordSection() {
@@ -226,6 +265,7 @@ export default function SettingsPage({ auth }) {
             </div>
           </SectionCard>
 
+          <PremiumSection />
           <ChangePasswordSection />
           <ChangeEmailSection auth={auth} />
           <DangerZone auth={auth} />

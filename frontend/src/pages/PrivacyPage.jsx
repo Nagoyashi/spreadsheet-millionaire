@@ -64,13 +64,24 @@ export default function PrivacyPage({ auth }) {
           list to join.</li>
         <li><strong>Render</strong> and <strong>Vercel</strong> — run the application server
           and serve the site.</li>
+        <li><strong>Sentry</strong> — captures crash and error diagnostics so we can fix
+          bugs. It receives technical details of an error (stack trace, browser and page)
+          — never your IP address, saved calculations, or account details — and only when
+          something breaks. It is not analytics and does not track your behaviour.</li>
+        <li><strong>PostHog (EU&nbsp;Cloud)</strong> — privacy-preserving product analytics,
+          hosted in the EU. It records a small set of aggregate product events (for example,
+          that a calculator was used or an account was created) so we can see which features
+          help. It uses no automatic click or keystroke capture, does not record your screen
+          or sessions, and never receives your saved calculations, financial inputs, email,
+          or advertising profile.</li>
       </ul>
 
       <h2>What we don't do</h2>
       <ul>
-        <li>No advertising and no ad networks.</li>
+        <li>No advertising, ad networks, or cross-site trackers.</li>
         <li>No selling, renting, or sharing of your personal data.</li>
-        <li>No third-party analytics or behavioural tracking.</li>
+        <li>No session recording, no keystroke capture, and no behavioural profiling —
+          product analytics is limited to the aggregate events described above.</li>
         <li>No marketing email.</li>
       </ul>
 

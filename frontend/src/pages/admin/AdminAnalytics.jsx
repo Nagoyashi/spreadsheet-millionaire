@@ -4,9 +4,11 @@ import { CALC_MAP } from '../../calculators/registry'
 import { adminApi } from '../../api/adminApi'
 
 // Analytics (Screen 2). Signups + the tier funnel come from our DB and always
-// render; visitors / sources / per-calculator runs come from GA4 (server-side
-// proxy) and show a "connect GA4" empty state until GA4 is configured. Free→Paid
-// and the Pro/Elite funnel stages stay disabled until billing is live.
+// render; visitors / traffic sources come from GA4 (server-side proxy); the
+// activation funnel + per-calculator usage come from PostHog (#178, server-side
+// read-back). Each vendor is independently gated and shows its own "connect …"
+// empty state until configured. Free→Paid and the Pro/Elite funnel stages stay
+// disabled until billing is live.
 
 const RANGES = [
   { id: '7d', label: 'Last 7 days' },
@@ -23,6 +25,20 @@ function Kpi({ label, value, sub, subColor }) {
       <div className="mt-1 text-[28px] font-bold font-mono leading-none text-[#15181c]">{value}</div>
       {sub && <div className="mt-1.5 text-[12px] font-medium" style={{ color: subColor || '#9aa0a8' }}>{sub}</div>}
     </div>
+  )
+}
+
+function VendorStatus({ label, connected, loading }) {
+  return (
+    <span className="flex items-center gap-2">
+      <span
+        className="w-2 h-2 rounded-full"
+        style={{ background: !loading && connected ? '#16a34a' : '#b0b6bd' }}
+      />
+      <span className="text-[13px] font-medium text-[#6b7280]">
+        {label} {loading ? '…' : connected ? 'connected' : 'not connected'}
+      </span>
+    </span>
   )
 }
 
@@ -49,6 +65,61 @@ function GAEmpty({ what }) {
           <span className="font-mono">GA4_CREDENTIALS_JSON</span> on the backend.
         </p>
       </div>
+    </div>
+  )
+}
+
+// Shown in any PostHog-sourced card when PostHog read-back isn't configured.
+function PHEmpty({ what }) {
+  return (
+    <div className="h-[180px] grid place-items-center text-center px-4">
+      <div>
+        <p className="text-[13px] font-semibold text-[#6b7280]">Connect PostHog to see {what}</p>
+        <p className="mt-1 text-[12px] text-[#9aa0a8]">
+          Set <span className="font-mono">POSTHOG_API_KEY</span> +{' '}
+          <span className="font-mono">POSTHOG_PROJECT_ID</span> on the backend.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// The activation funnel (#177 events, read back via PostHog). Ordered product
+// milestones with the step-to-step conversion; distinct from the acquisition
+// "Conversion funnel" (visitors → signups → tier), which is DB/GA-sourced.
+const ACTIVATION_STAGES = [
+  { key: 'calculator_used', label: 'Used a calculator' },
+  { key: 'account_created', label: 'Created account' },
+  { key: 'tracker_first_entry', label: 'First tracker entry' },
+  { key: 'second_session', label: 'Returned (2nd session)' },
+  { key: 'upgrade_viewed', label: 'Viewed upgrade' },
+  { key: 'upgrade_clicked', label: 'Clicked upgrade' },
+]
+
+function ActivationFunnel({ funnel }) {
+  if (!funnel) return <PHEmpty what="the activation funnel" />
+  const stages = ACTIVATION_STAGES.map((s) => ({ ...s, value: funnel[s.key] || 0 }))
+  const max = Math.max(...stages.map((s) => s.value), 1)
+  return (
+    <div className="space-y-2.5">
+      {stages.map((s, idx) => {
+        const prev = idx > 0 ? stages[idx - 1].value : null
+        const conv = prev ? Math.round((s.value / prev) * 100) : null
+        return (
+          <div key={s.key} className="flex items-center gap-3">
+            <div className="w-36 shrink-0 text-[12px] font-semibold text-[#6b7280]">{s.label}</div>
+            <div className="flex-1 h-7 rounded-md bg-[#f1f3f5] overflow-hidden relative">
+              <div
+                className="h-full rounded-md"
+                style={{ width: `${(s.value / max) * 100}%`, minWidth: s.value ? '6%' : 0, background: '#7b5cff' }}
+              />
+              <span className="absolute right-2 top-1/2 -translate-y-1/2 font-mono text-[11px] text-[#6b7280]">
+                {fmtNum(s.value)}{conv != null ? ` · ${conv}%` : ''}
+              </span>
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -170,18 +241,9 @@ export default function AdminAnalytics() {
       <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
         <div>
           <h1 className="text-[26px] font-extrabold tracking-[-0.5px]">Analytics</h1>
-          <div className="flex items-center gap-2 mt-1.5">
-            <span
-              className="w-2 h-2 rounded-full"
-              style={{ background: data?.configured ? '#16a34a' : '#b0b6bd' }}
-            />
-            <span className="text-[13px] font-medium text-[#6b7280]">
-              {data == null
-                ? 'Loading…'
-                : data.configured
-                  ? 'Connected to Google Analytics 4'
-                  : 'Not connected — signups shown from our database'}
-            </span>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5">
+            <VendorStatus label="GA4" connected={data?.configured} loading={data == null} />
+            <VendorStatus label="PostHog" connected={data?.posthog_configured} loading={data == null} />
           </div>
         </div>
         <select
@@ -199,6 +261,11 @@ export default function AdminAnalytics() {
       {data?.ga_error && (
         <div className="mb-4 text-[13px] text-[#b8860b] bg-[#fdf3da] border border-[#f1e3b8] rounded-lg px-3 py-2">
           GA4 is configured but unavailable: {data.ga_error}
+        </div>
+      )}
+      {data?.posthog_error && (
+        <div className="mb-4 text-[13px] text-[#b8860b] bg-[#fdf3da] border border-[#f1e3b8] rounded-lg px-3 py-2">
+          PostHog is configured but unavailable: {data.posthog_error}
         </div>
       )}
 
@@ -232,7 +299,7 @@ export default function AdminAnalytics() {
       </div>
 
       {/* Row: funnel | most-used calculators */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-[14px]">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-[14px] mb-[14px]">
         <Card title="Conversion funnel">
           <Funnel funnel={data?.funnel} />
         </Card>
@@ -242,10 +309,15 @@ export default function AdminAnalytics() {
             labelKey="label"
             valueKey="runs"
             colorOf={(it) => CAT_COLOR[it.category] || '#f5b829'}
-            empty={<GAEmpty what="per-calculator runs (needs the calc_run event)" />}
+            empty={<PHEmpty what="per-calculator usage" />}
           />
         </Card>
       </div>
+
+      {/* Activation funnel — product milestones from PostHog (#177/#178) */}
+      <Card title="Activation funnel">
+        <ActivationFunnel funnel={data?.activation_funnel} />
+      </Card>
     </div>
   )
 }

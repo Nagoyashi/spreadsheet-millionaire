@@ -89,6 +89,11 @@ service.
 | Health check path | `/api/health` | `/api/health` |
 | Instance type | **paid (always-on)** at launch | Free (keepalive, § 4) |
 
+> **Keep Render's health-check path on `/api/health`** (the dumb liveness probe),
+> **not** `/api/health/ready`. Render restarts an instance whose health check
+> fails; pointing it at the readiness probe would restart the whole service on a
+> transient DB blip. Readiness is for *external* monitoring/alerting only (§ 4).
+
 Notes (apply to both):
 - The **start command runs from the root directory** (`backend/`), so
   `app:create_app()` and all intra-backend imports resolve. Never add a
@@ -113,6 +118,15 @@ here.** The two services must **not** share the secret key, database, or Redis.
 | `SESSION_COOKIE_SECURE` | `True` | `True` | Both are HTTPS. |
 | `GA4_PROPERTY_ID` | *(optional)* GA4 property id | *(optional)* | Admin **Analytics** tab. Unset → the tab shows an empty "connect GA4" state (signup KPIs still render from the DB). Needs the commented `google-analytics-data` dep uncommented. |
 | `GA4_CREDENTIALS_JSON` | *(optional)* service-account JSON or key-file path | *(optional)* | Server-side only — never `VITE_`-prefixed; the key must not reach the client. Pairs with `GA4_PROPERTY_ID`. |
+| `POSTHOG_API_KEY` | *(optional)* PostHog **personal API key** (read scope) | *(optional)* | Admin **Analytics** → activation funnel + per-calculator usage (#178). A **secret** — server-side only, never `VITE_`-prefixed (distinct from the public browser ingest key `VITE_POSTHOG_KEY`). Unset → the funnel card shows a "connect PostHog" empty state. |
+| `POSTHOG_PROJECT_ID` | *(optional)* PostHog project id | *(optional)* | Pairs with `POSTHOG_API_KEY`; both required for live numbers. |
+| `POSTHOG_HOST` | *(optional)* `https://eu.posthog.com` | *(optional)* | The read **API** host, EU by default. Note this is the app host, **not** the ingest host `eu.i.posthog.com` the browser SDK posts to. |
+| `SENTRY_DSN` | Sentry **EU-region** DSN | *(optional)* — own project or unset | Gates backend error monitoring. Unset → Sentry never inits (warning in prod, no network calls). Use an EU-region DSN so event data stays in the EU. |
+| `SENTRY_TRACES_SAMPLE_RATE` | *(optional)* `0.0`–`1.0` | *(optional)* | Fraction of requests carrying a performance trace. Defaults to `0.1`; set `0` for errors-only. |
+| `SENTRY_ENVIRONMENT` | *(optional)* tag, e.g. `production` | *(optional)* e.g. `staging` | Tags events by environment. Defaults to `FLASK_ENV` (`production` for both services) — set explicitly to tell prod and staging apart in Sentry. |
+| `SENTRY_RELEASE` | *(optional)* version/commit tag | *(optional)* | Pins an error spike to a deploy. Set to the release tag or commit SHA if you want per-deploy tracking. |
+| `LOG_LEVEL` | *(optional)* `INFO` | *(optional)* | Root log threshold for the structured request log. Defaults to `INFO`; set `DEBUG` to troubleshoot, `WARNING` to quieten. |
+| `LOG_FORMAT` | *(optional)* `json` | *(optional)* | Stdout log shape. Defaults to `json` in production (`FLASK_ENV=production`) and `plain` in dev; override to force either. Render captures stdout, so JSON logs are queryable there. |
 
 **Schema — migrates automatically on every deploy.** `backend/gunicorn.conf.py`
 runs the idempotent `db_init.init_db()` in the gunicorn **master, before any
@@ -169,24 +183,68 @@ How the proxy is wired (no dashboard rewrite config needed):
   API calls never get rewritten to `index.html`.
 - Set `BACKEND_ORIGIN` for **both** scopes — this is § 1, the crux. Don't skip it.
 
+**Frontend env vars** — all `VITE_`-prefixed, so they're inlined into the client bundle at build time (set them in Vercel, then redeploy so the build picks them up):
+
+| Var | Production | Preview | Notes |
+|---|---|---|---|
+| `VITE_SENTRY_DSN` | Sentry **EU-region** DSN (browser project) | *(optional)* own project or unset | Gates frontend error monitoring. Unset → `@sentry/react` never inits, no SDK phones home. A Sentry DSN is a public ingest key, not a secret — safe to inline (unlike the server-side GA4 credentials). Sentry is already named in `PrivacyPage.jsx`'s sub-processor list, so enabling it keeps the privacy page accurate. |
+| `VITE_SENTRY_ENVIRONMENT` | *(optional)* e.g. `production` | *(optional)* e.g. `preview` | Defaults to Vite's `MODE`. Set explicitly to tell prod and preview apart in Sentry. |
+| `VITE_SENTRY_TRACES_SAMPLE_RATE` | *(optional)* `0`–`1` | *(optional)* | Defaults to `0` (errors only — no performance tracing). Raise only deliberately. |
+| `VITE_SENTRY_RELEASE` | *(optional)* version/commit | *(optional)* | Pins a frontend error to a deploy. |
+| `VITE_POSTHOG_KEY` | PostHog **EU Cloud** project API key | *(optional)* own project or unset | Gates the activation-funnel analytics. Unset → `posthog-js` never inits, no SDK phones home (dev/CI/fresh checkout run with analytics off). A PostHog project key is a public ingest key, not a secret — safe to inline. PostHog is named in `PrivacyPage.jsx`'s sub-processor list, so enabling it keeps the privacy page accurate. |
+| `VITE_POSTHOG_HOST` | *(optional)* `https://eu.i.posthog.com` | *(optional)* | Defaults to the EU cloud host. Set only to pin a self-hosted or reverse-proxy origin; **must stay EU** (privacy invariant 8). |
+
 After the frontend origins are known, set each Render service's `CORS_ORIGINS`
 (§ 2) to the matching frontend origin and let Render redeploy.
 
 ---
 
-## 4. Keepalive (free-tier cold-start mitigation — staging)
+## 4. Health monitoring (two probes, two jobs)
+
+The backend exposes two probes, and they are **not interchangeable**:
+
+| Probe | Checks | Who polls it | On failure |
+|---|---|---|---|
+| `GET /api/health` | process is up (no DB/Redis) | Render health check + keepalive | Render restarts the instance |
+| `GET /api/health/ready` | Postgres reachable (`SELECT 1`) | **external uptime monitor** | monitor alerts you |
+
+Both are rate-limit-exempt. Successful polls of either are skipped from the
+request log; a **failing** readiness probe is logged (with the DB error) and
+`503 {"status":"degraded","checks":{"db":"down"}}` is returned.
+
+### Keepalive (free-tier cold-start mitigation — staging)
 
 Render's **free** instance sleeps after 15 idle minutes; the next request pays a
 multi-second cold start that can exceed the Vercel proxy timeout. Keep the
 **staging** service warm:
 
 - Create a job on **cron-job.org** (or any uptime pinger).
-- URL: `GET https://<staging-render-url>.onrender.com/api/health`
+- URL: `GET https://<staging-render-url>.onrender.com/api/health` (the dumb
+  liveness probe — do **not** point the keepalive at readiness).
 - Interval: **every 10 minutes**.
 - `/api/health` is rate-limit-exempt and does no DB/Redis work — safe to ping.
 
 The **production** service runs on the paid always-on instance at launch, so it
 never sleeps and the keepalive is optional there.
+
+### Uptime monitoring + alerting (both environments)
+
+Liveness only proves the process answers; it stays green even when the database
+is down. To catch "up but can't serve", point an external monitor at the
+**readiness** probe and turn on alerting:
+
+- Use **UptimeRobot**, **Better Stack**, **cron-job.org**, or any HTTP monitor.
+- URL: `GET https://<render-url>.onrender.com/api/health/ready`
+- Interval: **every 1–5 minutes**; alert after 2 consecutive failures (avoids
+  paging on a single blip).
+- **Treat a non-`200` as down** — a `503` from this endpoint is a real degradation
+  (Postgres unreachable), which never surfaces on `/api/health`.
+- Wire the monitor's alert channel (email / SMS / Slack) to whoever is on call.
+
+Redis is deliberately **not** part of readiness: sessions fall back to the
+filesystem and rate limiting to in-memory when Upstash is down, so an unreachable
+Redis is a soft degradation, not an outage — see `DECISIONS.md` § "Liveness vs
+readiness health probes".
 
 ---
 
@@ -230,6 +288,10 @@ preview URL), pointed at that environment's backend.
 Backend, directly on Render (bypasses Vercel):
 
 - [ ] `curl https://<render-url>.onrender.com/api/health` → `200 {"status":"ok"}`
+- [ ] `curl https://<render-url>.onrender.com/api/health/ready` →
+      `200 {"status":"ok","checks":{"db":"ok"}}` (proves the DB is reachable from
+      the deployed instance — a `503` means the `DATABASE_URL` is wrong or Neon is
+      unreachable)
 
 Then on the **frontend origin** (exercises the full single-origin path):
 

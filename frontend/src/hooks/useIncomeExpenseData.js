@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { incomeExpenseApi } from '../api/incomeExpenseApi'
 import { describeError } from '../api/httpClient'
+import { analytics } from '../api/analytics'
 
 // Income & Expense data layer — fetches transactions (filtered by the selected
 // year/month) and the summary (for the selected year), and exposes CRUD methods
@@ -65,7 +66,13 @@ export function useIncomeExpenseData(isAuthenticated) {
     setError,
     refresh: fetchAll,
 
-    addTransaction: (body) => mutate(() => incomeExpenseApi.createTransaction(body)),
+    // Funnel: the first successful transaction is this tracker's activation
+    // moment. trackerFirstEntry is one-shot, so only the first ever fires.
+    addTransaction: (body) =>
+      mutate(() => incomeExpenseApi.createTransaction(body)).then((result) => {
+        if (result.success) analytics.trackerFirstEntry('income-expenses')
+        return result
+      }),
     updateTransaction: (id, body) => mutate(() => incomeExpenseApi.updateTransaction(id, body)),
     deleteTransaction: (id) => mutate(() => incomeExpenseApi.removeTransaction(id)),
   }

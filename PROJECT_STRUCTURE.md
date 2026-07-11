@@ -36,8 +36,9 @@ backend/
 ├── requirements.txt            # flask, flask-cors, flask-session, flask-limiter, flask-talisman, bcrypt, marshmallow, python-dotenv, psycopg, redis, resend, gunicorn
 ├── requirements-dev.txt        # Test deps (pytest) — pulls in requirements.txt; never installed in prod
 ├── pytest.ini                  # pytest config — testpaths=tests; run as `cd backend && pytest`
-├── app.py                      # Flask app factory — ProxyFix, db teardown, limiter + Talisman, startup warnings
+├── app.py                      # Flask app factory — structured logging + Sentry init (DSN-gated), ProxyFix, db teardown, limiter + Talisman, startup warnings, per-request logging hooks
 ├── config.py                   # All config read from .env — exits if SECRET_KEY/DATABASE_URL invalid (and REDIS_URL in prod)
+├── logging_config.py           # Structured request logging (stdlib) — configure_logging() (JSON in prod / plain in dev) + install_request_logging() (request id, timing, status→level, X-Request-ID header, skips /api/health). DECISIONS.md § "Structured request logging"
 ├── calc_types.py               # Single source of truth for VALID_CALC_TYPES (imported by schema + db_init)
 ├── net_worth_types.py          # Single source of truth for Net Worth enum sets (ASSET_TYPES/LIABILITY_TYPES/ASSET_CLASSES/PROPERTY_TYPES) — imported by nw schema + db_init
 ├── income_expense_types.py     # Single source of truth for Income & Expense enums (TRANSACTION_TYPES/EXPENSE_CATEGORIES/INCOME_CATEGORIES/ALL_CATEGORIES/RECURRENCE_UNITS) — imported by ie schema + db_init
@@ -62,7 +63,7 @@ backend/
 │   ├── admin.py                # /api/admin/* — admin-only (admin_required, 404 for non-admins). Overview: GET /calculators, PATCH /calculators/:type {published} (calcs + trackers). Users: GET /users (search/tier), PATCH /users/:id {tier?,suspended?}, PATCH /users/:id/admin {is_admin} (superadmin_required) — all audit-logged. Analytics: GET /analytics?range= (DB signups + GA4 proxy)
 │   ├── net_worth.py            # /api/net-worth/* — CRUD for assets/liabilities/investments/real-estate + /summary + /snapshots (login_required, CSRF, rate-limited writes)
 │   ├── income_expense.py       # /api/income-expense/* — transactions CRUD (year/month filters) + /summary (login_required, CSRF, rate-limited writes)
-│   └── health.py               # GET /api/health — liveness probe, rate-limit exempt, no DB/Redis
+│   └── health.py               # GET /api/health — dumb liveness probe (no DB/Redis) · GET /api/health/ready — readiness probe (SELECT 1 → 200 / 503 degraded) for external uptime monitoring; both rate-limit exempt. DECISIONS.md § "Liveness vs readiness health probes"
 ├── schemas/
 │   ├── user_schema.py          # Shared validate_password (8+ chars, 1 letter, 1 number) + Register/Login/ResetPassword/ChangePassword/ChangeEmail schemas
 │   ├── calculator_schema.py    # Imports VALID_CALC_TYPES from calc_types.py
@@ -70,17 +71,21 @@ backend/
 │   └── income_expense_schema.py # TransactionSchema — enums from income_expense_types.py; per-type category validation
 ├── services/
 │   ├── email.py                # Resend wrapper — send_email + send_welcome_email + send_password_reset_email; disabled (no-op) without RESEND_API_KEY
-│   └── analytics.py            # Admin Analytics — DB signups/funnel (always) + GA4 Data API proxy (optional, lazy SDK import); empty-state when GA4 unconfigured
+│   ├── analytics.py            # Admin Analytics assembler — DB signups/funnel (always) + GA4 traffic proxy (optional) + PostHog activation funnel/top-calculators (optional, #178); per-vendor empty-state
+│   └── posthog_analytics.py    # PostHog read-back (#178) — HogQL Query API via stdlib urllib, personal API key (secret, server-side); fetch()=activation_funnel + top_calculators; PostHogError on failure
 ├── utils/
 │   └── auth_helpers.py         # login_required, admin_required (404 for non-admins), csrf_protect, set/clear session, generate_csrf_token
 └── tests/
     ├── conftest.py             # Hermetic test env (forced before import) + app/client/get_csrf_token fixtures; db/auth_client skip without TEST_DATABASE_URL
-    ├── test_health.py          # GET /api/health smoke test (no DB)
+    ├── test_health.py          # /api/health liveness smoke test + /api/health/ready readiness (DB-up 200 needs TEST_DATABASE_URL; DB-down 503 + failure-logging via monkeypatch, no DB)
     ├── test_db_smoke.py        # DB-path wiring proof (register + truncation isolation); skips without TEST_DATABASE_URL, runs in CI
     ├── test_auth.py            # End-to-end auth-flow tests (register/login/logout/forgot+reset/delete/change-pw/change-email); email mocked, DB-backed
     ├── test_idor.py            # Tenant-isolation tests for saved_calculators (Hard Rule #6) — route + model layer, two users, unauth 401
-    ├── test_admin.py           # Admin gate (401/404) + publish toggle + public /published surface; DB-backed
-    └── test_calculators.py     # Saved-calculator write bounds (#20) — MAX_CONTENT_LENGTH 413, data field cap 422, no row on reject
+    ├── test_admin.py           # Admin gate (401/404) + publish toggle + public /published surface + Analytics (GA4/PostHog empty-state, PostHog funnel when configured, posthog_error labelling); DB-backed
+    ├── test_posthog_analytics.py # PostHog read-back unit tests (#178) — fetch() shaping, HTTP-error → PostHogError; DB-free (urllib mocked)
+    ├── test_calculators.py     # Saved-calculator write bounds (#20) — MAX_CONTENT_LENGTH 413, data field cap 422, no row on reject
+    ├── test_sentry.py          # Sentry backend guard — DSN gate (no init without DSN) + privacy defaults; no DB
+    └── test_request_logging.py # Structured request logging (#175) — request-id header, structured fields, status→level, /api/health skip, JSON formatter; no DB
 ```
 
 ### Backend .env variables
@@ -107,15 +112,21 @@ frontend/
 ├── .prettierignore             # dist, node_modules, package-lock.json
 └── src/
     ├── App.jsx                 # BrowserRouter + full route map. Marketing at / (+ /privacy, /terms); app namespaced under /app/*; RequireGuest (login/register) + RequireAuth (/app/settings) wrappers; param-preserving redirects from old top-level app paths. See "Route map" below
-    ├── main.jsx                # React root mount
+    ├── main.jsx                # React root mount — calls initSentry(), then initPostHog() + analytics.trackSession(), before render
+    ├── sentry.js               # Sentry (@sentry/react) init + Sentry re-export — DSN-gated on VITE_SENTRY_DSN, no PII/replay/tracing (DECISIONS.md § "Error monitoring via Sentry (frontend)")
+    ├── sentry.test.js          # vitest — initSentry() no-ops without a DSN
+    ├── posthog.js              # PostHog (posthog-js) init + re-export — key-gated on VITE_POSTHOG_KEY, EU cloud, autocapture/replay/pageview OFF (DECISIONS.md § "Product analytics via PostHog (EU cloud)")
+    ├── posthog.test.js         # vitest — initPostHog() no-ops without a key
     ├── index.css               # Tailwind directives + base styles
-    ├── constants.js            # Shared storage key generators (CALC_STORAGE_KEY, FAVOURITES_KEY)
+    ├── constants.js            # Shared storage key generators (CALC_STORAGE_KEY, FAVOURITES_KEY, ANALYTICS_SESSION_KEY, ANALYTICS_ONCE_KEY)
     ├── upcomingFeatures.js     # UPCOMING_FEATURES tracker teasers (Net Worth, Income/Expense) — deliberately NOT in the calculator registry; raw source for trackers.js
     ├── setupTests.js           # vitest setup — jest-dom matchers + a ResizeObserver stub (for recharts in jsdom); wired via vite.config test.setupFiles
     ├── trackers.js             # Published-tracker surface: useLiveTrackers() + useVisibleUpcoming() — runtime hooks over usePublishedTypes (DB-backed publish), replacing the deleted build-time featureFlags.js. Every nav/grid consumer derives from these, never re-filters UPCOMING_FEATURES
     ├── api/
     │   ├── httpClient.js       # Shared fetch wrapper. createApi(baseUrl) + central CSRF injection, stale-CSRF 403 retry (#22), and 401→onUnauthorized hook (#21)
     │   ├── httpClient.test.js  # vitest — CSRF-403 self-heal retry + central 401 handling
+    │   ├── analytics.js        # PostHog activation-funnel instrumentation (#177) — one helper per event (calculatorUsed/accountCreated/trackerFirstEntry/secondSession/upgradeViewed/upgradeClicked) + identify/reset/trackSession; no-ops until posthog loads (DECISIONS.md § "Product analytics via PostHog (EU cloud)")
+    │   ├── analytics.test.js   # vitest — funnel events, one-shot tracker_first_entry, second_session session-counter
     │   ├── authApi.js          # register / login / logout / deleteAccount / getStatus / fetchCsrfToken / forgotPassword / resetPassword / changePassword / changeEmail
     │   ├── calculatorApi.js    # getPublished (public runtime publish surface) / getAll / create / update / remove
     │   ├── adminApi.js         # /api/admin/* — getCalculators / setPublished / getUsers / updateUser / setUserAdmin (superadmin) / getAnalytics (PATCH via createApi)
@@ -176,8 +187,8 @@ frontend/
     │   ├── SavedCalculationsSidebar.jsx   # List of saved calcs with click-to-deselect on active item (injected into AppSidebar's slot by CalculatorPage)
     │   ├── AuthCardShell.jsx              # Presentational chrome (gray page + top bar + white card + badge/title/subtitle/footer) for the auth family; used by AuthForm + Forgot/Reset pages
     │   ├── AuthForm.jsx                   # Shared email+password form for LoginPage + RegisterPage (renders inside AuthCardShell)
-    │   ├── ErrorBoundary.jsx              # Top-level render-error boundary (wraps Routes in App.jsx) — fallback with Reload + Back-to-calculators instead of a white screen (#23)
-    │   ├── ErrorBoundary.test.jsx         # vitest — fallback on a thrown child, children pass through otherwise
+    │   ├── ErrorBoundary.jsx              # Top-level render-error boundary (wraps Routes in App.jsx) — fallback with Reload + Back-to-calculators instead of a white screen (#23); reports the crash to Sentry (#174)
+    │   ├── ErrorBoundary.test.jsx         # vitest — fallback on a thrown child, children pass through otherwise, and the crash is reported to Sentry
     │   └── UserFooter.jsx                 # Authenticated-user footer (email + Settings link + sign out + delete account modal)
     ├── hooks/
     │   ├── useAuth.js                 # login / logout / register / deleteAccount + session rehydration
@@ -219,7 +230,7 @@ frontend/
         └── admin/                 # /admin — internal admin-only portal (RequireAdmin gate; invisible to non-admins). Phase 12 — Admin Control Center
             ├── AdminPage.jsx      # Shell: dark sticky top bar (wordmark + 3 tabs + "internal · /admin" badge + avatar), switches Overview/Analytics/Users
             ├── AdminOverview.jsx  # Project Status — stat strip + calculator catalog table with live publish toggles (optimistic + rollback; invalidatePublished on success)
-            ├── AdminAnalytics.jsx # Placeholder — GA4 analytics lands in a later phase (#152)
+            ├── AdminAnalytics.jsx # Analytics screen — DB signup KPIs + GA4 traffic (VendorStatus-gated) + PostHog activation funnel & most-used calculators (#178), per-vendor empty states
             └── AdminUsers.jsx     # Placeholder — tier control / suspend / audit log lands in a later phase (#151)
 ```
 

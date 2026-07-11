@@ -111,6 +111,47 @@ if _is_production and "localhost" in _app_base_url:
     )
 
 
+# ── Error monitoring (Sentry) ─────────────────────────────────────────────────
+# Best-effort, DSN-gated: a missing SENTRY_DSN disables Sentry entirely (dev AND
+# prod) rather than failing startup — error monitoring must never be load-bearing
+# for availability. app.py only calls sentry_sdk.init() when the DSN is present.
+# In production a missing DSN is a warning (we ship blind to errors), not an exit.
+# Use a Sentry EU-region DSN to keep event data in the EU (privacy invariant 8).
+_sentry_dsn = os.getenv("SENTRY_DSN", "").strip()
+
+if _is_production and not _sentry_dsn:
+    STARTUP_WARNINGS.append(
+        "SENTRY_DSN not set while FLASK_ENV=production — backend error monitoring "
+        "is disabled. Set it (use an EU-region DSN) to capture unhandled errors."
+    )
+
+# PostHog read-back for the admin Analytics funnel is optional; a missing key in
+# production just means the funnel card shows its empty state (signups still
+# render from our DB). Warn, don't exit — analytics is never load-bearing.
+if _is_production and not (
+    os.getenv("POSTHOG_API_KEY", "").strip() and os.getenv("POSTHOG_PROJECT_ID", "").strip()
+):
+    STARTUP_WARNINGS.append(
+        "POSTHOG_API_KEY / POSTHOG_PROJECT_ID not set while FLASK_ENV=production — "
+        "the admin activation-funnel card will show an empty state. Set both (use "
+        "an EU-region personal API key) to read product-event data."
+    )
+
+
+def _float_env(name: str, default: float) -> float:
+    """Read a float env var, falling back to default on absence or bad value."""
+    raw = os.getenv(name, "").strip()
+    if not raw:
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        STARTUP_WARNINGS.append(
+            f"{name}={raw!r} is not a valid float — using default {default}."
+        )
+        return default
+
+
 class Config:
     # ── Security ──────────────────────────────────────────────────────────────
     SECRET_KEY = _secret_key
@@ -172,6 +213,44 @@ class Config:
     GA4_PROPERTY_ID       = os.getenv("GA4_PROPERTY_ID", "").strip()
     GA4_CREDENTIALS_JSON  = os.getenv("GA4_CREDENTIALS_JSON", "").strip()
     GA4_CONFIGURED        = bool(GA4_PROPERTY_ID and GA4_CREDENTIALS_JSON)
+
+    # ── Product analytics read-back (PostHog Query API — admin portal) ─────────
+    # The admin Analytics screen reads the activation funnel + per-calculator
+    # usage from PostHog via its server-side Query API. POSTHOG_API_KEY is a
+    # *personal API key* with read scope — a SECRET, kept server-side, never
+    # VITE_-prefixed (unlike the public browser ingest key VITE_POSTHOG_KEY that
+    # #177 writes with). Both the key and the project id must be set for live
+    # numbers; until then the endpoint reports posthog_configured=false and the
+    # funnel card shows an empty state. POSTHOG_HOST is the API host (EU by
+    # default) — note it's the app host eu.posthog.com, NOT the ingest host
+    # eu.i.posthog.com the browser SDK posts to.
+    POSTHOG_API_KEY     = os.getenv("POSTHOG_API_KEY", "").strip()
+    POSTHOG_PROJECT_ID  = os.getenv("POSTHOG_PROJECT_ID", "").strip()
+    POSTHOG_HOST        = os.getenv("POSTHOG_HOST", "").strip() or "https://eu.posthog.com"
+    POSTHOG_CONFIGURED  = bool(POSTHOG_API_KEY and POSTHOG_PROJECT_ID)
+
+    # ── Error monitoring (Sentry) ─────────────────────────────────────────────
+    # SENTRY_DSN gates the whole integration (see app.py). Traces sampling is a
+    # cost/volume knob — default 10% of requests carry a performance trace; set
+    # SENTRY_TRACES_SAMPLE_RATE=0 to disable tracing and keep error capture only.
+    # SENTRY_ENVIRONMENT tags events (defaults to FLASK_ENV); SENTRY_RELEASE is an
+    # optional version/commit tag so a spike can be pinned to a deploy.
+    SENTRY_DSN                = _sentry_dsn
+    SENTRY_TRACES_SAMPLE_RATE = _float_env("SENTRY_TRACES_SAMPLE_RATE", 0.1)
+    SENTRY_ENVIRONMENT        = os.getenv("SENTRY_ENVIRONMENT", "").strip() or _flask_env
+    SENTRY_RELEASE            = os.getenv("SENTRY_RELEASE", "").strip() or None
+
+    # ── Logging ───────────────────────────────────────────────────────────────
+    # Structured request logging (logging_config.py). LOG_LEVEL sets the root
+    # threshold. LOG_FORMAT picks the stdout shape: JSON for machine-readable
+    # production logs (Render captures stdout), a readable line in development —
+    # defaulting per environment but overridable (e.g. LOG_FORMAT=json locally to
+    # eyeball prod output).
+    LOG_LEVEL  = os.getenv("LOG_LEVEL", "INFO").upper()
+    LOG_FORMAT = (
+        os.getenv("LOG_FORMAT", "").strip().lower()
+        or ("json" if _is_production else "plain")
+    )
 
     # ── Environment ───────────────────────────────────────────────────────────
     FLASK_ENV   = _flask_env

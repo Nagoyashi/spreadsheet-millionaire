@@ -10,7 +10,7 @@ import { useEffect } from 'react'
 // The title resets to the index.html default when the component unmounts so a
 // stale calculator title never lingers on a route that forgot to set its own.
 
-const DEFAULT_TITLE = 'SpreadsheetMillionaire — Free financial planning calculators'
+const DEFAULT_TITLE = 'SpreadsheetMillionaire — Free personal finance tools and calculators'
 
 export function useDocumentTitle(title) {
   useEffect(() => {

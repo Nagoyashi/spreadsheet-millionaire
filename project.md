@@ -16,24 +16,27 @@ expanding from calculators into trackers and a freemium tier.
 
 ## Current phase
 
-**Phase 13 — Backlog cleanup + Security hardening** shipped as `v0.13.0`
-(2026-06-29): security headers/CSP, payload bounds + write rate limits, session
-fixation, login timing, bcrypt cap, client resilience (CSRF self-heal, central
-401, error boundary), and three calculator bug fixes — plus the post-v0.12
-dependency bumps and admin-portal cleanups. Next up: Phase 14 — Product review &
-go-live readiness (`v0.14.0`), not yet opened as a milestone.
+**Phase 14 — Go-live readiness + instrumentation** is underway, shipped in
+sub-releases. **`v0.14.0` — Observability + analytics foundation** shipped
+(2026-07-11): Sentry (Flask + React), structured request logging, the
+`/api/health/ready` uptime probe, and a PostHog (EU cloud) activation funnel
+wired end-to-end into `/admin`. All credential-gated — off until keys are set.
+Next up: **`v0.14.1` — data lifecycle + legal** (account-deletion cascade, data
+export, privacy/ToS), not yet opened as a milestone.
 
 ## Current cycle
 
 > Canonical cycle state = the single **open GitHub Milestone**. This line mirrors
 > it for at-a-glance reading in the editor; if they disagree, the milestone wins.
 
-**Between cycles.** `v0.13.0` — Backlog cleanup + Security hardening shipped
-(2026-06-29, all 12 issues). No milestone is currently open. The next cycle is
-`v0.14.0` — Product review & go-live readiness (see § Future). Trackers ship
-**dark via runtime publish** (DB-backed, revealed from `/admin` Overview);
-production shows "coming soon" until toggled. `v0.13.0` live in production at
-www.spreadsheetmillionaire.com · backlog on the
+**Between cycles.** `v0.14.0` (Phase 14 — Observability + analytics foundation)
+shipped 2026-07-11 and its milestone is closed; no milestone is open. **Next up:
+`v0.14.1` — data lifecycle + legal** (account-deletion cascade #179, data export
+#180, privacy/ToS #181, admin trigger deletion/export #182) — to be opened as the
+next milestone. Phase 14's third sub-release, `v0.14.2` (CI confidence + scale
+sanity: #183–188), follows. Those issues are on the board (backlog), not yet in a
+milestone. Trackers stay **dark via runtime publish** (DB-backed, revealed from
+`/admin` Overview). `v0.14.0` staged to production; backlog on the
 [Project board](https://github.com/users/Nagoyashi/projects) ↗
 
 Each release cycle is a Milestone named for its target version (`v0.10.0`); its
@@ -59,6 +62,7 @@ issues are the cycle's scope. Patches (`vX.Y.Z`, Z > 0) skip milestones.
 | **Phase 11 — Income & Expense Tracker** | `v0.11.0` · 2026-06-21 | Second tracker: `ie_transactions` + `/api/income-expense/*` (CRUD + monthly/yearly summary), transactions panel + recharts cashflow dashboard; ships dark behind `INCOME_EXPENSE_ENABLED`. No shared tracker framework. → [v0.11.0](docs/releases/v0.11.0.md) |
 | **Phase 12 — Admin Control Center** | `v0.12.0` · 2026-06-28 | Internal admin-only `/admin` portal (`users.is_admin`, 404 for non-admins): Overview with **live publish toggles** (publish state moved to a DB-backed `calculator_publish` table the public app reads at runtime), Users (tier `free`/`pro`/`elite` + suspend/reinstate + `admin_audit_log`), Analytics (GA4 server-side proxy + DB-signup empty state). Also: migrate-on-boot (gunicorn `on_starting`) + sidebar brand-link fix. → [v0.12.0](docs/releases/v0.12.0.md) |
 | **Phase 13 — Backlog cleanup + Security hardening** | `v0.13.0` · 2026-06-29 | Security: frontend CSP/headers (Vercel), bounded payloads (`MAX_CONTENT_LENGTH` + `data` caps) + write rate limits, session-id rotation (fixation), login-timing equalisation, 72-byte password cap. Resilience: stale-CSRF self-heal + retry, central 401→logout, render error boundary. Calculator fixes: dividend growth (#77), reachability display (#33), Sankey input validation (#24). Plus dependency bumps + admin-portal cleanups. → [v0.13.0](docs/releases/v0.13.0.md) |
+| **Phase 14 — Observability + analytics** *(1 of 3 Phase-14 sub-releases)* | `v0.14.0` · 2026-07-11 | Sentry (Flask #173 + React #174), structured request logging (#175), the `/api/health/ready` uptime probe (#176), and a PostHog EU-cloud activation funnel — SDK + funnel events (#177) surfaced server-side in `/admin` Analytics (#178). All credential-gated (off until keys set). No new product surface. → [v0.14.0](docs/releases/v0.14.0.md) |
 
 > Phases 1–5 integrated on `develop` (2026-06-11/12) with **no individual
 > release tags**; they first reached production bundled in **`v0.6.0`**.
