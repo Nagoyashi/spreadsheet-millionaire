@@ -102,13 +102,20 @@ def db(app):
     Points the app at the throwaway database in TEST_DATABASE_URL, ensures the
     schema exists (db_init is idempotent), and TRUNCATEs every user-scoped table
     before and after each test so rows never leak. Skipped when TEST_DATABASE_URL
-    is unset.
+    is unset — EXCEPT under CI_REQUIRE_DB=1 (set by ci.yml), where a missing URL
+    is a hard failure: a broken service container must never turn the DB-backed
+    majority into silent skips and let CI go green without them (#183).
 
     Truncation (not transactional rollback) is deliberate: the models do
     `from db import get_db` and each request opens its own connection, so a
     rollback held on a separate test connection would never see the app's writes.
     """
     if not _TEST_DB_URL:
+        if os.environ.get("CI_REQUIRE_DB") == "1":
+            pytest.fail(
+                "CI_REQUIRE_DB=1 but TEST_DATABASE_URL is unset — the CI Postgres "
+                "service is broken; refusing to silently skip the DB-backed suite."
+            )
         pytest.skip("TEST_DATABASE_URL not set — skipping DB-backed test")
 
     import psycopg
