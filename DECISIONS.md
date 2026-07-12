@@ -572,6 +572,14 @@
 
 **Why GET + login only (no CSRF, no password re-confirmation):** CSRF protection is for mutations; this is a read. And unlike deletion, a password gate adds no boundary — a hijacked session can already read every one of these rows through the normal APIs; export just bundles them. Rate-limited (5/hour) because it's a multi-table scan. Served with `Content-Disposition: attachment`, which lets the Settings "Your data" section be a plain `<a href>` download — not a `fetch`, so hard rule #4 (all HTTP via `httpClient`) doesn't apply; the browser handles the download natively.
 
+## Admin support tools — deletion/export on a user's behalf
+
+**TL;DR:** `GET /api/admin/users/:id/export` and `DELETE /api/admin/users/:id` (#182) are the support path for GDPR requests that arrive by email instead of through the app. Both reuse the #179/#180 services verbatim — no second deletion or export code path — and both are **audit-logged**, including the export: an admin *reading* a user's data is exactly the event the audit log exists for (the detail carries per-table row counts, never the data).
+
+**Delete guards mirror `update_user`'s privilege model:** not yourself (use your own settings flow — preserves the lockout guard), never a superadmin (bootstrap protection), and an admin account only by a superadmin. The UI menu computes the same predicate so it never offers what the API rejects — but the server-side guard is the boundary.
+
+**Audit ordering quirk (deliberate):** the deletion audit row is written *after* the delete succeeds, so `target_user_id` must be `NULL` — the user row is gone and an FK can't point at it. The deleted numeric id + erasure counts live in the `detail` payload instead. Writing the row before the delete would record deletions that then abort (the #179 service rolls back on cascade failure). The admin delete is **not optimistic** in the UI either — a destructive action waits for the server.
+
 ## Password reset via hashed single-use tokens
 
 **TL;DR:** A forgotten password is recoverable via an emailed link backed by a hashed, single-use, 60-minute token. The raw token is never stored; the request endpoint never reveals whether an email exists.

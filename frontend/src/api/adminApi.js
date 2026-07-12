@@ -35,6 +35,11 @@ export const adminApi = {
   // Superadmin-only server-side (returns 404 for non-superadmins).
   setUserAdmin: (id, isAdmin) => api.patch(`/users/${id}/admin`, { is_admin: isAdmin }),
 
+  // DELETE /api/admin/users/:id — support-path hard delete (#182). Server-side
+  // guards: not yourself, never a superadmin, admins only by a superadmin.
+  // Audit-logged with the per-table erasure counts.
+  deleteUser: (id) => api.delete(`/users/${id}`),
+
   // GET /api/admin/analytics?range=30d — DB signups + GA4 (when configured).
   getAnalytics: (range = '30d') => api.get(`/analytics?range=${encodeURIComponent(range)}`),
 }

@@ -11,6 +11,8 @@ the calculator catalog + publish toggles. Users (tier/suspend + audit log) and
 Analytics (GA4 proxy) land in later phases of the same cycle.
 """
 
+from datetime import date
+
 from flask import Blueprint, request, jsonify, session
 
 from app import limiter
@@ -18,7 +20,7 @@ from publishable import PUBLISHABLE_TYPES
 from user_tiers import USER_TIERS
 from models import calculator_publish, admin_audit
 from models.user import User
-from services import analytics
+from services import account_deletion, analytics, data_export
 from utils.auth_helpers import admin_required, superadmin_required, csrf_protect
 
 bp = Blueprint("admin", __name__, url_prefix="/api/admin")
@@ -188,6 +190,86 @@ def set_user_admin(user_id):
         {"is_admin": is_admin},
     )
     return jsonify({"user": updated.to_admin_dict()}), 200
+
+
+# ---------------------------------------------------------------------------- #
+# Support tools — trigger a user's data export / account deletion (#182)
+# ---------------------------------------------------------------------------- #
+@bp.route("/users/<int:user_id>/export", methods=["GET"])
+@admin_required
+@limiter.limit("30 per hour")
+def export_user_data(user_id):
+    """
+    Download a user's full data export (the same payload as the self-service
+    "download my data", #180) — for support requests that arrive by email
+    instead of through the app. Read-only GET, but **audit-logged**: an admin
+    accessing a user's data is exactly the kind of event the audit log exists
+    for. The detail carries per-table row counts, never the data itself.
+    """
+    payload = data_export.export_account(user_id)
+    if payload is None:
+        return jsonify({"error": "User not found."}), 404
+
+    admin_audit.record(
+        session["user_id"],
+        "export_data",
+        user_id,
+        {"rows": {table: len(rows) for table, rows in payload["data"].items()}},
+    )
+
+    resp = jsonify(payload)
+    filename = f"sm-user-{user_id}-export-{date.today().isoformat()}.json"
+    resp.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return resp, 200
+
+
+@bp.route("/users/<int:user_id>", methods=["DELETE"])
+@admin_required
+@csrf_protect
+@limiter.limit("10 per hour")
+def delete_user(user_id):
+    """
+    Hard-delete a user's account and all their data — the support path for a
+    deletion request that arrives by email (GDPR Art. 17) instead of through the
+    app. Goes through services/account_deletion.delete_account, the single
+    deletion path (#179), so the cascade is enumerated and verified.
+
+    Guards mirror update_user's privilege model:
+      - not yourself (use your own settings flow — keeps the lockout guard),
+      - a superadmin account can never be deleted here (bootstrap protection),
+      - only a superadmin may delete an admin account.
+
+    Audit-logged AFTER the deletion succeeds. target_user_id must be None —
+    the user row is gone, so an FK to it can't be written; the deleted id and
+    the per-table erasure counts live in the detail payload instead (a numeric
+    id + counts — no PII, per the audit-log posture).
+    """
+    admin_id = session["user_id"]
+    if user_id == admin_id:
+        return jsonify({"error": "You can't delete your own account here — use your account settings."}), 400
+
+    target = User.get_by_id(user_id)
+    if target is None:
+        return jsonify({"error": "User not found."}), 404
+
+    if target.is_superadmin:
+        return jsonify({"error": "A superadmin account can't be deleted from the portal."}), 400
+    if target.is_admin:
+        actor = User.get_by_id(admin_id)
+        if actor is None or not actor.is_superadmin:
+            return jsonify({"error": "Only a superadmin can delete an admin account."}), 403
+
+    report = account_deletion.delete_account(user_id)
+    if report is None:  # raced with another deletion
+        return jsonify({"error": "User not found."}), 404
+
+    admin_audit.record(
+        admin_id,
+        "delete_account",
+        None,  # FK can't point at the now-deleted row; id lives in detail
+        {"deleted_user_id": user_id, "deleted": report["deleted"]},
+    )
+    return jsonify({"message": "Account deleted.", "deleted": report["deleted"]}), 200
 
 
 # ---------------------------------------------------------------------------- #

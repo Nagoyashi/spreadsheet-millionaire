@@ -60,7 +60,7 @@ backend/
 ├── routes/
 │   ├── auth.py                 # /api/auth/* — register (+welcome email), login, logout, status, delete account, GET account/export (download-my-data JSON attachment, #180), csrf-token, forgot-password, reset-password, change-password, change-email
 │   ├── calculators.py          # /api/calculators/* — CRUD for saved calculations + GET /published (public runtime publish surface)
-│   ├── admin.py                # /api/admin/* — admin-only (admin_required, 404 for non-admins). Overview: GET /calculators, PATCH /calculators/:type {published} (calcs + trackers). Users: GET /users (search/tier), PATCH /users/:id {tier?,suspended?}, PATCH /users/:id/admin {is_admin} (superadmin_required) — all audit-logged. Analytics: GET /analytics?range= (DB signups + GA4 proxy)
+│   ├── admin.py                # /api/admin/* — admin-only (admin_required, 404 for non-admins). Overview: GET /calculators, PATCH /calculators/:type {published} (calcs + trackers). Users: GET /users (search/tier), PATCH /users/:id {tier?,suspended?}, PATCH /users/:id/admin {is_admin} (superadmin_required). Support (#182): GET /users/:id/export (attachment) + DELETE /users/:id (via account_deletion; guards: not self / never superadmin / admins only by superadmin) — all audit-logged. Analytics: GET /analytics?range= (DB signups + GA4 proxy + PostHog funnel)
 │   ├── net_worth.py            # /api/net-worth/* — CRUD for assets/liabilities/investments/real-estate + /summary + /snapshots (login_required, CSRF, rate-limited writes)
 │   ├── income_expense.py       # /api/income-expense/* — transactions CRUD (year/month filters) + /summary (login_required, CSRF, rate-limited writes)
 │   └── health.py               # GET /api/health — dumb liveness probe (no DB/Redis) · GET /api/health/ready — readiness probe (SELECT 1 → 200 / 503 degraded) for external uptime monitoring; both rate-limit exempt. DECISIONS.md § "Liveness vs readiness health probes"
@@ -83,7 +83,7 @@ backend/
     ├── test_db_smoke.py        # DB-path wiring proof (register + truncation isolation); skips without TEST_DATABASE_URL, runs in CI
     ├── test_auth.py            # End-to-end auth-flow tests (register/login/logout/forgot+reset/delete/change-pw/change-email); email mocked, DB-backed
     ├── test_idor.py            # Tenant-isolation tests for saved_calculators (Hard Rule #6) — route + model layer, two users, unauth 401
-    ├── test_admin.py           # Admin gate (401/404) + publish toggle + public /published surface + Analytics (GA4/PostHog empty-state, PostHog funnel when configured, posthog_error labelling); DB-backed
+    ├── test_admin.py           # Admin gate (401/404) + publish toggle + public /published surface + Analytics (GA4/PostHog empty-state, PostHog funnel when configured, posthog_error labelling) + support tools (#182: export audit, delete + guards); DB-backed
     ├── test_posthog_analytics.py # PostHog read-back unit tests (#178) — fetch() shaping, HTTP-error → PostHogError; DB-free (urllib mocked)
     ├── test_account_deletion.py # Cascade contract (#179) — seeds every USER_SCOPED_TABLE for two users, full wipe + bystander isolation + erasure report + drift guard + route-uses-service spy; DB-backed
     ├── test_data_export.py     # Export contract (#180) — every registry table present, bystander excluded, secrets stripped, values JSON-plain, route auth + attachment header; DB-backed
@@ -133,7 +133,7 @@ frontend/
     │   ├── analytics.test.js   # vitest — funnel events, one-shot tracker_first_entry, second_session session-counter
     │   ├── authApi.js          # register / login / logout / deleteAccount / getStatus / fetchCsrfToken / forgotPassword / resetPassword / changePassword / changeEmail
     │   ├── calculatorApi.js    # getPublished (public runtime publish surface) / getAll / create / update / remove
-    │   ├── adminApi.js         # /api/admin/* — getCalculators / setPublished / getUsers / updateUser / setUserAdmin (superadmin) / getAnalytics (PATCH via createApi)
+    │   ├── adminApi.js         # /api/admin/* — getCalculators / setPublished / getUsers / updateUser / setUserAdmin (superadmin) / deleteUser (#182) / getAnalytics
     │   ├── adminApi.test.js    # vitest — admin endpoint verb + path + body wiring
     │   ├── netWorthApi.js      # /api/net-worth/* — assets/liabilities/investments/realEstate CRUD + getSummary + snapshots
     │   ├── incomeExpenseApi.js # /api/income-expense/* — transactions CRUD (year/month filters) + getSummary
@@ -235,7 +235,7 @@ frontend/
             ├── AdminPage.jsx      # Shell: dark sticky top bar (wordmark + 3 tabs + "internal · /admin" badge + avatar), switches Overview/Analytics/Users
             ├── AdminOverview.jsx  # Project Status — stat strip + calculator catalog table with live publish toggles (optimistic + rollback; invalidatePublished on success)
             ├── AdminAnalytics.jsx # Analytics screen — DB signup KPIs + GA4 traffic (VendorStatus-gated) + PostHog activation funnel & most-used calculators (#178), per-vendor empty states
-            └── AdminUsers.jsx     # Placeholder — tier control / suspend / audit log lands in a later phase (#151)
+            └── AdminUsers.jsx     # Users screen — search/tier chips, tier menu (tier / suspend / admin-role) + support tools (#182: export-data link, two-step delete confirm mirroring the server guards)
 ```
 
 ### Frontend environment variables (Vercel)
