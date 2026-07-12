@@ -714,6 +714,24 @@
 
 ---
 
+## Contrast with the workspace AGENTS.md (T3) standard
+
+**TL;DR:** Audited 2026-07-12 against the workspace-level `~/code/AGENTS.md` T3 standard (Next.js, TypeScript, tRPC, Tailwind, Postgres/Prisma, Better Auth, pnpm). This app diverges on nearly every technology axis — deliberately — while meeting the standard's actual principles. The divergences stand.
+
+**Decision:** No stack migration. The divergences and why they hold:
+- **Flask + React/Vite SPA instead of Next.js.** The split is load-bearing: textbook backend layering (routes → services → models → schemas) and a registry-driven SPA. A Next.js rewrite would be enormous cost for zero user-visible gain.
+- **REST + axios instead of tRPC.** tRPC is a TypeScript tool; the typed-contract discipline lives instead in the registry/`calc_types.py` single-source rules (Hard rule 2) and Marshmallow schemas.
+- **Marshmallow instead of Zod.** Zod is also a TS tool; Marshmallow is the correct Python equivalent, and every write payload passes through it server-side.
+- **Custom session auth instead of Better Auth** — bcrypt + Flask-Session/Redis + CSRF + rate limiting + Talisman headers, with authorization enforced at the query layer (Hard rule 6, IDOR-tested). Matches the "no auth providers without approval" rule below.
+- **`db_init.py` idempotent DDL instead of a migration framework** — guarded by `test_migrations.py`; Alembic joins the "don't add without approval" list until schema churn actually hurts.
+- **npm instead of pnpm** — irrelevant at this scale.
+
+**Where the standard is met or exceeded:** Tailwind, Neon Postgres with indexes on every user-scoped access path, parameterised SQL only, three-layer entitlement gating, 147 tests across both tiers (including IDOR/auth/rate-limit suites), CI with a real throwaway-Postgres backend job, no committed secrets.
+
+**The gaps (tracked, not divergences):** the missing `.env.example` the README references → **#277**. TypeScript is the one *philosophical* clash ("type-safe end-to-end") — already recorded below in "Decisions deliberately NOT made" with its own trigger (before trackers ship / before adding another dev); new code should not make that migration harder.
+
+**When to revisit:** per the TypeScript trigger below; or if a greenfield sibling project starts, the AGENTS.md T3 default applies to *it*, never retroactively here.
+
 ## Decisions deliberately NOT made (and why)
 
 These come up in conversations as "should we add this?" — the answers below are durable until something changes:
