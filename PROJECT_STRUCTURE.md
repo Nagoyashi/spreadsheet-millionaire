@@ -87,7 +87,7 @@ backend/
     ├── test_idor.py            # Tenant-isolation tests for saved_calculators (Hard Rule #6) — route + model layer, two users, unauth 401
     ├── test_admin.py           # Admin gate (401/404) + publish toggle + public /published surface + Analytics (GA4/PostHog empty-state, PostHog funnel when configured, posthog_error labelling) + support tools (#182: export audit, delete + guards); DB-backed
     ├── test_posthog_analytics.py # PostHog read-back unit tests (#178) — fetch() shaping, HTTP-error → PostHogError; DB-free (urllib mocked)
-    ├── test_account_deletion.py # Cascade contract (#179) — seeds every USER_SCOPED_TABLE for two users, full wipe + bystander isolation + erasure report + drift guard + route-uses-service spy; DB-backed
+    ├── test_account_deletion.py # Cascade contract (#179) + route E2E (#186) — seeds every USER_SCOPED_TABLE, full wipe + bystander isolation + erasure report + drift guard + route-uses-service spy + full DELETE /api/auth/account pass (guards→service→cascade→session teardown); DB-backed
     ├── test_data_export.py     # Export contract (#180) — every registry table present, bystander excluded, secrets stripped, values JSON-plain, route auth + attachment header; DB-backed
     ├── test_calculators.py     # Saved-calculator write bounds (#20) — MAX_CONTENT_LENGTH 413, data field cap 422, no row on reject
     ├── test_sentry.py          # Sentry backend guard — DSN gate (no init without DSN) + privacy defaults; no DB
