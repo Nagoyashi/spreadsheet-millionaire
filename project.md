@@ -16,29 +16,32 @@ expanding from calculators into trackers and a freemium tier.
 
 ## Current phase
 
-**Phase 14 — Go-live readiness + instrumentation** is underway, shipped in
-sub-releases. **`v0.14.0` — Observability + analytics foundation** shipped
-2026-07-11 (Sentry, structured logging, readiness probe, PostHog funnel — all
-credential-gated). **`v0.14.1` — Data lifecycle + legal** shipped 2026-07-12:
-verified account-deletion cascade, "download my data" export, legal pages
-brought current, admin support tools for deletion/export — one registry of
-user-scoped tables drives it all. Next up: **`v0.14.2` — CI confidence + scale
-sanity** (#183–188), not yet opened as a milestone.
+**Phase 14 — Go-live readiness + instrumentation is COMPLETE** — shipped as
+three sub-releases: **`v0.14.0`** observability + analytics (2026-07-11:
+Sentry, structured logging, readiness probe, PostHog funnel — all
+credential-gated), **`v0.14.1`** data lifecycle + legal (2026-07-12: verified
+deletion cascade, data export, legal pages current, admin support tools), and
+**`v0.14.2`** CI confidence + scale sanity (2026-07-12: CI can't go green
+without the DB, migration/entitlement/cascade/rate-limit tests, Neon pooling
+check — suite 132→147). Next up: **Phase 15 — Billing (`v0.15.0`)**, the
+keystone every monetization feature hangs off (see `docs/ROADMAP.md`); not yet
+opened as a milestone.
 
 ## Current cycle
 
 > Canonical cycle state = the single **open GitHub Milestone**. This line mirrors
 > it for at-a-glance reading in the editor; if they disagree, the milestone wins.
 
-**Between cycles.** `v0.14.1` (Phase 14 — Data lifecycle + legal) shipped
-2026-07-12 and its milestone closes on the tag; no other milestone is open.
-**Next up: `v0.14.2` — CI confidence + scale sanity** (CI Postgres service
-container #183, migration tests #184, entitlement tests #185, deletion-cascade
-test #186, Neon pooling check #187, auth rate-limit audit #188) — to be opened
-as the next milestone; those issues sit on the board, unmilestoned. It is the
-last Phase-14 sub-release ("is it solid for go-live"). Trackers stay **dark via
-runtime publish**. Backlog on the
-[Project board](https://github.com/users/Nagoyashi/projects) ↗
+**Between cycles — Phase 14 complete.** `v0.14.2` (CI confidence + scale
+sanity) shipped 2026-07-12 and its milestone closes on the tag; no milestone is
+open. **Next up: Phase 15 — Billing (`v0.15.0`)**, the keystone (Stripe
+Checkout + Customer Portal, signed/idempotent webhooks syncing subscription →
+tier, the computed-entitlement helper, dunning/receipt emails, real MRR, admin
+billing panel — see `docs/ROADMAP.md` § Phase 15). Its issues are not yet
+filed/promoted. Operator to-dos still pending from Phase 14: Sentry + PostHog
+keys, external uptime monitor on `/api/health/ready`, `pooling_check.py`
+against the real Neon strings. Trackers stay **dark via runtime publish**.
+Backlog on the [Project board](https://github.com/users/Nagoyashi/projects) ↗
 
 Each release cycle is a Milestone named for its target version (`v0.10.0`); its
 issues are the cycle's scope. Patches (`vX.Y.Z`, Z > 0) skip milestones.
@@ -65,6 +68,7 @@ issues are the cycle's scope. Patches (`vX.Y.Z`, Z > 0) skip milestones.
 | **Phase 13 — Backlog cleanup + Security hardening** | `v0.13.0` · 2026-06-29 | Security: frontend CSP/headers (Vercel), bounded payloads (`MAX_CONTENT_LENGTH` + `data` caps) + write rate limits, session-id rotation (fixation), login-timing equalisation, 72-byte password cap. Resilience: stale-CSRF self-heal + retry, central 401→logout, render error boundary. Calculator fixes: dividend growth (#77), reachability display (#33), Sankey input validation (#24). Plus dependency bumps + admin-portal cleanups. → [v0.13.0](docs/releases/v0.13.0.md) |
 | **Phase 14 — Observability + analytics** *(1 of 3 Phase-14 sub-releases)* | `v0.14.0` · 2026-07-11 | Sentry (Flask #173 + React #174), structured request logging (#175), the `/api/health/ready` uptime probe (#176), and a PostHog EU-cloud activation funnel — SDK + funnel events (#177) surfaced server-side in `/admin` Analytics (#178). All credential-gated (off until keys set). No new product surface. → [v0.14.0](docs/releases/v0.14.0.md) |
 | **Phase 14 — Data lifecycle + legal** *(2 of 3 Phase-14 sub-releases)* | `v0.14.1` · 2026-07-12 | Verified account-deletion cascade via a single `USER_SCOPED_TABLES` registry + drift guard (#179), "download my data" JSON export derived from the same registry (#180), Privacy/Terms brought current with trackers + export + verified erasure (#181), audit-logged admin support tools for deletion/export with privilege guards (#182). → [v0.14.1](docs/releases/v0.14.1.md) |
+| **Phase 14 — CI confidence + scale sanity** *(3 of 3 — Phase 14 complete)* | `v0.14.2` · 2026-07-12 | Pure hardening, no product changes: `CI_REQUIRE_DB=1` (CI can't go green without the DB, #183), migration-system tests incl. never-reset publish toggles (#184), entitlement-boundary tests incl. suspension-after-password (#185), route-level E2E deletion cascade (#186), `pooling_check.py` Neon load tool (#187), auth rate limits pinned live (#188). Suite 132→147. → [v0.14.2](docs/releases/v0.14.2.md) |
 
 > Phases 1–5 integrated on `develop` (2026-06-11/12) with **no individual
 > release tags**; they first reached production bundled in **`v0.6.0`**.

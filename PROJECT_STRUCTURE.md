@@ -46,6 +46,7 @@ backend/
 ├── publishable.py              # The toggleable surface = VALID_CALC_TYPES + TRACKER_TYPES (net-worth, income-expenses). Seeds calculator_publish (trackers default unpublished); admin publish route validates against it
 ├── db.py                       # Per-request psycopg connection on Flask g, closed on teardown (no in-process pool)
 ├── db_init.py                  # Postgres schema creation + idempotent CHECK-constraint rebuild (users [+is_admin/tier/suspended/last_login_at], saved_calculators, password_reset_tokens, nw_* Net Worth tables, ie_transactions, calculator_publish [seeded from DEFAULT_PUBLISHED_TYPES], admin_audit_log); advisory-locked so concurrent boots serialise
+├── pooling_check.py            # Standalone load check (#187) — N workers of connect→SELECT 1→close (the app's exact per-request pattern) against a DATABASE_URL; warns on non-'-pooler' Neon hosts; exit 0 only on zero errors. DEPLOYMENT.md § 7
 ├── gunicorn.conf.py            # Auto-loaded by gunicorn (run from backend/) — on_starting hook runs db_init once in the master before workers fork, so every deploy self-migrates (DECISIONS.md § "Schema migrations run on boot")
 ├── __pycache__/
 ├── venv/                       # Python virtual environment — never committed
@@ -81,11 +82,14 @@ backend/
     ├── conftest.py             # Hermetic test env (forced before import) + app/client/get_csrf_token fixtures; db/auth_client skip without TEST_DATABASE_URL
     ├── test_health.py          # /api/health liveness smoke test + /api/health/ready readiness (DB-up 200 needs TEST_DATABASE_URL; DB-down 503 + failure-logging via monkeypatch, no DB)
     ├── test_db_smoke.py        # DB-path wiring proof (register + truncation isolation); skips without TEST_DATABASE_URL, runs in CI
+    ├── test_migrations.py      # db_init contract (#184) — idempotent re-run preserves data, older schema migrates forward (dropped columns re-added w/ defaults), CHECKs rebuild from Python source, publish seeding backfills but never resets admin toggles; DB-backed
+    ├── test_entitlements.py    # Entitlement boundary (#185) — suspension blocks login AFTER password check (no email leak), suspended/revoked admin loses portal mid-session (fresh DB reads), suspended normal session pinned as still-served, tier = no enforcement yet; DB-backed
+    ├── test_auth_rate_limits.py # Auth rate-limit audit (#188) — login 5/min, register 10/h, forgot-password 3/h, reset-password 5/min pinned live (own limits-ON app; failures count too); verify-resend N/A (no email-verification flow); DB-backed
     ├── test_auth.py            # End-to-end auth-flow tests (register/login/logout/forgot+reset/delete/change-pw/change-email); email mocked, DB-backed
     ├── test_idor.py            # Tenant-isolation tests for saved_calculators (Hard Rule #6) — route + model layer, two users, unauth 401
     ├── test_admin.py           # Admin gate (401/404) + publish toggle + public /published surface + Analytics (GA4/PostHog empty-state, PostHog funnel when configured, posthog_error labelling) + support tools (#182: export audit, delete + guards); DB-backed
     ├── test_posthog_analytics.py # PostHog read-back unit tests (#178) — fetch() shaping, HTTP-error → PostHogError; DB-free (urllib mocked)
-    ├── test_account_deletion.py # Cascade contract (#179) — seeds every USER_SCOPED_TABLE for two users, full wipe + bystander isolation + erasure report + drift guard + route-uses-service spy; DB-backed
+    ├── test_account_deletion.py # Cascade contract (#179) + route E2E (#186) — seeds every USER_SCOPED_TABLE, full wipe + bystander isolation + erasure report + drift guard + route-uses-service spy + full DELETE /api/auth/account pass (guards→service→cascade→session teardown); DB-backed
     ├── test_data_export.py     # Export contract (#180) — every registry table present, bystander excluded, secrets stripped, values JSON-plain, route auth + attachment header; DB-backed
     ├── test_calculators.py     # Saved-calculator write bounds (#20) — MAX_CONTENT_LENGTH 413, data field cap 422, no row on reject
     ├── test_sentry.py          # Sentry backend guard — DSN gate (no init without DSN) + privacy defaults; no DB
