@@ -18,25 +18,26 @@ expanding from calculators into trackers and a freemium tier.
 
 **Phase 14 — Go-live readiness + instrumentation** is underway, shipped in
 sub-releases. **`v0.14.0` — Observability + analytics foundation** shipped
-(2026-07-11): Sentry (Flask + React), structured request logging, the
-`/api/health/ready` uptime probe, and a PostHog (EU cloud) activation funnel
-wired end-to-end into `/admin`. All credential-gated — off until keys are set.
-Next up: **`v0.14.1` — data lifecycle + legal** (account-deletion cascade, data
-export, privacy/ToS), not yet opened as a milestone.
+2026-07-11 (Sentry, structured logging, readiness probe, PostHog funnel — all
+credential-gated). **`v0.14.1` — Data lifecycle + legal** shipped 2026-07-12:
+verified account-deletion cascade, "download my data" export, legal pages
+brought current, admin support tools for deletion/export — one registry of
+user-scoped tables drives it all. Next up: **`v0.14.2` — CI confidence + scale
+sanity** (#183–188), not yet opened as a milestone.
 
 ## Current cycle
 
 > Canonical cycle state = the single **open GitHub Milestone**. This line mirrors
 > it for at-a-glance reading in the editor; if they disagree, the milestone wins.
 
-**Between cycles.** `v0.14.0` (Phase 14 — Observability + analytics foundation)
-shipped 2026-07-11 and its milestone is closed; no milestone is open. **Next up:
-`v0.14.1` — data lifecycle + legal** (account-deletion cascade #179, data export
-#180, privacy/ToS #181, admin trigger deletion/export #182) — to be opened as the
-next milestone. Phase 14's third sub-release, `v0.14.2` (CI confidence + scale
-sanity: #183–188), follows. Those issues are on the board (backlog), not yet in a
-milestone. Trackers stay **dark via runtime publish** (DB-backed, revealed from
-`/admin` Overview). `v0.14.0` staged to production; backlog on the
+**Between cycles.** `v0.14.1` (Phase 14 — Data lifecycle + legal) shipped
+2026-07-12 and its milestone closes on the tag; no other milestone is open.
+**Next up: `v0.14.2` — CI confidence + scale sanity** (CI Postgres service
+container #183, migration tests #184, entitlement tests #185, deletion-cascade
+test #186, Neon pooling check #187, auth rate-limit audit #188) — to be opened
+as the next milestone; those issues sit on the board, unmilestoned. It is the
+last Phase-14 sub-release ("is it solid for go-live"). Trackers stay **dark via
+runtime publish**. Backlog on the
 [Project board](https://github.com/users/Nagoyashi/projects) ↗
 
 Each release cycle is a Milestone named for its target version (`v0.10.0`); its
@@ -63,6 +64,7 @@ issues are the cycle's scope. Patches (`vX.Y.Z`, Z > 0) skip milestones.
 | **Phase 12 — Admin Control Center** | `v0.12.0` · 2026-06-28 | Internal admin-only `/admin` portal (`users.is_admin`, 404 for non-admins): Overview with **live publish toggles** (publish state moved to a DB-backed `calculator_publish` table the public app reads at runtime), Users (tier `free`/`pro`/`elite` + suspend/reinstate + `admin_audit_log`), Analytics (GA4 server-side proxy + DB-signup empty state). Also: migrate-on-boot (gunicorn `on_starting`) + sidebar brand-link fix. → [v0.12.0](docs/releases/v0.12.0.md) |
 | **Phase 13 — Backlog cleanup + Security hardening** | `v0.13.0` · 2026-06-29 | Security: frontend CSP/headers (Vercel), bounded payloads (`MAX_CONTENT_LENGTH` + `data` caps) + write rate limits, session-id rotation (fixation), login-timing equalisation, 72-byte password cap. Resilience: stale-CSRF self-heal + retry, central 401→logout, render error boundary. Calculator fixes: dividend growth (#77), reachability display (#33), Sankey input validation (#24). Plus dependency bumps + admin-portal cleanups. → [v0.13.0](docs/releases/v0.13.0.md) |
 | **Phase 14 — Observability + analytics** *(1 of 3 Phase-14 sub-releases)* | `v0.14.0` · 2026-07-11 | Sentry (Flask #173 + React #174), structured request logging (#175), the `/api/health/ready` uptime probe (#176), and a PostHog EU-cloud activation funnel — SDK + funnel events (#177) surfaced server-side in `/admin` Analytics (#178). All credential-gated (off until keys set). No new product surface. → [v0.14.0](docs/releases/v0.14.0.md) |
+| **Phase 14 — Data lifecycle + legal** *(2 of 3 Phase-14 sub-releases)* | `v0.14.1` · 2026-07-12 | Verified account-deletion cascade via a single `USER_SCOPED_TABLES` registry + drift guard (#179), "download my data" JSON export derived from the same registry (#180), Privacy/Terms brought current with trackers + export + verified erasure (#181), audit-logged admin support tools for deletion/export with privilege guards (#182). → [v0.14.1](docs/releases/v0.14.1.md) |
 
 > Phases 1–5 integrated on `develop` (2026-06-11/12) with **no individual
 > release tags**; they first reached production bundled in **`v0.6.0`**.

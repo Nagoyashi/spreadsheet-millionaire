@@ -35,8 +35,8 @@ export default function DeleteAccountModal({ onConfirm, onCancel, error, loading
         </div>
 
         <p className="text-sm text-gray-600 mb-4 leading-relaxed">
-          All your saved calculations will be permanently deleted.
-          Enter your password to confirm.
+          All your data — saved calculations and tracker entries — will be
+          permanently deleted. Enter your password to confirm.
         </p>
 
         {error && (

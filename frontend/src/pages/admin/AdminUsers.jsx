@@ -54,7 +54,10 @@ function Badge({ label, color, bg }) {
   )
 }
 
-function TierMenu({ user, isSuperadmin, onPick, onSetAdmin, onClose }) {
+function TierMenu({ user, isSuperadmin, canDelete, onPick, onSetAdmin, onDelete, onClose }) {
+  // Two-step confirm for the destructive action — the first click arms it, the
+  // second executes. Closing the menu (backdrop) resets naturally on remount.
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
   return (
     <>
       {/* backdrop closes on outside click */}
@@ -73,13 +76,36 @@ function TierMenu({ user, isSuperadmin, onPick, onSetAdmin, onClose }) {
             {user.tier === t && <Check className="w-4 h-4 text-[#16a34a]" />}
           </button>
         ))}
+        {/* Support tools (#182): export is a plain GET-attachment link (same
+            pattern as the self-service export — not a fetch, so rule 4 doesn't
+            apply); it is audit-logged server-side. */}
         <div className="my-1 border-t border-[#f1f3f5]" />
+        <a
+          href={`/api/admin/users/${user.id}/export`}
+          download
+          onClick={onClose}
+          className="block w-full text-left px-3 py-2 text-sm text-[#15181c] hover:bg-[#fafbfc] no-underline"
+        >
+          Export data (JSON)
+        </a>
         <button
           onClick={() => onPick({ suspended: !user.suspended })}
           className="w-full text-left px-3 py-2 text-sm text-[#ef4444] hover:bg-[#fdeaea]"
         >
           {user.suspended ? 'Reinstate account' : 'Suspend account'}
         </button>
+        {canDelete && (
+          <button
+            onClick={() => (confirmingDelete ? onDelete() : setConfirmingDelete(true))}
+            className={`w-full text-left px-3 py-2 text-sm font-semibold ${
+              confirmingDelete
+                ? 'text-white bg-[#ef4444] hover:bg-[#dc2626]'
+                : 'text-[#ef4444] hover:bg-[#fdeaea]'
+            }`}
+          >
+            {confirmingDelete ? 'Confirm permanent delete' : 'Delete account…'}
+          </button>
+        )}
         {/* Granting/revoking admin is superadmin-only and not allowed on a
             superadmin (always an admin). */}
         {isSuperadmin && !user.is_superadmin && (
@@ -99,7 +125,10 @@ function TierMenu({ user, isSuperadmin, onPick, onSetAdmin, onClose }) {
   )
 }
 
-function UserRow({ user, menuOpen, onMenu, onPick, onSetAdmin, isSuperadmin }) {
+function UserRow({ user, menuOpen, onMenu, onPick, onSetAdmin, onDelete, isSuperadmin, selfId }) {
+  // Mirrors the server's delete guards so the menu doesn't offer what the API
+  // rejects: not yourself, never a superadmin, admins only for a superadmin.
+  const canDelete = user.id !== selfId && !user.is_superadmin && (!user.is_admin || isSuperadmin)
   const tint = tintFor(user.id)
   const pill = TIER_PILL[user.tier] || TIER_PILL.free
   return (
@@ -153,8 +182,10 @@ function UserRow({ user, menuOpen, onMenu, onPick, onSetAdmin, isSuperadmin }) {
           <TierMenu
             user={user}
             isSuperadmin={isSuperadmin}
+            canDelete={canDelete}
             onPick={(f) => onPick(user, f)}
             onSetAdmin={(next) => onSetAdmin(user, next)}
+            onDelete={() => onDelete(user)}
             onClose={() => onMenu(null)}
           />
         )}
@@ -238,6 +269,20 @@ export default function AdminUsers({ auth }) {
   // Superadmin-only: grant/revoke the admin role via the dedicated endpoint.
   function setAdmin(user, nextIsAdmin) {
     applyOptimistic(user, { is_admin: nextIsAdmin }, () => adminApi.setUserAdmin(user.id, nextIsAdmin))
+  }
+
+  // Support-path hard delete (#182). NOT optimistic — a destructive action
+  // waits for the server before the row disappears; failure shows the error.
+  function remove(user) {
+    setMenuOpen(null)
+    adminApi.deleteUser(user.id).then(({ ok, data }) => {
+      if (!ok) {
+        setError(data?.error || 'Could not delete the account.')
+        return
+      }
+      setUsers((us) => us.filter((u) => u.id !== user.id))
+      setCounts((c) => ({ ...c, [user.tier]: Math.max(0, (c[user.tier] || 0) - 1) }))
+    })
   }
 
   const total = useMemo(() => Object.values(counts).reduce((a, b) => a + b, 0), [counts])
@@ -331,7 +376,9 @@ export default function AdminUsers({ auth }) {
               onMenu={setMenuOpen}
               onPick={update}
               onSetAdmin={setAdmin}
+              onDelete={remove}
               isSuperadmin={isSuperadmin}
+              selfId={auth?.user?.id}
             />
           ))}
       </div>

@@ -1,3 +1,5 @@
+from datetime import date
+
 from flask import Blueprint, request, jsonify, session
 from marshmallow import ValidationError
 
@@ -9,6 +11,7 @@ from schemas.user_schema import (
     RegisterSchema, LoginSchema,
     ResetPasswordSchema, ChangePasswordSchema, ChangeEmailSchema,
 )
+from services import account_deletion, data_export
 from services.email import send_welcome_email, send_password_reset_email
 from utils.auth_helpers import (
     set_session, clear_session, get_current_user,
@@ -135,7 +138,9 @@ def delete_account():
     left open on a shared machine, and satisfies GDPR Article 17 (right
     to erasure) by ensuring the deletion is intentional.
 
-    ON DELETE CASCADE on saved_calculators handles data cleanup automatically.
+    Deletion goes through services/account_deletion.delete_account — the single
+    deletion path (#179): explicit cascade across every user-scoped table,
+    verified before commit, with a no-PII erasure report in the log.
     """
     user_id  = session["user_id"]
     body     = request.get_json(silent=True) or {}
@@ -151,10 +156,34 @@ def delete_account():
     if not user.check_password(password):
         return jsonify({"error": "Incorrect password."}), 401
 
-    User.delete(user_id)
+    account_deletion.delete_account(user_id)
     clear_session()
 
     return jsonify({"message": "Account deleted."}), 200
+
+
+@bp.route("/account/export", methods=["GET"])
+@login_required
+@limiter.limit("5 per hour")
+def export_account():
+    """
+    Download my data (#180) — the complete JSON export of everything stored for
+    the authenticated user (GDPR Art. 15/20; the read counterpart of deletion).
+
+    GET + login only: no CSRF (read-only) and no password re-confirmation — a
+    hijacked session can already read all of this through the normal APIs, so a
+    password gate here would be friction without a boundary. Rate-limited: it's
+    one SELECT per user-scoped table. Served as an attachment so the browser
+    downloads a file instead of rendering the JSON.
+    """
+    payload = data_export.export_account(session["user_id"])
+    if payload is None:
+        return jsonify({"error": "User not found."}), 404
+
+    resp = jsonify(payload)
+    filename = f"spreadsheetmillionaire-export-{date.today().isoformat()}.json"
+    resp.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return resp, 200
 
 
 @bp.route("/forgot-password", methods=["POST"])

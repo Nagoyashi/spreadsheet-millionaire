@@ -549,11 +549,36 @@
 
 ## Account deletion requires password re-confirmation
 
-**TL;DR:** `DELETE /api/auth/account` checks the password. Cascades via `ON DELETE CASCADE`.
+**TL;DR:** `DELETE /api/auth/account` checks the password. Deletion itself goes through the explicit service below (§ "Account deletion — explicit, verified cascade").
 
-**Decision:** `DELETE /api/auth/account` rejects the request unless the request body contains the user's current password (verified via bcrypt). Cascades via `ON DELETE CASCADE` on `saved_calculators`.
+**Decision:** `DELETE /api/auth/account` rejects the request unless the request body contains the user's current password (verified via bcrypt).
 **Why:** Hijacked session shouldn't be able to nuke the account silently. Requiring the password means an attacker would also need the credentials — at which point they could log into a fresh session anyway, but the friction stops casual session-hijack scenarios.
-**Next phase note:** The new tracker tables will need `ON DELETE CASCADE` to `users` for the same reason.
+
+## Account deletion — explicit, verified cascade (the single deletion path)
+
+**TL;DR:** Every user-scoped table already carries `ON DELETE CASCADE`, but an *implicit* cascade is a liability: nothing owned the enumeration, nothing verified it, and a future table added without the FK clause would silently orphan financial rows. `services/account_deletion.py` (#179) makes the contract explicit — an authoritative `USER_SCOPED_TABLES` registry (8 tables), `delete_account()` that counts → deletes → **verifies every table is empty before committing**, and `verify_cascade_coverage()`, an `information_schema` drift guard. There is deliberately **no `User.delete`** — the service is the only deletion path.
+
+**Decision:** `delete_account(user_id)` runs in one transaction: per-table row counts first (the erasure report — what #182's admin surface shows and what the no-PII log line records), then `DELETE FROM users`, then a re-count of every registry table. Any surviving row → **rollback + `CascadeIntegrityError`** — we fail the deletion loudly (a 500, captured by Sentry) rather than commit a half-wipe. `verify_cascade_coverage()` cross-checks the live schema against the registry in both directions (a cascade table missing from the registry; a registry table missing its CASCADE) and knows the two deliberate non-cascade referencers: `admin_audit_log` (`SET NULL`, detail payloads carry tier/flag values, never emails — GDPR-clean retention) and `calculator_publish.updated_by` (`SET NULL`, config table).
+
+**Consumers:** #180 data export and #182 admin deletion/export derive their table lists from `USER_SCOPED_TABLES` — never a second list (single-source rule). The #186 cascade test (v0.14.2) builds on `verify_cascade_coverage()` + the service tests in `tests/test_account_deletion.py` (which also pin the registry to conftest's truncation list, so the two can't drift). **Adding a user-scoped table** means adding it to `db_init.py` (with `ON DELETE CASCADE`), the registry, and conftest's `_USER_TABLES` in the same PR — the guard test fails otherwise.
+
+**Sessions after deletion:** the route clears the current session; any other live session dies on its next request (user row gone → `get_current_user()` → None → 401 → the client's central 401 logout). No session enumeration needed.
+
+## Data export — "download my data" derives from the deletion registry
+
+**TL;DR:** `GET /api/auth/account/export` (#180) returns everything stored for the authenticated user as one JSON attachment — the GDPR Art. 15/20 read counterpart to Art. 17 deletion. `services/data_export.py` derives its table list from `account_deletion.USER_SCOPED_TABLES` — **no second list**, so a table added to the deletion registry appears in exports automatically.
+
+**Decision:** one `SELECT * … WHERE user_id = %s` per registry table (fixed identifiers, rule #7; user-scoped, rule #6), values normalised per the house pattern (`Decimal → float`, dates → ISO). **Secret columns are stripped, not their rows**: the export shows *that* a reset-token record exists (it's data about the user) but never `token_hash`, and the account block never includes `password_hash` — credentials aren't exportable personal data. `format_version: 1` heads the payload so an old export file is identifiable in a support conversation.
+
+**Why GET + login only (no CSRF, no password re-confirmation):** CSRF protection is for mutations; this is a read. And unlike deletion, a password gate adds no boundary — a hijacked session can already read every one of these rows through the normal APIs; export just bundles them. Rate-limited (5/hour) because it's a multi-table scan. Served with `Content-Disposition: attachment`, which lets the Settings "Your data" section be a plain `<a href>` download — not a `fetch`, so hard rule #4 (all HTTP via `httpClient`) doesn't apply; the browser handles the download natively.
+
+## Admin support tools — deletion/export on a user's behalf
+
+**TL;DR:** `GET /api/admin/users/:id/export` and `DELETE /api/admin/users/:id` (#182) are the support path for GDPR requests that arrive by email instead of through the app. Both reuse the #179/#180 services verbatim — no second deletion or export code path — and both are **audit-logged**, including the export: an admin *reading* a user's data is exactly the event the audit log exists for (the detail carries per-table row counts, never the data).
+
+**Delete guards mirror `update_user`'s privilege model:** not yourself (use your own settings flow — preserves the lockout guard), never a superadmin (bootstrap protection), and an admin account only by a superadmin. The UI menu computes the same predicate so it never offers what the API rejects — but the server-side guard is the boundary.
+
+**Audit ordering quirk (deliberate):** the deletion audit row is written *after* the delete succeeds, so `target_user_id` must be `NULL` — the user row is gone and an FK can't point at it. The deleted numeric id + erasure counts live in the `detail` payload instead. Writing the row before the delete would record deletions that then abort (the #179 service rolls back on cascade failure). The admin delete is **not optimistic** in the UI either — a destructive action waits for the server.
 
 ## Password reset via hashed single-use tokens
 

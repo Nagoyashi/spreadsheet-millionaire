@@ -7,7 +7,7 @@ export default function TermsPage({ auth }) {
   useDocumentTitle('Terms of Service — SpreadsheetMillionaire')
 
   return (
-    <LegalLayout auth={auth} title="Terms of Service" updated="12 June 2026">
+    <LegalLayout auth={auth} title="Terms of Service" updated="12 July 2026">
       <p>
         These terms govern your use of SpreadsheetMillionaire (the "service"). By using
         the service, you agree to them. If you don't agree, please don't use the service.
@@ -15,12 +15,14 @@ export default function TermsPage({ auth }) {
 
       <h2>Not financial advice</h2>
       <p>
-        <strong>The calculators are educational tools, not financial advice.</strong> They
-        produce estimates from the numbers and assumptions you provide, and those
-        assumptions (rates of return, inflation, timelines) are inherently uncertain.
-        Nothing on this service is personalised investment, tax, legal, or financial
-        advice, and nothing here should be relied on as such. For decisions that matter,
-        consult a qualified professional who knows your full situation.
+        <strong>The calculators and trackers are educational planning tools, not
+        financial advice.</strong> The calculators produce estimates from the numbers and
+        assumptions you provide, and those assumptions (rates of return, inflation,
+        timelines) are inherently uncertain; the trackers simply organise and display
+        figures you enter yourself. Nothing on this service is personalised investment,
+        tax, legal, or financial advice, and nothing here should be relied on as such.
+        For decisions that matter, consult a qualified professional who knows your full
+        situation.
       </p>
 
       <h2>The service is provided "as is"</h2>
@@ -52,9 +54,11 @@ export default function TermsPage({ auth }) {
 
       <h2>Your content</h2>
       <p>
-        The calculations you save remain yours. By saving them you simply allow us to
-        store and display them back to you as part of running the service. You can delete
-        them, or your whole account, at any time from the settings page.
+        The data you save — calculations and tracker entries alike — remains yours. By
+        saving it you simply allow us to store and display it back to you as part of
+        running the service. You can delete individual entries, download everything as a
+        single file, or delete your whole account and all its data, at any time from the
+        settings page.
       </p>
 
       <h2>Termination</h2>

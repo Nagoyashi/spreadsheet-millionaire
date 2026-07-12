@@ -547,3 +547,95 @@ def test_superadmin_can_modify_an_admin(superadmin_client, app, get_csrf_token):
         json={"tier": "pro"},
     )
     assert resp.status_code == 200 and resp.get_json()["user"]["tier"] == "pro"
+
+
+# ---------------------------------------------------------------------------- #
+# Support tools — admin-triggered export / deletion (#182)
+# ---------------------------------------------------------------------------- #
+def _audit_rows(action):
+    with psycopg.connect(_TEST_DB_URL) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT admin_user_id, target_user_id, detail FROM admin_audit_log "
+                "WHERE action = %s ORDER BY id",
+                (action,),
+            )
+            return cur.fetchall()
+
+
+def test_admin_export_user_data_downloads_and_audits(admin_client, app):
+    client, admin = admin_client
+    other = _register(app, "exportee@example.com")
+    other_id = other.get("/api/auth/status").get_json()["user"]["id"]
+
+    resp = client.get(f"/api/admin/users/{other_id}/export")
+    assert resp.status_code == 200
+    assert "attachment" in resp.headers["Content-Disposition"]
+    body = resp.get_json()
+    assert body["account"]["id"] == other_id
+    assert "password_hash" not in body["account"]
+
+    # Support access to user data is itself audit-logged — counts only, no data.
+    from services.account_deletion import USER_SCOPED_TABLES
+
+    rows = _audit_rows("export_data")
+    assert len(rows) == 1
+    assert rows[0][0] == admin["id"] and rows[0][1] == other_id
+    assert set(rows[0][2]["rows"]) == set(USER_SCOPED_TABLES)
+
+
+def test_admin_delete_user_erases_and_audits(admin_client, app, get_csrf_token):
+    client, admin = admin_client
+    other = _register(app, "deletee@example.com")
+    other_id = other.get("/api/auth/status").get_json()["user"]["id"]
+
+    token = get_csrf_token(client)
+    resp = client.delete(f"/api/admin/users/{other_id}", headers={"X-CSRF-Token": token})
+    assert resp.status_code == 200
+    assert "deleted" in resp.get_json()
+
+    with psycopg.connect(_TEST_DB_URL) as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM users WHERE id = %s", (other_id,))
+            assert cur.fetchone()[0] == 0
+
+    # Audited AFTER success: target FK is NULL (row is gone); id in the detail.
+    rows = _audit_rows("delete_account")
+    assert len(rows) == 1
+    assert rows[0][0] == admin["id"] and rows[0][1] is None
+    assert rows[0][2]["deleted_user_id"] == other_id
+
+
+def test_admin_delete_guards(admin_client, app, get_csrf_token):
+    client, admin = admin_client
+    token = get_csrf_token(client)
+
+    # Not yourself.
+    resp = client.delete(f"/api/admin/users/{admin['id']}", headers={"X-CSRF-Token": token})
+    assert resp.status_code == 400
+
+    # Never a superadmin.
+    other = _register(app, "boss@example.com")
+    other_id = other.get("/api/auth/status").get_json()["user"]["id"]
+    _promote_super("boss@example.com")
+    resp = client.delete(f"/api/admin/users/{other_id}", headers={"X-CSRF-Token": token})
+    assert resp.status_code == 400
+
+    # An admin only by a superadmin.
+    peer = _register(app, "peer-admin@example.com")
+    peer_id = peer.get("/api/auth/status").get_json()["user"]["id"]
+    _promote("peer-admin@example.com")
+    resp = client.delete(f"/api/admin/users/{peer_id}", headers={"X-CSRF-Token": token})
+    assert resp.status_code == 403
+
+    # Unknown user.
+    resp = client.delete("/api/admin/users/999999999", headers={"X-CSRF-Token": token})
+    assert resp.status_code == 404
+
+
+def test_support_tools_hidden_from_non_admins(auth_client, get_csrf_token):
+    client, user = auth_client
+    assert client.get(f"/api/admin/users/{user['id']}/export").status_code == 404
+    token = get_csrf_token(client)
+    resp = client.delete(f"/api/admin/users/{user['id']}", headers={"X-CSRF-Token": token})
+    assert resp.status_code == 404

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, AlertTriangle, Sparkles } from 'lucide-react'
+import { ArrowLeft, AlertTriangle, Download, Sparkles } from 'lucide-react'
 import { authApi } from '../api/authApi'
 import { analytics } from '../api/analytics'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
@@ -10,9 +10,9 @@ import DeleteAccountModal from '../components/ui/DeleteAccountModal'
 //
 // One page, sections stacked: account email, a Premium teaser (the funnel's
 // upgrade surface, #177 — premium isn't live yet), change password, change email
-// (password-confirmed), and a danger zone hosting the existing DeleteAccountModal
-// flow. Deliberately minimal this phase — no language, currency, tier, or
-// email-verification settings (see DECISIONS.md).
+// (password-confirmed), a "Your data" export download (#180), and a danger zone
+// hosting the existing DeleteAccountModal flow. Deliberately minimal this phase —
+// no language, currency, tier, or email-verification settings (see DECISIONS.md).
 
 function SectionCard({ title, description, children }) {
   return (
@@ -190,6 +190,28 @@ function ChangeEmailSection({ auth }) {
   )
 }
 
+// "Download my data" (#180) — GDPR-style full export. A plain anchor, not an
+// API call: the endpoint is a session-cookie GET served with
+// Content-Disposition: attachment, so the browser downloads the JSON file
+// directly (no fetch → hard rule 4 doesn't apply; CSRF is mutation-only).
+function YourDataSection() {
+  return (
+    <SectionCard
+      title="Your data"
+      description="Download everything we store for your account — your saved calculations and tracker entries — as a single JSON file."
+    >
+      <a
+        href="/api/auth/account/export"
+        download
+        className={`${btnCls} inline-flex items-center gap-2 no-underline`}
+      >
+        <Download className="w-4 h-4" />
+        Download my data
+      </a>
+    </SectionCard>
+  )
+}
+
 function DangerZone({ auth }) {
   const [showModal, setShowModal]     = useState(false)
   const [deleteError, setDeleteError] = useState(null)
@@ -215,7 +237,9 @@ function DangerZone({ auth }) {
         <h2 className="text-base font-semibold text-red-700">Danger zone</h2>
       </div>
       <p className="text-sm text-gray-500 mt-1 mb-4">
-        Permanently delete your account and all your saved calculations. This cannot be undone.
+        Permanently delete your account and all your data — saved calculations and
+        tracker entries. This cannot be undone. You can download a copy first from
+        "Your data" above.
       </p>
       <button
         onClick={() => { setDeleteError(null); setShowModal(true) }}
@@ -268,6 +292,7 @@ export default function SettingsPage({ auth }) {
           <PremiumSection />
           <ChangePasswordSection />
           <ChangeEmailSection auth={auth} />
+          <YourDataSection />
           <DangerZone auth={auth} />
         </div>
       </main>
