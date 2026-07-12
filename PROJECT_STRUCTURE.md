@@ -82,6 +82,7 @@ backend/
     ├── test_health.py          # /api/health liveness smoke test + /api/health/ready readiness (DB-up 200 needs TEST_DATABASE_URL; DB-down 503 + failure-logging via monkeypatch, no DB)
     ├── test_db_smoke.py        # DB-path wiring proof (register + truncation isolation); skips without TEST_DATABASE_URL, runs in CI
     ├── test_migrations.py      # db_init contract (#184) — idempotent re-run preserves data, older schema migrates forward (dropped columns re-added w/ defaults), CHECKs rebuild from Python source, publish seeding backfills but never resets admin toggles; DB-backed
+    ├── test_entitlements.py    # Entitlement boundary (#185) — suspension blocks login AFTER password check (no email leak), suspended/revoked admin loses portal mid-session (fresh DB reads), suspended normal session pinned as still-served, tier = no enforcement yet; DB-backed
     ├── test_auth.py            # End-to-end auth-flow tests (register/login/logout/forgot+reset/delete/change-pw/change-email); email mocked, DB-backed
     ├── test_idor.py            # Tenant-isolation tests for saved_calculators (Hard Rule #6) — route + model layer, two users, unauth 401
     ├── test_admin.py           # Admin gate (401/404) + publish toggle + public /published surface + Analytics (GA4/PostHog empty-state, PostHog funnel when configured, posthog_error labelling) + support tools (#182: export audit, delete + guards); DB-backed
