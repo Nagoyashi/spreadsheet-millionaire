@@ -58,7 +58,7 @@ backend/
 │   ├── income_expense.py       # Income & Expense data-access — ie_transactions CRUD (year/month filters) + SQL monthly/yearly summary; all queries filter user_id
 │   └── password_reset.py       # PasswordResetToken model — stores only the SHA-256 hash; create/find-valid-by-hash/mark-used/invalidate-all-for-user/delete-expired
 ├── routes/
-│   ├── auth.py                 # /api/auth/* — register (+welcome email), login, logout, status, delete account, csrf-token, forgot-password, reset-password, change-password, change-email
+│   ├── auth.py                 # /api/auth/* — register (+welcome email), login, logout, status, delete account, GET account/export (download-my-data JSON attachment, #180), csrf-token, forgot-password, reset-password, change-password, change-email
 │   ├── calculators.py          # /api/calculators/* — CRUD for saved calculations + GET /published (public runtime publish surface)
 │   ├── admin.py                # /api/admin/* — admin-only (admin_required, 404 for non-admins). Overview: GET /calculators, PATCH /calculators/:type {published} (calcs + trackers). Users: GET /users (search/tier), PATCH /users/:id {tier?,suspended?}, PATCH /users/:id/admin {is_admin} (superadmin_required) — all audit-logged. Analytics: GET /analytics?range= (DB signups + GA4 proxy)
 │   ├── net_worth.py            # /api/net-worth/* — CRUD for assets/liabilities/investments/real-estate + /summary + /snapshots (login_required, CSRF, rate-limited writes)
@@ -71,6 +71,7 @@ backend/
 │   └── income_expense_schema.py # TransactionSchema — enums from income_expense_types.py; per-type category validation
 ├── services/
 │   ├── account_deletion.py     # The single account-deletion path (#179) — USER_SCOPED_TABLES registry (8 tables), delete_account() (count → delete → verify-empty → commit; CascadeIntegrityError + rollback on survivors), verify_cascade_coverage() drift guard. DECISIONS.md § "Account deletion — explicit, verified cascade"
+│   ├── data_export.py          # Download-my-data (#180) — export_account() dumps account + every USER_SCOPED_TABLES row as plain JSON (secrets stripped: password_hash, token_hash); table list derived from the deletion registry
 │   ├── email.py                # Resend wrapper — send_email + send_welcome_email + send_password_reset_email; disabled (no-op) without RESEND_API_KEY
 │   ├── analytics.py            # Admin Analytics assembler — DB signups/funnel (always) + GA4 traffic proxy (optional) + PostHog activation funnel/top-calculators (optional, #178); per-vendor empty-state
 │   └── posthog_analytics.py    # PostHog read-back (#178) — HogQL Query API via stdlib urllib, personal API key (secret, server-side); fetch()=activation_funnel + top_calculators; PostHogError on failure
@@ -85,6 +86,7 @@ backend/
     ├── test_admin.py           # Admin gate (401/404) + publish toggle + public /published surface + Analytics (GA4/PostHog empty-state, PostHog funnel when configured, posthog_error labelling); DB-backed
     ├── test_posthog_analytics.py # PostHog read-back unit tests (#178) — fetch() shaping, HTTP-error → PostHogError; DB-free (urllib mocked)
     ├── test_account_deletion.py # Cascade contract (#179) — seeds every USER_SCOPED_TABLE for two users, full wipe + bystander isolation + erasure report + drift guard + route-uses-service spy; DB-backed
+    ├── test_data_export.py     # Export contract (#180) — every registry table present, bystander excluded, secrets stripped, values JSON-plain, route auth + attachment header; DB-backed
     ├── test_calculators.py     # Saved-calculator write bounds (#20) — MAX_CONTENT_LENGTH 413, data field cap 422, no row on reject
     ├── test_sentry.py          # Sentry backend guard — DSN gate (no init without DSN) + privacy defaults; no DB
     └── test_request_logging.py # Structured request logging (#175) — request-id header, structured fields, status→level, /api/health skip, JSON formatter; no DB
@@ -228,7 +230,7 @@ frontend/
         ├── RegisterPage.jsx       # Thin wrapper around AuthForm
         ├── ForgotPasswordPage.jsx # /forgot-password — email field; always shows the same neutral "check your inbox" state
         ├── ResetPasswordPage.jsx  # /reset-password/:token — new password + confirm; success / generic-invalid-link / weak-password states
-        ├── SettingsPage.jsx       # /app/settings (auth-guarded) — account email + change password + change email + danger zone (DeleteAccountModal)
+        ├── SettingsPage.jsx       # /app/settings (auth-guarded) — account email + Premium teaser (#177 upgrade events) + change password + change email + "Your data" export download (#180) + danger zone (DeleteAccountModal)
         └── admin/                 # /admin — internal admin-only portal (RequireAdmin gate; invisible to non-admins). Phase 12 — Admin Control Center
             ├── AdminPage.jsx      # Shell: dark sticky top bar (wordmark + 3 tabs + "internal · /admin" badge + avatar), switches Overview/Analytics/Users
             ├── AdminOverview.jsx  # Project Status — stat strip + calculator catalog table with live publish toggles (optimistic + rollback; invalidatePublished on success)

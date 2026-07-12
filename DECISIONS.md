@@ -564,6 +564,14 @@
 
 **Sessions after deletion:** the route clears the current session; any other live session dies on its next request (user row gone → `get_current_user()` → None → 401 → the client's central 401 logout). No session enumeration needed.
 
+## Data export — "download my data" derives from the deletion registry
+
+**TL;DR:** `GET /api/auth/account/export` (#180) returns everything stored for the authenticated user as one JSON attachment — the GDPR Art. 15/20 read counterpart to Art. 17 deletion. `services/data_export.py` derives its table list from `account_deletion.USER_SCOPED_TABLES` — **no second list**, so a table added to the deletion registry appears in exports automatically.
+
+**Decision:** one `SELECT * … WHERE user_id = %s` per registry table (fixed identifiers, rule #7; user-scoped, rule #6), values normalised per the house pattern (`Decimal → float`, dates → ISO). **Secret columns are stripped, not their rows**: the export shows *that* a reset-token record exists (it's data about the user) but never `token_hash`, and the account block never includes `password_hash` — credentials aren't exportable personal data. `format_version: 1` heads the payload so an old export file is identifiable in a support conversation.
+
+**Why GET + login only (no CSRF, no password re-confirmation):** CSRF protection is for mutations; this is a read. And unlike deletion, a password gate adds no boundary — a hijacked session can already read every one of these rows through the normal APIs; export just bundles them. Rate-limited (5/hour) because it's a multi-table scan. Served with `Content-Disposition: attachment`, which lets the Settings "Your data" section be a plain `<a href>` download — not a `fetch`, so hard rule #4 (all HTTP via `httpClient`) doesn't apply; the browser handles the download natively.
+
 ## Password reset via hashed single-use tokens
 
 **TL;DR:** A forgotten password is recoverable via an emailed link backed by a hashed, single-use, 60-minute token. The raw token is never stored; the request endpoint never reveals whether an email exists.
