@@ -68,6 +68,11 @@ jobs:
       # _ensure_sslmode() would otherwise append sslmode=require, and the plain
       # postgres:16 service has no SSL — every connection would fail.
       TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db?sslmode=disable
+      # Guard against silent green (#183): if TEST_DATABASE_URL were ever lost
+      # (renamed var, service misconfig), the db fixture would skip the entire
+      # DB-backed majority and CI would still pass. Under CI_REQUIRE_DB=1,
+      # conftest hard-fails instead of skipping.
+      CI_REQUIRE_DB: "1"
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
@@ -84,7 +89,9 @@ jobs:
         run: python -m compileall -q .
 
       - name: Run pytest
-        run: pytest -q
+        # -ra surfaces skip/fail reasons in the log, so an unexpected skip is
+        # visible at a glance even when it isn't fatal.
+        run: pytest -q -ra
 
       # CLAUDE.md hard rule #1: intra-backend imports must be bare (Flask runs from
       # inside backend/, so a 'backend.' prefix breaks at runtime). Enforce it.
