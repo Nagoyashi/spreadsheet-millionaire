@@ -311,6 +311,33 @@ Then on the **frontend origin** (exercises the full single-origin path):
 
 ---
 
+## 7. Neon pooled-connection check (#187)
+
+The app opens **one psycopg connection per request and closes it on teardown** —
+deliberately no in-process pool (`db.py`), because `DATABASE_URL` points at
+Neon's **PgBouncer (pooled)** endpoint, which does the pooling. That design is
+only sound if the pooled endpoint actually absorbs a connect-per-request burst.
+`backend/pooling_check.py` proves it:
+
+```sh
+cd backend && source venv/bin/activate
+python pooling_check.py --url "$DATABASE_URL" --workers 20 --duration 15
+```
+
+- Run it against **each environment's** pooled string (staging + production)
+  from a shell with that env's `DATABASE_URL` (or pass `--url` explicitly).
+- **Pass:** `0 failed` and a p95 comfortably inside a request budget (~250 ms
+  from the same region; a laptop over the public internet reads higher — judge
+  the errors, not the latency).
+- **Fail with connection-limit errors** → the URL is almost certainly the
+  **direct** (non-pooled) endpoint. Neon's pooled host carries a `-pooler`
+  suffix; the script warns when a `neon.tech` host is missing it.
+- Re-run after any change to worker counts (gunicorn), Neon plan, or the
+  connection string. 20 workers ≈ 10× the concurrency two gunicorn workers can
+  generate — comfortable headroom.
+
+---
+
 ## Known caveats (carried from earlier phases)
 
 - **Resend domain not yet verified.** Until `spreadsheetmillionaire.com` is

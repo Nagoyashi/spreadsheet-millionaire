@@ -46,6 +46,7 @@ backend/
 ├── publishable.py              # The toggleable surface = VALID_CALC_TYPES + TRACKER_TYPES (net-worth, income-expenses). Seeds calculator_publish (trackers default unpublished); admin publish route validates against it
 ├── db.py                       # Per-request psycopg connection on Flask g, closed on teardown (no in-process pool)
 ├── db_init.py                  # Postgres schema creation + idempotent CHECK-constraint rebuild (users [+is_admin/tier/suspended/last_login_at], saved_calculators, password_reset_tokens, nw_* Net Worth tables, ie_transactions, calculator_publish [seeded from DEFAULT_PUBLISHED_TYPES], admin_audit_log); advisory-locked so concurrent boots serialise
+├── pooling_check.py            # Standalone load check (#187) — N workers of connect→SELECT 1→close (the app's exact per-request pattern) against a DATABASE_URL; warns on non-'-pooler' Neon hosts; exit 0 only on zero errors. DEPLOYMENT.md § 7
 ├── gunicorn.conf.py            # Auto-loaded by gunicorn (run from backend/) — on_starting hook runs db_init once in the master before workers fork, so every deploy self-migrates (DECISIONS.md § "Schema migrations run on boot")
 ├── __pycache__/
 ├── venv/                       # Python virtual environment — never committed
