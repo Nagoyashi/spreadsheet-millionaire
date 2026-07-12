@@ -3,9 +3,10 @@ Account-deletion service tests (#179) — the cascade contract.
 
 Seeds a row in EVERY table in USER_SCOPED_TABLES for two users, deletes one, and
 asserts: full erasure for the deleted user, zero collateral damage for the other,
-an accurate per-table erasure report, and a clean schema-drift guard. DB-backed
-(skipped without TEST_DATABASE_URL). The exhaustive route-level E2E cascade test
-is #186 (v0.14.2); this file owns the service-level contract.
+an accurate per-table erasure report, and a clean schema-drift guard. Also holds
+the route-level E2E (#186): a real registered user, seeded everywhere, deleted
+through DELETE /api/auth/account — route guards, service, cascade, and session
+teardown in one pass. DB-backed (skipped without TEST_DATABASE_URL).
 """
 
 import os
@@ -30,6 +31,15 @@ def _seed_user_with_full_data(suffix: str) -> int:
                 (f"cascade-{suffix}@example.com", "x" * 60),
             )
             uid = cur.fetchone()[0]
+    seed_rows_for(uid, suffix)
+    return uid
+
+
+def seed_rows_for(uid: int, suffix: str) -> None:
+    """Insert exactly one row in every user-scoped table for an EXISTING user —
+    shared by the service tests here and the route-level E2E (#186)."""
+    with psycopg.connect(_TEST_DB_URL) as conn:
+        with conn.cursor() as cur:
             today = date.today()
             cur.execute(
                 "INSERT INTO saved_calculators (user_id, name, calc_type, data) "
@@ -74,7 +84,6 @@ def _seed_user_with_full_data(suffix: str) -> int:
                 (uid, today),
             )
         conn.commit()
-    return uid
 
 
 def _count_rows(table: str, uid: int) -> int:
@@ -156,3 +165,33 @@ def test_route_delete_account_uses_the_service(auth_client, get_csrf_token, monk
     )
     assert resp.status_code == 200
     assert calls == [user["id"]]
+
+
+def test_route_e2e_full_cascade(app, auth_client, get_csrf_token):
+    """#186 — the end-to-end cascade: a real registered user with a row in
+    EVERY user-scoped table deletes their account through the actual route
+    (password + CSRF), and nothing of theirs survives anywhere. The service
+    tests above prove the contract; this proves the whole path a real deletion
+    takes — route guards, service, cascade, session teardown."""
+    client, user = auth_client
+    seed_rows_for(user["id"], "e2e")
+
+    token = get_csrf_token(client)
+    resp = client.delete(
+        "/api/auth/account",
+        headers={"X-CSRF-Token": token},
+        json={"password": "Testpass123"},
+    )
+    assert resp.status_code == 200
+
+    # Nothing survives in any registry table, and the user row is gone.
+    for table in account_deletion.USER_SCOPED_TABLES:
+        assert _count_rows(table, user["id"]) == 0, f"{table} kept rows"
+    with psycopg.connect(_TEST_DB_URL) as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM users WHERE id = %s", (user["id"],))
+            assert cur.fetchone()[0] == 0
+
+    # The session is torn down: the client is anonymous again.
+    status = client.get("/api/auth/status").get_json()
+    assert status["logged_in"] is False
