@@ -22,22 +22,24 @@ sub-releases. **`v0.14.0` — Observability + analytics foundation** shipped
 credential-gated). **`v0.14.1` — Data lifecycle + legal** shipped 2026-07-12:
 verified account-deletion cascade, "download my data" export, legal pages
 brought current, admin support tools for deletion/export — one registry of
-user-scoped tables drives it all. Next up: **`v0.14.2` — CI confidence + scale
-sanity** (#183–188), not yet opened as a milestone.
+user-scoped tables drives it all. Now underway: **`v0.14.2` — CI confidence + scale
+sanity** (#183–188), open as the current milestone — the last Phase-14
+sub-release.
 
 ## Current cycle
 
 > Canonical cycle state = the single **open GitHub Milestone**. This line mirrors
 > it for at-a-glance reading in the editor; if they disagree, the milestone wins.
 
-**Between cycles.** `v0.14.1` (Phase 14 — Data lifecycle + legal) shipped
-2026-07-12 and its milestone closes on the tag; no other milestone is open.
-**Next up: `v0.14.2` — CI confidence + scale sanity** (CI Postgres service
-container #183, migration tests #184, entitlement tests #185, deletion-cascade
-test #186, Neon pooling check #187, auth rate-limit audit #188) — to be opened
-as the next milestone; those issues sit on the board, unmilestoned. It is the
-last Phase-14 sub-release ("is it solid for go-live"). Trackers stay **dark via
-runtime publish**. Backlog on the
+**`v0.14.2` — Phase 14, sub-release 3 (final): CI confidence + scale sanity**
+(open milestone, 6 issues). Finish the pytest harness on real Postgres in CI —
+mind the #25 gotchas — covering the migration system (#184), entitlement checks
+(#185), and the deletion cascade (#186); harden the CI Postgres service
+container (#183); confirm the Neon pooled connection string under load (#187)
+and the auth-endpoint rate limits (#188). Invariants 4 + 5; out of scope:
+exhaustive coverage — test the money/data paths, skip trivia. The gate answers
+"is it solid for go-live." Trackers stay **dark via runtime publish**.
+`v0.14.1` shipped 2026-07-12; backlog on the
 [Project board](https://github.com/users/Nagoyashi/projects) ↗
 
 Each release cycle is a Milestone named for its target version (`v0.10.0`); its
