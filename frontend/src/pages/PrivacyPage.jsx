@@ -1,5 +1,9 @@
 // Privacy Policy — written against the app's actual data practices (no ads, no
-// analytics, no data sale; self-service account + data deletion).
+// behavioural tracking, no data sale; EU-hosted aggregate product analytics only;
+// self-service account deletion + full data export). Keep this in lockstep with
+// the product: #177 added the PostHog/Sentry sub-processor entries, #180/#181
+// the export + tracker-data language. If practices change, this page changes in
+// the same PR.
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import LegalLayout from '../marketing/LegalLayout'
 import { CONTACT_EMAIL } from '../marketing/links'
@@ -8,7 +12,7 @@ export default function PrivacyPage({ auth }) {
   useDocumentTitle('Privacy Policy — SpreadsheetMillionaire')
 
   return (
-    <LegalLayout auth={auth} title="Privacy Policy" updated="12 June 2026">
+    <LegalLayout auth={auth} title="Privacy Policy" updated="12 July 2026">
       <p>
         This policy explains what SpreadsheetMillionaire ("we", "us") collects, why,
         and what you can do about it. We've written it against what the product
@@ -39,6 +43,11 @@ export default function PrivacyPage({ auth }) {
         <li><strong>Saved calculations</strong> — the inputs you choose to save, stored
           against your account so you can reload and rename them. These are the numbers
           you entered into a calculator; we don't enrich them with anything else.</li>
+        <li><strong>Tracker entries</strong> — if you use the trackers (net worth,
+          income &amp; expenses), the figures you enter there: asset and liability values,
+          holdings, property details, transactions, and snapshots. Like saved
+          calculations, they exist only so the app can show them back to you; we don't
+          enrich, analyse, or share them.</li>
       </ul>
 
       <h2>Cookies</h2>
@@ -91,13 +100,18 @@ export default function PrivacyPage({ auth }) {
         for visitors in the EU:
       </p>
       <ul>
-        <li><strong>Access and portability</strong> — your saved calculations are visible and
-          reloadable in the app at any time.</li>
+        <li><strong>Access and portability</strong> — download everything we store for
+          your account — your account details, saved calculations, and tracker entries —
+          as a single machine-readable JSON file, self-service from the settings page
+          ("Your data"). Your saved data is also visible and reloadable in the app at
+          any time.</li>
         <li><strong>Correction</strong> — update your email or password yourself from the
           settings page.</li>
         <li><strong>Deletion</strong> — deleting your account is self-service from settings,
-          and it permanently removes your account and all of your saved calculations.
-          This is immediate and cannot be undone.</li>
+          and it permanently removes your account and every row of data we hold for it:
+          saved calculations, all tracker entries, and pending reset tokens. The deletion
+          is verified against every table that stores your data before it completes. This
+          is immediate and cannot be undone.</li>
       </ul>
       <p>
         If you need help exercising any of these rights, contact us at the address below.
@@ -105,10 +119,12 @@ export default function PrivacyPage({ auth }) {
 
       <h2>Data retention</h2>
       <p>
-        We keep your account and saved calculations for as long as your account exists.
-        When you delete your account, the associated data is removed. Password-reset
-        tokens are short-lived and single-use, and expired tokens are cleared
-        automatically.
+        We keep your account, saved calculations, and tracker entries for as long as
+        your account exists. When you delete your account, all of that data is removed
+        in the same operation. Password-reset tokens are short-lived and single-use,
+        and expired tokens are cleared automatically. Administrative audit records
+        (which never contain your email or financial data) may be retained after
+        deletion for accountability.
       </p>
 
       <h2>Children</h2>
