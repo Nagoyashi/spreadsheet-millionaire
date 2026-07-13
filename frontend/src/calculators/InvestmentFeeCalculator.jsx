@@ -70,7 +70,7 @@ export default function InvestmentFeeCalculator({ initialData, onDataChange }) {
         <StatCard
           label="Low-Fee Portfolio"
           value={fmt(results.lowFeeValue)}
-          sub={`At ${inputs.low_fee}% fee`}
+          sub={`At ${inputs.low_fee || 0}% fee`}
           Icon={TrendingDown}
           iconClass="text-emerald-500"
           gradientClass="from-emerald-500 to-teal-600"
@@ -78,7 +78,7 @@ export default function InvestmentFeeCalculator({ initialData, onDataChange }) {
         <StatCard
           label="High-Fee Portfolio"
           value={fmt(results.highFeeValue)}
-          sub={`At ${inputs.high_fee}% fee`}
+          sub={`At ${inputs.high_fee || 0}% fee`}
           Icon={TrendingDown}
           iconClass="text-red-500"
           gradientClass="from-red-500 to-rose-600"

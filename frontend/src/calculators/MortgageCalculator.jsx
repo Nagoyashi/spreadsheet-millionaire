@@ -19,7 +19,7 @@ const DEFAULTS = {
   insurance_monthly: 150,
 }
 
-function calculate(inputs) {
+export function calculate(inputs) {
   const homePrice    = parseFloat(inputs.home_price) || 0
   const downPayment  = parseFloat(inputs.down_payment) || 0
   const annualRate   = parseFloat(inputs.annual_rate) / 100 || 0
@@ -27,7 +27,8 @@ function calculate(inputs) {
   const taxRate      = parseFloat(inputs.property_tax_rate) / 100 || 0
   const insurance    = parseFloat(inputs.insurance_monthly) || 0
 
-  const principal    = homePrice - downPayment
+  // A down payment above the price means no loan — never a negative one.
+  const principal    = Math.max(0, homePrice - downPayment)
   const monthlyRate  = annualRate / 12
   const numPayments  = termYears * 12
   const downPct      = homePrice > 0 ? (downPayment / homePrice) * 100 : 0

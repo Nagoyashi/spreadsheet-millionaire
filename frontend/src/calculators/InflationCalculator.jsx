@@ -59,7 +59,7 @@ export default function InflationCalculator({ initialData, onDataChange }) {
         <StatCard
           label="Future Cost"
           value={fmt(results.futureValue)}
-          sub={`Today's ${fmt(parseFloat(inputs.current_amount))} in ${inputs.years}yrs`}
+          sub={`Today's ${fmt(parseFloat(inputs.current_amount))} in ${inputs.years || 0}yrs`}
           Icon={TrendingDown}
           iconClass="text-red-500"
           gradientClass="from-red-500 to-rose-600"
@@ -82,7 +82,7 @@ export default function InflationCalculator({ initialData, onDataChange }) {
         />
         <StatCard
           label="Inflation Rate"
-          value={`${parseFloat(inputs.inflation_rate).toFixed(1)}%`}
+          value={`${(parseFloat(inputs.inflation_rate) || 0).toFixed(1)}%`}
           sub="Annual rate assumed"
           Icon={Percent}
           iconClass="text-violet-500"

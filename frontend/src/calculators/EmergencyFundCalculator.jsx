@@ -62,7 +62,7 @@ export default function EmergencyFundCalculator({ initialData, onDataChange }) {
         <StatCard
           label="Target Fund"
           value={fmt(results.targetAmount)}
-          sub={`${inputs.target_months} months of expenses`}
+          sub={`${inputs.target_months || 0} months of expenses`}
           Icon={Shield}
           iconClass="text-emerald-500"
           gradientClass="from-emerald-500 to-teal-600"
