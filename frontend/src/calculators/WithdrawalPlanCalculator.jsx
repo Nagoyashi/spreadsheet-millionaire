@@ -18,7 +18,7 @@ const DEFAULTS = {
   years: 30,
 }
 
-function calculate(inputs) {
+export function calculate(inputs) {
   const portfolio   = parseFloat(inputs.portfolio_value) || 0
   const withdrawal  = parseFloat(inputs.annual_withdrawal) || 0
   const returnRate  = parseFloat(inputs.expected_return) / 100 || 0
@@ -26,15 +26,19 @@ function calculate(inputs) {
   const years       = parseFloat(inputs.years) || 0
 
   const withdrawalRate = portfolio > 0 ? (withdrawal / portfolio) * 100 : 0
-  const realReturn     = returnRate - inflation
+  const realReturnPct  = (returnRate - inflation) * 100
 
-  // Find how long money lasts (may exceed years)
+  // Simulate past the horizon (up to 50y) so "how long does it last" can
+  // exceed the user's own timeframe, but report the balance AT the horizon.
+  const horizon = Math.max(years, 50)
   let balance = portfolio
   let depletionYear = null
+  let balanceAtHorizon = 0
   const chartData = []
 
-  for (let y = 0; y <= Math.max(years, 50); y++) {
+  for (let y = 0; y <= horizon; y++) {
     chartData.push({ year: y, balance: Math.max(0, Math.round(balance)) })
+    if (y === Math.ceil(years)) balanceAtHorizon = Math.max(0, balance)
     if (balance <= 0 && depletionYear === null) {
       depletionYear = y
     }
@@ -43,10 +47,9 @@ function calculate(inputs) {
     balance = balance * (1 + returnRate) - inflationAdjustedWithdrawal
   }
 
-  const finalBalance = Math.max(0, balance)
-  const sustainable  = depletionYear === null
+  const survivesHorizon = depletionYear === null || depletionYear > years
 
-  return { withdrawalRate, realReturn, depletionYear, finalBalance, sustainable, chartData }
+  return { withdrawalRate, realReturnPct, depletionYear, horizon, balanceAtHorizon, survivesHorizon, chartData }
 }
 
 export default function WithdrawalPlanCalculator({ initialData, onDataChange }) {
@@ -58,8 +61,8 @@ export default function WithdrawalPlanCalculator({ initialData, onDataChange }) 
   })
   const results = calculate(inputs)
 
-  const statusColor  = results.sustainable ? 'from-emerald-50 to-teal-50 border-emerald-100' : 'from-red-50 to-rose-50 border-red-100'
-  const statusText   = results.sustainable ? 'emerald' : 'red'
+  const statusColor  = results.survivesHorizon ? 'from-emerald-50 to-teal-50 border-emerald-100' : 'from-red-50 to-rose-50 border-red-100'
+  const statusText   = results.survivesHorizon ? 'emerald' : 'red'
 
   return (
     <div className="space-y-6">
@@ -75,23 +78,23 @@ export default function WithdrawalPlanCalculator({ initialData, onDataChange }) 
         />
         <StatCard
           label="Portfolio Lasts"
-          value={results.sustainable ? `${inputs.years}+ yrs` : `${results.depletionYear} yrs`}
-          sub={results.sustainable ? 'Sustainable' : 'Runs out of money'}
+          value={results.depletionYear !== null ? `${results.depletionYear} yrs` : `${results.horizon}+ yrs`}
+          sub={results.depletionYear !== null ? 'Runs out of money' : 'Sustainable'}
           Icon={Calendar}
-          iconClass={results.sustainable ? 'text-emerald-500' : 'text-red-500'}
-          gradientClass={results.sustainable ? 'from-emerald-500 to-teal-600' : 'from-red-500 to-rose-600'}
+          iconClass={results.survivesHorizon ? 'text-emerald-500' : 'text-red-500'}
+          gradientClass={results.survivesHorizon ? 'from-emerald-500 to-teal-600' : 'from-red-500 to-rose-600'}
         />
         <StatCard
-          label={`Balance at ${inputs.years}yrs`}
-          value={results.sustainable ? fmt(results.finalBalance) : '$0'}
-          sub={results.sustainable ? 'Remaining portfolio' : 'Depleted'}
+          label={`Balance at ${inputs.years || 0}yrs`}
+          value={results.survivesHorizon ? fmt(results.balanceAtHorizon) : '$0'}
+          sub={results.survivesHorizon ? 'Remaining portfolio' : 'Depleted'}
           Icon={Wallet}
           iconClass="text-blue-500"
           gradientClass="from-blue-500 to-indigo-600"
         />
         <StatCard
           label="Real Return"
-          value={`${results.realReturn.toFixed(1)}%`}
+          value={`${results.realReturnPct.toFixed(1)}%`}
           sub="After inflation"
           Icon={TrendingDown}
           iconClass="text-violet-500"
@@ -143,12 +146,13 @@ export default function WithdrawalPlanCalculator({ initialData, onDataChange }) 
 
           <div className={`mt-5 bg-gradient-to-r ${statusColor} border rounded-lg p-4`}>
             <p className={`text-xs font-semibold text-${statusText}-600 uppercase tracking-wider mb-1`}>
-              {results.sustainable ? '✓ Sustainable' : '⚠ Unsustainable'}
+              {results.survivesHorizon ? '✓ Lasts your horizon' : '⚠ Unsustainable'}
             </p>
             <p className="text-sm text-gray-600 leading-relaxed">
-              {results.sustainable
-                ? <>Your <strong className="text-gray-800">{results.withdrawalRate.toFixed(1)}%</strong> withdrawal rate is sustainable.
-                   Portfolio grows to <strong className="text-gray-800">{fmt(results.finalBalance)}</strong> after {inputs.years} years.</>
+              {results.survivesHorizon
+                ? <>Your <strong className="text-gray-800">{results.withdrawalRate.toFixed(1)}%</strong> withdrawal rate leaves
+                   <strong className="text-gray-800"> {fmt(results.balanceAtHorizon)}</strong> after {inputs.years} years
+                   {results.depletionYear !== null && <>, though the portfolio runs out in <strong className="text-gray-800">{results.depletionYear} years</strong></>}.</>
                 : <>At this rate your portfolio runs out in <strong className="text-gray-800">{results.depletionYear} years</strong>.
                    Reduce withdrawals or increase portfolio size.</>
               }

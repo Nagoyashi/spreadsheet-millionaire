@@ -87,6 +87,7 @@ function ItemRow({ item, colour, currency, onLabelChange, onValueChange, onRemov
         value={item.label}
         onChange={e => onLabelChange(item.id, e.target.value)}
         maxLength={40}
+        aria-label="Item name"
         className="flex-1 min-w-0 text-sm text-gray-700 bg-transparent border-b border-gray-200 focus:border-blue-400 focus:outline-none px-1 py-0.5 transition-colors truncate"
       />
       <div className="flex rounded border border-gray-200 overflow-hidden focus-within:ring-1 focus-within:ring-blue-400 shrink-0">
@@ -94,8 +95,16 @@ function ItemRow({ item, colour, currency, onLabelChange, onValueChange, onRemov
         <input
           type="number"
           value={item.value}
-          onChange={e => onValueChange(item.id, e.target.value)}
+          onChange={e => {
+            // Native min only guards the spinner; clamp typed/pasted negatives too.
+            const raw = e.target.value
+            if (raw === '') { onValueChange(item.id, ''); return }
+            const num = Number(raw)
+            if (!Number.isFinite(num)) return
+            onValueChange(item.id, num < 0 ? '0' : raw)
+          }}
           min={0}
+          aria-label={`${item.label || 'Item'} amount`}
           className="w-16 px-2 py-1 text-xs text-gray-700 bg-white focus:outline-none text-right"
         />
       </div>
@@ -292,6 +301,7 @@ function GroupEditor({ group, colour, currency, onGroupLabel, onItemLabel, onIte
           value={group.label}
           onChange={e => onGroupLabel(group.id, e.target.value)}
           maxLength={40}
+          aria-label="Group name"
           className="flex-1 min-w-0 text-sm font-semibold text-gray-700 bg-transparent border-b border-transparent hover:border-gray-200 focus:border-blue-400 focus:outline-none px-1 py-0.5 transition-colors truncate"
         />
         <button

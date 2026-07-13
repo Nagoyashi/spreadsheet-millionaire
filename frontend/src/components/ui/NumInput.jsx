@@ -15,7 +15,10 @@
 // (every calculator treats "" as 0 via `parseFloat(x) || 0`). The visible field
 // can therefore never hold a value outside [min, max].
 
+import { useId } from 'react'
+
 export default function NumInput({ label, prefix, suffix, value, onChange, hint, min, max, step = 'any' }) {
+  const id = useId()
   function handleChange(raw) {
     // Empty field → defined fallback (calculators read "" as 0).
     if (raw === '') { onChange(''); return }
@@ -32,7 +35,7 @@ export default function NumInput({ label, prefix, suffix, value, onChange, hint,
 
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-600 mb-1">
+      <label htmlFor={id} className="block text-sm font-medium text-gray-600 mb-1">
         {label}
         {hint && <span className="ml-1 text-gray-400 font-normal">{hint}</span>}
       </label>
@@ -43,6 +46,7 @@ export default function NumInput({ label, prefix, suffix, value, onChange, hint,
           </span>
         )}
         <input
+          id={id}
           type="number"
           inputMode="decimal"
           value={value}
