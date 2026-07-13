@@ -88,4 +88,43 @@ describe('CategoryManager', () => {
     fireEvent.click(within(form).getByRole('button', { name: /save changes/i }))
     expect(onUpdate).toHaveBeenCalledWith(9, expect.objectContaining({ name: 'Checking' }))
   })
+
+  it('re-seeds the form when the instance is reused for another category', () => {
+    // WealthPage keeps one CategoryManager across tab switches. Without the
+    // re-seed, the liabilities form kept the liquid-assets field shape and the
+    // Add button could never enable (prod bug, 2026-07-14).
+    const { rerender } = render(
+      <CategoryManager
+        config={CATEGORY_CONFIGS.liquid}
+        items={[]}
+        onAdd={vi.fn(ok)}
+        onUpdate={vi.fn(ok)}
+        onDelete={vi.fn(ok)}
+      />
+    )
+    const onAdd = vi.fn(ok)
+    rerender(
+      <CategoryManager
+        config={CATEGORY_CONFIGS.liabilities}
+        items={[]}
+        onAdd={onAdd}
+        onUpdate={vi.fn(ok)}
+        onDelete={vi.fn(ok)}
+      />
+    )
+    const form = document.querySelector('form')
+    expect(within(form).getByText('Add liability')).toBeInTheDocument() // singular label, not "liabilitie"
+    fireEvent.change(within(form).getAllByRole('textbox')[0], { target: { value: 'Visa' } })
+    fireEvent.change(within(form).getAllByRole('spinbutton')[0], { target: { value: '2000' } })
+    const addBtn = within(form).getByRole('button', { name: /add/i })
+    expect(addBtn).toBeEnabled()
+    fireEvent.click(addBtn)
+    expect(onAdd).toHaveBeenCalledWith(
+      expect.objectContaining({
+        liability_type: 'credit_card',
+        name: 'Visa',
+        current_balance: 2000,
+      })
+    )
+  })
 })

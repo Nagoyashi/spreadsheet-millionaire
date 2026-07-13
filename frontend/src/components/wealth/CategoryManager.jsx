@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Pencil, Trash2, Plus, X } from 'lucide-react'
 import NumInput from '../ui/NumInput'
 import {
@@ -18,11 +18,22 @@ import {
 
 export default function CategoryManager({ config, items, onAdd, onUpdate, onDelete }) {
   const { title, fields, columns, fixed = {} } = config
+  const singular = config.singular || title.toLowerCase().replace(/s$/, '')
 
   const [form, setForm] = useState(() => initialForm(fields))
   const [editingId, setEditingId] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState('')
+
+  // WealthPage reuses this one instance across category tabs, so the form must
+  // be re-seeded when the category changes — otherwise the previous tab's field
+  // shape lingers in state and canSubmit() can never pass (disabled Add button).
+  useEffect(() => {
+    setForm(initialForm(fields))
+    setEditingId(null)
+    setFormError('')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config.resource])
 
   function setField(name, value) {
     setForm((prev) => ({ ...prev, [name]: value }))
@@ -127,9 +138,7 @@ export default function CategoryManager({ config, items, onAdd, onUpdate, onDele
       <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-md p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-bold text-gray-800">
-            {editingId
-              ? `Edit ${title.toLowerCase().replace(/s$/, '')}`
-              : `Add ${title.toLowerCase().replace(/s$/, '')}`}
+            {editingId ? `Edit ${singular}` : `Add ${singular}`}
           </h3>
           {editingId && (
             <button

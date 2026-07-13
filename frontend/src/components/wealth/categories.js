@@ -192,6 +192,7 @@ export const CATEGORY_CONFIGS = {
 
   liabilities: {
     title: 'Liabilities',
+    singular: 'liability',
     resource: 'liability',
     fields: [
       {
