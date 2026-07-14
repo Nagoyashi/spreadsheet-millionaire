@@ -39,16 +39,15 @@ tickets are pre-filed (#189–#197), not yet promoted to a milestone.
 > Canonical cycle state = the single **open GitHub Milestone**. This line mirrors
 > it for at-a-glance reading in the editor; if they disagree, the milestone wins.
 
-**Release staged — Phase 15 complete, awaiting the ship-it gate.** All 4
-`v0.15.0` issues closed on `develop` (#292 data model + bulk month API, #293
-Monthly-entry grid UI, #294 overview verification + badge, #295 roadmap
-resequencing); the `develop`→`main` release PR is open. Owner gate: merge the
-PR (merge commit) + push the annotated `v0.15.0` tag — the Action publishes the
-Release and closes the milestone. **Next up: Phase 16 — Billing (`v0.16.0`)**,
-pre-filed as #189–#197 (see `docs/ROADMAP.md` § Phase 16). Operator to-dos
-still pending from Phase 14: Sentry + PostHog keys, external uptime monitor on
-`/api/health/ready`, `pooling_check.py` against the real Neon strings. Backlog
-on the [Project board](https://github.com/users/Nagoyashi/projects) ↗
+**Between cycles — Phase 15 shipped** (`v0.15.0` tagged 2026-07-14, milestone
+closed; same-day patch `v0.15.1` — custom categories, grid color coding, bulk
+teaser, year-selector fix — follows the patch ritual). **Next up: Phase 16 —
+Billing (`v0.16.0`)**, pre-filed as #189–#197 plus the free/premium boundary
+decision (see `docs/ROADMAP.md` § Phase 16); not yet opened as a milestone.
+Operator to-dos still pending from Phase 14: Sentry + PostHog keys, external
+uptime monitor on `/api/health/ready`, `pooling_check.py` against the real
+Neon strings. Backlog on the
+[Project board](https://github.com/users/Nagoyashi/projects) ↗
 
 Each release cycle is a Milestone named for its target version (`v0.10.0`); its
 issues are the cycle's scope. Patches (`vX.Y.Z`, Z > 0) skip milestones.
@@ -94,6 +93,7 @@ issues are the cycle's scope. Patches (`vX.Y.Z`, Z > 0) skip milestones.
 | `v0.13.2` | 2026-06-30 | Marketing landing polish: full-width header; a continuous one-card-at-a-time `Carousel` (autoplay + arrows, no cut-off) for the calculator showcase and "More on the way" (which now shows the whole roadmap — trackers + unpublished calculators + the Guide/Comparison/ETFs sections); boxed value props with a section separator. → [v0.13.2](docs/releases/v0.13.2.md) |
 | `v0.14.3` | 2026-07-14 | Calculator math fixes from the prod-wide QA sweep (#279): Compound Interest's inverted compounding-frequency ratio, Withdrawal Plan's real-return/balance-at-horizon/depleted-display trio, Coast FIRE's static-vs-rising coast threshold, FIRE's "0 yrs" on unreachable goals; the Net Worth category form permanently disabled after a tab switch (#282); plus input clamps (negative loan, negative Sankey amounts, NaN%) and label-association a11y across all `NumInput`s. 19 new regression tests. → [v0.14.3](docs/releases/v0.14.3.md) |
 | `v0.14.4` | 2026-07-14 | `NumInput` min-clamp moved from keystroke to blur — raised-min fields (Barista/Coast FIRE ages, FIRE's 0.1-min withdrawal rate, the min=1 year/month fields) were untypeable, "numbers jumping around" (#288); README/CLAUDE.md status caught up with production — all 12 calculators + both trackers live (#289). 8 new `NumInput` tests, suite 184→192. → [v0.14.4](docs/releases/v0.14.4.md) |
+| `v0.15.1` | 2026-07-14 | Custom I&E categories (user-scoped `ie_categories`: inline add, recoverable archive, duplicate-proof restore, lazy default seed — no data migration), color-coded grid fields (`NumInput` `tone`), "Bulk upload" coming-soon tab, Overview year-selector window fix. Suites 210 frontend / +7 backend. → [v0.15.1](docs/releases/v0.15.1.md) |
 
 ### ⬜ Future (prose only — not issues yet)
 
