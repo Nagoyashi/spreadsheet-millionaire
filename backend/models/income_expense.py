@@ -9,10 +9,12 @@ Every query filters user_id — the IDOR boundary (hard rule #6). NUMERIC comes
 back as Decimal and DATE as date; _row_to_dict normalises to float / ISO.
 """
 
+import re
 from datetime import date, datetime
 from decimal import Decimal
 
 from db import get_db
+from income_expense_types import DEFAULT_CATEGORIES
 
 # Insert/update allow-list (server-side, never request input).
 _COLUMNS = (
@@ -118,6 +120,134 @@ def delete(txn_id: int, user_id: int) -> bool:
 # (values are always bound as %s). This mirrors the net_worth model's rationale.
 
 
+# --------------------------------------------------------------------------- #
+# Categories — user-scoped, customizable (v0.15.1). Archive is a soft delete;
+# re-adding a case-insensitively matching name restores the archived row rather
+# than duplicating it. See DECISIONS.md § "Income & Expense Tracker".
+# --------------------------------------------------------------------------- #
+def _slugify(name: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+    return slug or "category"
+
+
+def ensure_categories_seeded(user_id: int) -> None:
+    """First touch of the categories surface seeds the defaults (both types).
+    Keys equal the pre-v0.15.1 curated slugs, so historical transaction rows
+    resolve against a seeded category. Idempotent — a user with ANY category
+    row is left alone."""
+    conn = get_db()
+    row = conn.execute(
+        "SELECT 1 FROM ie_categories WHERE user_id = %s LIMIT 1", (user_id,)
+    ).fetchone()
+    if row:
+        return
+    for cat_type, defaults in DEFAULT_CATEGORIES.items():
+        for key, name in defaults:
+            conn.execute(
+                "INSERT INTO ie_categories (user_id, type, key, name) "
+                "VALUES (%s, %s, %s, %s) ON CONFLICT DO NOTHING",
+                (user_id, cat_type, key, name),
+            )
+    conn.commit()
+
+
+def list_categories(user_id: int) -> list[dict]:
+    """All of a user's categories (active + archived), seed order then creation
+    order. Seeds the defaults on first touch."""
+    ensure_categories_seeded(user_id)
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT id, type, key, name, archived FROM ie_categories "
+        "WHERE user_id = %s ORDER BY id",
+        (user_id,),
+    ).fetchall()
+    return [_row_to_dict(r) for r in rows]
+
+
+def create_category(user_id: int, cat_type: str, name: str) -> tuple[dict | None, str]:
+    """Create a category, or restore the archived one whose name matches
+    case-insensitively (duplicate-avoidance). Returns (row, outcome) where
+    outcome is 'created' | 'restored' | 'conflict' (row is the existing active
+    duplicate for 'conflict')."""
+    ensure_categories_seeded(user_id)
+    name = name.strip()
+    conn = get_db()
+    existing = conn.execute(
+        "SELECT id, type, key, name, archived FROM ie_categories "
+        "WHERE user_id = %s AND type = %s AND lower(name) = lower(%s)",
+        (user_id, cat_type, name),
+    ).fetchone()
+    if existing:
+        if existing["archived"]:
+            conn.execute(
+                "UPDATE ie_categories SET archived = FALSE "
+                "WHERE id = %s AND user_id = %s",
+                (existing["id"], user_id),
+            )
+            conn.commit()
+            return get_category(existing["id"], user_id), "restored"
+        return _row_to_dict(existing), "conflict"
+
+    # Immutable key: slug of the name, suffixed until unique per (user, type) —
+    # archived rows included, since a key on old transaction rows must never be
+    # reused for a different category.
+    base = _slugify(name)
+    taken = {
+        r["key"]
+        for r in conn.execute(
+            "SELECT key FROM ie_categories WHERE user_id = %s AND type = %s",
+            (user_id, cat_type),
+        ).fetchall()
+    }
+    key = base
+    suffix = 2
+    while key in taken:
+        key = f"{base}-{suffix}"
+        suffix += 1
+
+    row = conn.execute(
+        "INSERT INTO ie_categories (user_id, type, key, name) "
+        "VALUES (%s, %s, %s, %s) RETURNING id",
+        (user_id, cat_type, key, name),
+    ).fetchone()
+    conn.commit()
+    return get_category(row["id"], user_id), "created"
+
+
+def get_category(cat_id: int, user_id: int) -> dict | None:
+    conn = get_db()
+    row = conn.execute(
+        "SELECT id, type, key, name, archived FROM ie_categories "
+        "WHERE id = %s AND user_id = %s",
+        (cat_id, user_id),
+    ).fetchone()
+    return _row_to_dict(row) if row else None
+
+
+def set_category_archived(cat_id: int, user_id: int, archived: bool) -> dict | None:
+    """Soft delete / restore. None if not found / wrong user."""
+    conn = get_db()
+    cursor = conn.execute(
+        "UPDATE ie_categories SET archived = %s WHERE id = %s AND user_id = %s",
+        (archived, cat_id, user_id),
+    )
+    conn.commit()
+    return get_category(cat_id, user_id) if cursor.rowcount else None
+
+
+def active_category_keys(user_id: int, cat_type: str) -> set[str]:
+    """The user's active category keys for one type — the write-time validity
+    set for transactions and grid cells (seeds defaults on first touch)."""
+    ensure_categories_seeded(user_id)
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT key FROM ie_categories "
+        "WHERE user_id = %s AND type = %s AND archived = FALSE",
+        (user_id, cat_type),
+    ).fetchall()
+    return {r["key"] for r in rows}
+
+
 def _month_bounds(year: int, month: int) -> tuple[date, date]:
     """[start, end) date bounds for one calendar month."""
     start = date(year, month, 1)
@@ -167,17 +297,26 @@ def replace_month(user_id: int, year: int, month: int, cells: list[dict]) -> dic
     bucket, insert the submitted cells at the first of the month, commit once
     (delete + inserts are a single transaction). A cell absent from the payload
     is cleared — no upsert bookkeeping. Manual rows are untouched.
+
+    The wholesale delete is scoped to the user's ACTIVE categories — aggregate
+    rows for archived categories are preserved (the grid renders them read-only;
+    restore the category to edit them). The route validates every submitted
+    cell against the active sets before calling this.
     """
     start, end = _month_bounds(year, month)
     conn = get_db()
-    conn.execute(
-        """
-        DELETE FROM ie_transactions
-        WHERE user_id = %s AND source = 'monthly'
-          AND occurred_on >= %s AND occurred_on < %s
-        """,
-        (user_id, start, end),
-    )
+    for cat_type in ("income", "expense"):
+        keys = active_category_keys(user_id, cat_type)
+        if keys:
+            conn.execute(
+                """
+                DELETE FROM ie_transactions
+                WHERE user_id = %s AND source = 'monthly' AND type = %s
+                  AND category = ANY(%s)
+                  AND occurred_on >= %s AND occurred_on < %s
+                """,
+                (user_id, cat_type, list(keys), start, end),
+            )
     for cell in cells:
         conn.execute(
             """

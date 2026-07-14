@@ -27,6 +27,9 @@ vi.mock('../hooks/useIncomeExpenseData', () => ({
     updateTransaction: noop,
     deleteTransaction: noop,
     saveMonth: noop,
+    categories: [],
+    addCategory: noop,
+    setCategoryArchived: noop,
   }),
 }))
 
@@ -67,6 +70,13 @@ describe('IncomeExpensePage', () => {
     expect(await screen.findByLabelText('Salary')).toBeInTheDocument()
     expect(screen.getByLabelText('Housing')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /save month/i })).toBeInTheDocument()
+  })
+
+  it('switches to the Bulk upload tab and shows the coming-soon teaser', () => {
+    renderPage()
+    fireEvent.click(screen.getByRole('button', { name: /bulk upload/i }))
+    expect(screen.getByText(/bulk upload — coming soon/i)).toBeInTheDocument()
+    expect(screen.getByText(/PDF statement/i)).toBeInTheDocument()
   })
 
   it('switches to the Transactions tab and renders the panel', () => {

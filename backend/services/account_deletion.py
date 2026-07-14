@@ -55,6 +55,7 @@ USER_SCOPED_TABLES = (
     "nw_real_estate",
     "nw_snapshots",
     "ie_transactions",
+    "ie_categories",
 )
 
 

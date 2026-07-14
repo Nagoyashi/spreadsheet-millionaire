@@ -1,12 +1,14 @@
 """
 schemas/income_expense_schema.py
 --------------------------------
-Marshmallow schema for Income & Expense transactions.
+Marshmallow schemas for Income & Expense transactions, the monthly grid, and
+user-scoped categories.
 
 Enums draw on income_expense_types.py (the same source as the db_init CHECKs).
-The DB CHECK accepts the income∪expense category union; this schema additionally
-validates that the category matches the transaction's type (per-type), when both
-are present (PUT may send a partial body).
+Since v0.15.1 categories are user-scoped (ie_categories) — the schemas bound
+the category string's shape only; per-user validity (does this key exist,
+active, for this type?) is checked at the model layer by the routes, because a
+static schema can't see the user's category set.
 """
 
 from marshmallow import (
@@ -20,25 +22,18 @@ from marshmallow import (
 
 from income_expense_types import (
     TRANSACTION_TYPES,
-    ALL_CATEGORIES,
-    EXPENSE_CATEGORIES,
-    INCOME_CATEGORIES,
     RECURRENCE_UNITS,
+    CATEGORY_NAME_MAX,
 )
 
-
-def _check_category_matches_type(data):
-    """Per-type category validation shared by the transaction + grid-cell schemas."""
-    t, c = data.get("type"), data.get("category")
-    if t and c:
-        valid = EXPENSE_CATEGORIES if t == "expense" else INCOME_CATEGORIES
-        if c not in valid:
-            raise ValidationError(f"'{c}' is not a valid {t} category.", field_name="category")
+_category_field = lambda: fields.Str(  # noqa: E731 — one shared field shape
+    required=True, validate=validate.Length(min=1, max=CATEGORY_NAME_MAX)
+)
 
 
 class TransactionSchema(Schema):
     type = fields.Str(required=True, validate=validate.OneOf(TRANSACTION_TYPES))
-    category = fields.Str(required=True, validate=validate.OneOf(ALL_CATEGORIES))
+    category = _category_field()
     amount = fields.Decimal(
         required=True, places=2, validate=validate.Range(min=0, min_inclusive=False)
     )
@@ -53,10 +48,6 @@ class TransactionSchema(Schema):
     recurrence_interval = fields.Int(
         validate=validate.Range(min=1, max=366), load_default=1
     )
-
-    @validates_schema
-    def _category_matches_type(self, data, **kwargs):
-        _check_category_matches_type(data)
 
     @post_load
     def _normalise_recurrence(self, data, **kwargs):
@@ -79,18 +70,15 @@ class MonthCellSchema(Schema):
     """
 
     type = fields.Str(required=True, validate=validate.OneOf(TRANSACTION_TYPES))
-    category = fields.Str(required=True, validate=validate.OneOf(ALL_CATEGORIES))
+    category = _category_field()
     amount = fields.Decimal(
         required=True, places=2, validate=validate.Range(min=0, min_inclusive=False)
     )
 
-    @validates_schema
-    def _category_matches_type(self, data, **kwargs):
-        _check_category_matches_type(data)
 
-
-# Every (type, category) combo at most once — the hard ceiling on a grid payload.
-_MAX_GRID_CELLS = len(EXPENSE_CATEGORIES) + len(INCOME_CATEGORIES)
+# With user-scoped categories the combo count is per-user, so the payload cap is
+# a generous fixed bound rather than the default-set size.
+_MAX_GRID_CELLS = 200
 
 
 class MonthGridSchema(Schema):
@@ -117,3 +105,27 @@ class MonthGridSchema(Schema):
                     f"Duplicate cell for {key[0]}/{key[1]}.", field_name="cells"
                 )
             seen.add(key)
+
+
+class CategorySchema(Schema):
+    """POST /categories — add (or restore, on an archived name match) a
+    user-scoped category. The key is server-generated; archived state is
+    managed via PATCH, so neither is accepted here (unknown fields raise)."""
+
+    type = fields.Str(required=True, validate=validate.OneOf(TRANSACTION_TYPES))
+    name = fields.Str(
+        required=True, validate=validate.Length(min=1, max=CATEGORY_NAME_MAX)
+    )
+
+    @post_load
+    def _strip_name(self, data, **kwargs):
+        data["name"] = data["name"].strip()
+        if not data["name"]:
+            raise ValidationError("Name must not be blank.", field_name="name")
+        return data
+
+
+class CategoryArchiveSchema(Schema):
+    """PATCH /categories/<id> — archive (soft delete) or restore."""
+
+    archived = fields.Bool(required=True)

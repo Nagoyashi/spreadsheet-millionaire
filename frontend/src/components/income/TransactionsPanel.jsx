@@ -4,7 +4,7 @@ import NumInput from '../ui/NumInput'
 import { fmt } from '../../utils/format'
 import {
   TYPE_OPTIONS,
-  CATEGORY_OPTIONS,
+  activeCategoryOptions,
   categoryLabel,
   RECURRENCE_UNIT_OPTIONS,
   recurrenceLabel,
@@ -18,21 +18,12 @@ import {
 
 const money = (n) => fmt(n, { compact: false })
 
-const emptyForm = () => ({
-  type: 'expense',
-  category: CATEGORY_OPTIONS.expense[0].value,
-  amount: '',
-  occurred_on: '',
-  note: '',
-  recurrence_unit: 'none',
-  recurrence_interval: '1',
-})
-
 const selectClass =
   'w-full px-3 py-2.5 sm:py-2 text-base sm:text-sm text-gray-800 bg-white rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-500'
 
 export default function TransactionsPanel({
   transactions,
+  categories,
   filters,
   setFilters,
   availableYears,
@@ -40,6 +31,18 @@ export default function TransactionsPanel({
   onUpdate,
   onDelete,
 }) {
+  // The user's own active categories drive the form options (v0.15.1);
+  // archived/legacy keys on existing rows still label via categoryLabel.
+  const options = activeCategoryOptions(categories)
+  const emptyForm = () => ({
+    type: 'expense',
+    category: options.expense[0]?.value ?? '',
+    amount: '',
+    occurred_on: '',
+    note: '',
+    recurrence_unit: 'none',
+    recurrence_interval: '1',
+  })
   const [form, setForm] = useState(emptyForm)
   const [editingId, setEditingId] = useState(null)
   const [typeFilter, setTypeFilter] = useState('all')
@@ -50,7 +53,7 @@ export default function TransactionsPanel({
     setForm((prev) => {
       const next = { ...prev, [name]: value }
       // Switching type invalidates the category — reset to the new type's first.
-      if (name === 'type') next.category = CATEGORY_OPTIONS[value][0].value
+      if (name === 'type') next.category = options[value][0]?.value ?? ''
       return next
     })
   }
@@ -195,7 +198,7 @@ export default function TransactionsPanel({
                     </td>
                     <td className="px-4 py-3 text-gray-800">
                       <span className="inline-flex items-center gap-1.5">
-                        {categoryLabel(t.type, t.category)}
+                        {categoryLabel(t.type, t.category, categories)}
                         {t.source === 'monthly' && (
                           <span
                             className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-amber-100 text-amber-700"
@@ -291,7 +294,7 @@ export default function TransactionsPanel({
               onChange={(e) => setField('category', e.target.value)}
               className={selectClass}
             >
-              {CATEGORY_OPTIONS[form.type].map((o) => (
+              {options[form.type].map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
                 </option>
