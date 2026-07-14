@@ -1,6 +1,6 @@
 # SpreadsheetMillionaire
 
-Personal-finance calculator web app. Flask API + React/Vite SPA. Anonymous users can use every published calculator; authenticated users can save/load/rename/delete their inputs. The public MVP ships 4 of 12 calculators; the other 8 are hidden behind a `published` flag and re-enable one at a time as build-in-public patches.
+Personal-finance calculator web app. Flask API + React/Vite SPA. Anonymous users can use every published calculator; authenticated users can save/load/rename/delete their inputs. All 12 calculators and both trackers are published in production (the build-in-public rollout is complete); publish state stays runtime/DB-backed and admin-toggleable, so any surface can still be unpublished without a deploy.
 
 ## Session protocol — how to resume
 
