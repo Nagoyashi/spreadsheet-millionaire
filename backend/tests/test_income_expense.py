@@ -302,6 +302,23 @@ def test_month_idor_isolation(app, db, get_csrf_token):
     assert client_a.get("/api/income-expense/months/2026/3").get_json()["cells"] != []
 
 
+def test_summary_includes_monthly_grid_rows(auth_client, get_csrf_token):
+    """Regression (#294): aggregate grid rows are ordinary transactions — the
+    year summary must fold them in with manual rows, never filter on source."""
+    client, _ = auth_client
+    h = {"X-CSRF-Token": get_csrf_token(client)}
+
+    client.post("/api/income-expense/transactions", headers=h,
+                json=_txn(occurred_on="2026-03-15", amount=12.50))
+    client.put("/api/income-expense/months/2026/3", headers=h,
+               json=_cells(_cell(amount=400), _cell(type="income", category="salary", amount=3000)))
+
+    summary = client.get("/api/income-expense/summary?year=2026").get_json()
+    assert summary["totals"] == {"income": 3000.0, "expense": 412.50, "net": 2587.50}
+    assert summary["by_month"][2] == {"month": 3, "income": 3000.0, "expense": 412.50}
+    assert summary["by_category"]["expense"]["food"] == 412.50
+
+
 def test_manual_transactions_default_to_manual_source(auth_client, get_csrf_token):
     client, _ = auth_client
     h = {"X-CSRF-Token": get_csrf_token(client)}

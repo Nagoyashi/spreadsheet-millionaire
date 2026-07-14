@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Pencil, Trash2, Plus, X, Repeat } from 'lucide-react'
+import { Pencil, Trash2, Plus, X, Repeat, CalendarDays } from 'lucide-react'
 import NumInput from '../ui/NumInput'
 import { fmt } from '../../utils/format'
 import {
@@ -196,6 +196,15 @@ export default function TransactionsPanel({
                     <td className="px-4 py-3 text-gray-800">
                       <span className="inline-flex items-center gap-1.5">
                         {categoryLabel(t.type, t.category)}
+                        {t.source === 'monthly' && (
+                          <span
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-amber-100 text-amber-700"
+                            title="Aggregate row saved from the Monthly entry grid — editing or deleting it here updates the grid too"
+                          >
+                            <CalendarDays className="w-3 h-3" />
+                            Monthly entry
+                          </span>
+                        )}
                         {t.recurrence_unit && t.recurrence_unit !== 'none' && (
                           <span
                             className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-indigo-100 text-indigo-700"

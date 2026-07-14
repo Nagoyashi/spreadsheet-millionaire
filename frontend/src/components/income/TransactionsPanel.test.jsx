@@ -50,6 +50,31 @@ describe('TransactionsPanel', () => {
     expect(screen.getByText(/no transactions/i)).toBeInTheDocument()
   })
 
+  it('badges aggregate rows from the Monthly entry grid, not manual rows', () => {
+    setup([
+      {
+        id: 1,
+        type: 'expense',
+        category: 'food',
+        amount: 400,
+        occurred_on: '2026-03-01',
+        note: '',
+        source: 'monthly',
+      },
+      {
+        id: 2,
+        type: 'expense',
+        category: 'food',
+        amount: 12,
+        occurred_on: '2026-03-15',
+        note: '',
+        source: 'manual',
+      },
+    ])
+    // Exactly one badge — on the aggregate row only.
+    expect(screen.getAllByText('Monthly entry')).toHaveLength(1)
+  })
+
   it('category options follow the selected type', () => {
     setup([])
     const [typeSelect, categorySelect] = within(form()).getAllByRole('combobox')

@@ -14,7 +14,8 @@ describe('median', () => {
 })
 
 describe('monthlyIncomeStats', () => {
-  const empty = () => Array.from({ length: 12 }, (_, i) => ({ month: i + 1, income: 0, expense: 0 }))
+  const empty = () =>
+    Array.from({ length: 12 }, (_, i) => ({ month: i + 1, income: 0, expense: 0 }))
 
   it('returns nulls when no month has activity', () => {
     expect(monthlyIncomeStats(empty())).toEqual({ average: null, median: null, activeMonths: 0 })
@@ -79,5 +80,31 @@ describe('categoryBreakdown', () => {
 describe('txnYearMonth', () => {
   it('parses an ISO date without timezone drift', () => {
     expect(txnYearMonth('2026-03-15')).toEqual({ year: 2026, month: 3 })
+  })
+})
+
+describe('monthly-grid aggregate rows (source="monthly")', () => {
+  // Regression (#294): grid rows are ordinary transactions — the selectors must
+  // aggregate them exactly like manual rows, never filter on source.
+  it('categoryBreakdown sums aggregate and manual rows together', () => {
+    const rows = [
+      {
+        type: 'expense',
+        category: 'food',
+        amount: 400,
+        occurred_on: '2026-03-01',
+        source: 'monthly',
+      },
+      {
+        type: 'expense',
+        category: 'food',
+        amount: 12.5,
+        occurred_on: '2026-03-15',
+        source: 'manual',
+      },
+    ]
+    expect(categoryBreakdown(rows, { year: 2026, month: 3, type: 'expense' })).toEqual([
+      { category: 'food', value: 412.5 },
+    ])
   })
 })
