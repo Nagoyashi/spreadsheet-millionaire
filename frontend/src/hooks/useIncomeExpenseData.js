@@ -51,7 +51,7 @@ export function useIncomeExpenseData(isAuthenticated) {
         return { success: false, error: describeError(res), errors: res.data?.errors }
       }
       await fetchAll()
-      return { success: true, item: res.data?.item }
+      return { success: true, item: res.data?.item, data: res.data }
     },
     [fetchAll]
   )
@@ -75,5 +75,14 @@ export function useIncomeExpenseData(isAuthenticated) {
       }),
     updateTransaction: (id, body) => mutate(() => incomeExpenseApi.updateTransaction(id, body)),
     deleteTransaction: (id) => mutate(() => incomeExpenseApi.removeTransaction(id)),
+
+    // Monthly grid save — replaces one month's aggregate rows wholesale, then
+    // refetches so the summary/transactions stay in sync. A non-empty save is
+    // an activation moment too (trackerFirstEntry is one-shot server-side).
+    saveMonth: (year, month, cells) =>
+      mutate(() => incomeExpenseApi.putMonth(year, month, cells)).then((result) => {
+        if (result.success && cells.length > 0) analytics.trackerFirstEntry('income-expenses')
+        return result
+      }),
   }
 }

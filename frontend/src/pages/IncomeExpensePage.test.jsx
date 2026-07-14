@@ -26,7 +26,16 @@ vi.mock('../hooks/useIncomeExpenseData', () => ({
     addTransaction: noop,
     updateTransaction: noop,
     deleteTransaction: noop,
+    saveMonth: noop,
   }),
+}))
+
+// The Monthly-entry panel fetches its own month state on mount.
+vi.mock('../api/incomeExpenseApi', () => ({
+  incomeExpenseApi: {
+    getMonth: () =>
+      Promise.resolve({ ok: true, data: { cells: [], manual_sums: { income: {}, expense: {} } } }),
+  },
 }))
 
 import IncomeExpensePage from './IncomeExpensePage'
@@ -49,6 +58,15 @@ describe('IncomeExpensePage', () => {
   it('defaults to the Overview cashflow dashboard', () => {
     renderPage()
     expect(screen.getByText('Cashflow — 2026')).toBeInTheDocument()
+  })
+
+  it('switches to the Monthly entry tab and renders the grid', async () => {
+    renderPage()
+    fireEvent.click(screen.getByRole('button', { name: /monthly entry/i }))
+    // Both category sections render once the month state loads.
+    expect(await screen.findByLabelText('Salary')).toBeInTheDocument()
+    expect(screen.getByLabelText('Housing')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /save month/i })).toBeInTheDocument()
   })
 
   it('switches to the Transactions tab and renders the panel', () => {

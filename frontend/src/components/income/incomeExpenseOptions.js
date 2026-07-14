@@ -37,6 +37,23 @@ export function categoryLabel(type, value) {
   return CATEGORY_OPTIONS[type]?.find((o) => o.value === value)?.label ?? value
 }
 
+// Month display names, indexed 0–11 (calendar month − 1). Shared by the
+// Transactions filter bar and the Monthly-entry grid.
+export const MONTH_NAMES = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+]
+
 // Recurrence — mirrors backend RECURRENCE_UNITS. A repeat is (unit, interval):
 // e.g. ('week', 2) = "Every 2 weeks". 'none' = a one-off.
 export const RECURRENCE_UNIT_OPTIONS = [

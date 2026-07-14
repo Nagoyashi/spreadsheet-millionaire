@@ -8,6 +8,7 @@ import {
   categoryLabel,
   RECURRENCE_UNIT_OPTIONS,
   recurrenceLabel,
+  MONTH_NAMES,
 } from './incomeExpenseOptions'
 
 // Transactions tab — year/month/type filters + a table + an add/edit form.
@@ -16,20 +17,6 @@ import {
 // through the hook's setFilters; the type filter is client-side.
 
 const money = (n) => fmt(n, { compact: false })
-const MONTHS = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-]
 
 const emptyForm = () => ({
   type: 'expense',
@@ -155,7 +142,7 @@ export default function TransactionsPanel({
           className={`${selectClass} sm:w-auto`}
         >
           <option value="">All months</option>
-          {MONTHS.map((m, i) => (
+          {MONTH_NAMES.map((m, i) => (
             <option key={m} value={i + 1}>
               {m}
             </option>
