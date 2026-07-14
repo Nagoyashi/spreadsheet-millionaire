@@ -23,25 +23,29 @@ credential-gated), **`v0.14.1`** data lifecycle + legal (2026-07-12: verified
 deletion cascade, data export, legal pages current, admin support tools), and
 **`v0.14.2`** CI confidence + scale sanity (2026-07-12: CI can't go green
 without the DB, migration/entitlement/cascade/rate-limit tests, Neon pooling
-check — suite 132→147). Next up: **Phase 15 — Billing (`v0.15.0`)**, the
-keystone every monetization feature hangs off (see `docs/ROADMAP.md`); not yet
-opened as a milestone.
+check — suite 132→147). **Resequenced 2026-07-14:** the `v0.15.0` slot goes to
+**Phase 15 — I&E bulk data entry** (monthly category grid — the spreadsheet-style
+input rework); **Billing slides to Phase 16 (`v0.16.0`)** and absorbs the
+free/premium boundary decision from the former trackers-go-live phase (see
+`docs/ROADMAP.md`).
 
 ## Current cycle
 
 > Canonical cycle state = the single **open GitHub Milestone**. This line mirrors
 > it for at-a-glance reading in the editor; if they disagree, the milestone wins.
 
-**Between cycles — Phase 14 complete.** `v0.14.2` (CI confidence + scale
-sanity) shipped 2026-07-12 and its milestone closes on the tag; no milestone is
-open. **Next up: Phase 15 — Billing (`v0.15.0`)**, the keystone (Stripe
-Checkout + Customer Portal, signed/idempotent webhooks syncing subscription →
-tier, the computed-entitlement helper, dunning/receipt emails, real MRR, admin
-billing panel — see `docs/ROADMAP.md` § Phase 15). Its issues are not yet
-filed/promoted. Operator to-dos still pending from Phase 14: Sentry + PostHog
-keys, external uptime monitor on `/api/health/ready`, `pooling_check.py`
-against the real Neon strings. Trackers stay **dark via runtime publish**.
-Backlog on the [Project board](https://github.com/users/Nagoyashi/projects) ↗
+**Phase 15 — I&E bulk data entry (`v0.15.0`) — OPEN** (milestone opened
+2026-07-14, 0/4 issues closed): a month-at-a-time category grid on the Income &
+Expense tracker — pick a month, fill each category's sum (income + expense
+sections), save in bulk — alongside the existing per-transaction form. Issues:
+#292 (data model + bulk month API), #293 (Monthly-entry tab grid UI), #294
+(overview/selector verification), #295 (roadmap resequencing docs). PDF
+bank-statement import filed as unscheduled backlog (#296). Billing moved to
+`v0.16.0` (its pre-filed issues #189–#197 wait in the backlog). Operator
+to-dos still pending from Phase 14: Sentry + PostHog keys, external uptime
+monitor on `/api/health/ready`, `pooling_check.py` against the real Neon
+strings. Backlog on the
+[Project board](https://github.com/users/Nagoyashi/projects) ↗
 
 Each release cycle is a Milestone named for its target version (`v0.10.0`); its
 issues are the cycle's scope. Patches (`vX.Y.Z`, Z > 0) skip milestones.
@@ -117,11 +121,11 @@ issues are the cycle's scope. Patches (`vX.Y.Z`, Z > 0) skip milestones.
   (one asset's value over time, not just aggregate NW) and snapshot comparison (diff any
   two snapshots per asset class); both need a richer snapshot shape (schema change).
   Auto/scheduled snapshots need a background-job concept that doesn't exist yet.
-- **Product review & go-live readiness** *(next cycle — targeted at `v0.14.0`)* — full product
+- **Product review & go-live readiness** *(landed as Phase 14, `v0.14.x` — kept for the record)* — full product
   audit before committing to a launch shape: what's working/missing, feedback
   synthesis, competitive landscape, and the launch-posture decision (freemium vs.
   free-only, positioning). Output: clarity on go-live + the v0.15.0+ roadmap.
-- **Referral engine** *(targeted at `v0.15.0`)* — referral codes/links, attribution
+- **Referral engine** *(moved to `v1.1` — see `docs/ROADMAP.md`; epic tickets pre-filed #218–#225)* — referral codes/links, attribution
   + reward tracking, abuse/fraud guards, three-layer gating (UI / route / DB), and
   its own DB tables + API namespace. Shape depends on the product-review outcome
   (rewards as Freemium entitlement grants); design decisions recorded in
@@ -149,12 +153,12 @@ issues are the cycle's scope. Patches (`vX.Y.Z`, Z > 0) skip milestones.
 - **Settings expansion** — currency preference, i18n, email-verification-on-change.
 - **Design-system refresh** — extract shared primitives once the visual language settles.
 
-> **Planned cycle sequence** (prose intent, not yet milestones — open one at a time
-> per the Session protocol): `v0.9.0` Test & CI ✅ → `v0.10.0` Net Worth Tracker ✅
-> → `v0.11.0` Income & Expense Tracker ✅ → `v0.12.0` Backlog cleanup +
-> Security hardening (next) → `v0.13.0` Product review & go-live readiness →
-> `v0.14.0` Referral engine. The Freemium tier slots in wherever entitlement/rewards
-> work forces it (likely alongside the referral engine, after the product review).
+> **Planned cycle sequence** now lives in `docs/ROADMAP.md` (resequenced
+> 2026-07-14: `v0.15` I&E bulk data entry → `v0.16` Billing + free/premium
+> boundary → `v0.17` bridge + Score → `v1.0`, then the growth loops). The
+> sequence that used to sit here (Test & CI → trackers → cleanup/security →
+> product review → referral) shipped as `v0.9.0`–`v0.14.x`; the referral engine
+> moved to `v1.1` in the roadmap.
 
 > Format going forward: one line per release — `<date> · vX.Y.Z · <summary>` →
 > link to `docs/releases/`. Detail lives in the release file, not here. (Entries
