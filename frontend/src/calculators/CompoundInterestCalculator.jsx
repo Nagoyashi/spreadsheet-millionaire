@@ -20,7 +20,7 @@ const DEFAULTS = {
   compound_frequency: 12,
 }
 
-function calculate(inputs) {
+export function calculate(inputs) {
   const P   = parseFloat(inputs.principal) || 0
   const pmt = parseFloat(inputs.monthly_contribution) || 0
   const r   = parseFloat(inputs.annual_rate) / 100 || 0
@@ -30,7 +30,8 @@ function calculate(inputs) {
   const ratePerPeriod  = r / n
   const periods        = n * t
   const fvLump         = P * Math.pow(1 + ratePerPeriod, periods)
-  const periodicContrib = pmt * (n / 12)
+  // pmt is a *monthly* amount: 12·pmt per year, spread across n periods.
+  const periodicContrib = pmt * (12 / n)
   const fvContrib = periodicContrib > 0 && ratePerPeriod > 0
     ? periodicContrib * ((Math.pow(1 + ratePerPeriod, periods) - 1) / ratePerPeriod)
     : periodicContrib * periods

@@ -85,7 +85,7 @@ export default function DividendCalculator({ initialData, onDataChange }) {
           gradientClass="from-blue-500 to-indigo-600"
         />
         <StatCard
-          label={`Income in ${inputs.years}yrs`}
+          label={`Income in ${inputs.years || 0}yrs`}
           value={fmt(results.finalAnnualIncome)}
           sub="Annual after-tax income"
           Icon={TrendingUp}
@@ -93,7 +93,7 @@ export default function DividendCalculator({ initialData, onDataChange }) {
           gradientClass="from-violet-500 to-purple-600"
         />
         <StatCard
-          label={`Portfolio in ${inputs.years}yrs`}
+          label={`Portfolio in ${inputs.years || 0}yrs`}
           value={fmt(results.finalPortfolio)}
           sub="With reinvestment + contributions"
           Icon={Repeat}

@@ -21,7 +21,7 @@ const DEFAULTS = {
   withdrawal_rate: 4,
 }
 
-function calculate(inputs) {
+export function calculate(inputs) {
   const annualExpenses  = parseFloat(inputs.annual_expenses) || 0
   const savingsRate     = parseFloat(inputs.savings_rate) / 100 || 0
   const currentSavings  = parseFloat(inputs.current_savings) || 0
@@ -32,18 +32,16 @@ function calculate(inputs) {
   const fireNumber    = withdrawalRate > 0 ? annualExpenses / withdrawalRate : 0
   const annualSavings = annualIncome * savingsRate
 
+  // Simulate even with zero contributions — an existing portfolio can still
+  // compound its way to the target. `null` = not reached within 100 years.
   let years = 0
   let balance = currentSavings
-  if (annualSavings > 0 && fireNumber > 0) {
-    if (expectedReturn === 0) {
-      years = fireNumber > currentSavings ? Math.ceil((fireNumber - currentSavings) / annualSavings) : 0
-    } else {
-      while (balance < fireNumber && years < 100) {
-        balance = balance * (1 + expectedReturn) + annualSavings
-        years++
-      }
-      if (years >= 100) years = null
+  if (fireNumber > 0 && balance < fireNumber) {
+    while (balance < fireNumber && years < 100) {
+      balance = balance * (1 + expectedReturn) + annualSavings
+      years++
     }
+    if (balance < fireNumber) years = null
   }
 
   const chartData = []

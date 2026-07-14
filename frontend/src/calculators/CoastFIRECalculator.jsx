@@ -20,7 +20,7 @@ const DEFAULTS = {
   retirement_age: 65,
 }
 
-function calculate(inputs) {
+export function calculate(inputs) {
   const savings       = parseFloat(inputs.current_savings) || 0
   const contribution  = parseFloat(inputs.annual_contribution) || 0
   const returnRate    = parseFloat(inputs.expected_return) / 100 || 0.07
@@ -29,23 +29,27 @@ function calculate(inputs) {
   const currentAge    = parseFloat(inputs.current_age) || 30
   const retirementAge = parseFloat(inputs.retirement_age) || 65
 
-  const yearsToRetirement = retirementAge - currentAge
+  const yearsToRetirement = Math.max(0, retirementAge - currentAge)
   const fireNumber        = withdrawalRate > 0 ? expenses / withdrawalRate : 0
 
   // Coast FIRE number: amount needed NOW to hit FIRE number at retirement with no more contributions
   const coastNumber = fireNumber / Math.pow(1 + returnRate, yearsToRetirement)
+  // The threshold RISES each year you wait: at year y you need
+  // fireNumber / (1+r)^(yearsToRetirement - y) — fewer coasting years remain.
+  const coastAt = y => fireNumber / Math.pow(1 + returnRate, yearsToRetirement - y)
 
   const hasCoasted   = savings >= coastNumber
   const coastGap     = Math.max(0, coastNumber - savings)
 
-  // Years until coast number is reached with current contributions
-  let yearsToCoast = 0
+  // First year the contributing portfolio crosses that year's coast threshold.
+  // null = never before retirement (contributions too small to outpace it).
+  let yearsToCoast = null
   let bal = savings
-  while (bal < coastNumber && yearsToCoast < yearsToRetirement) {
+  for (let y = 0; y <= yearsToRetirement; y++) {
+    if (bal >= coastAt(y)) { yearsToCoast = y; break }
     bal = bal * (1 + returnRate) + contribution
-    yearsToCoast++
   }
-  const coastAge = currentAge + yearsToCoast
+  const coastAge = yearsToCoast !== null ? currentAge + yearsToCoast : null
 
   // Chart: portfolio with contributions until coast, then coasting to retirement
   const chartData = []
@@ -56,9 +60,9 @@ function calculate(inputs) {
       withContributions: Math.round(bal),
       coastOnly: Math.round(savings * Math.pow(1 + returnRate, y)),
       target: Math.round(fireNumber),
-      coastTarget: Math.round(coastNumber),
+      coastTarget: Math.round(coastAt(y)),
     })
-    if (y < yearsToCoast) {
+    if (yearsToCoast === null || y < yearsToCoast) {
       bal = bal * (1 + returnRate) + contribution
     } else {
       bal = bal * (1 + returnRate)
@@ -107,8 +111,8 @@ export default function CoastFIRECalculator({ initialData, onDataChange }) {
         />
         <StatCard
           label="Coast Age"
-          value={results.hasCoasted ? `Age ${inputs.current_age}` : `Age ${results.coastAge}`}
-          sub={results.hasCoasted ? 'Right now' : `In ${results.yearsToCoast} years`}
+          value={results.hasCoasted ? `Age ${inputs.current_age}` : results.coastAge !== null ? `Age ${results.coastAge}` : 'Not on track'}
+          sub={results.hasCoasted ? 'Right now' : results.coastAge !== null ? `In ${results.yearsToCoast} years` : 'Raise contributions to coast'}
           Icon={Calendar}
           iconClass="text-violet-500"
           gradientClass="from-violet-500 to-purple-600"
@@ -149,7 +153,7 @@ export default function CoastFIRECalculator({ initialData, onDataChange }) {
             <XAxis dataKey="year" tick={{ fontSize: 12, fill: '#6b7280' }} tickLine={false} axisLine={false} tickFormatter={v => `Age ${v}`} />
             <YAxis tickFormatter={fmt} tick={{ fontSize: 12, fill: '#6b7280' }} tickLine={false} axisLine={false} width={54} />
             <Tooltip content={<ChartTooltip fmt={fmt} />} />
-            {!results.hasCoasted && (
+            {!results.hasCoasted && results.coastAge !== null && (
               <ReferenceLine x={results.coastAge} stroke="#f59e0b" strokeDasharray="4 3" strokeWidth={1.5}
                 label={{ value: 'Coast', position: 'insideTopRight', fontSize: 10, fill: '#f59e0b' }} />
             )}
