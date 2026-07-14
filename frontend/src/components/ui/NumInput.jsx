@@ -10,10 +10,16 @@
 //
 // Clamping (the actual robustness guard): native min/max only constrain the
 // spinner — they do NOT stop typed or pasted values like "8e31" or "-5", which
-// is the real failure mode. So we clamp in handleChange too: out-of-range values
-// snap to the bound, non-numeric input is ignored, and an empty field stays empty
-// (every calculator treats "" as 0 via `parseFloat(x) || 0`). The visible field
-// can therefore never hold a value outside [min, max].
+// is the real failure mode. So we clamp in JS too, split by bound:
+//   max — clamped on CHANGE. Typing appends digits, so a prefix of an in-range
+//         number never overshoots it; snapping immediately is safe.
+//   min — clamped on BLUR. Prefixes of in-range numbers ARE below a raised min
+//         ("3" on the way to "35" with min 18), so clamping per keystroke made
+//         typing impossible — the field snapped to 18, then "185" → max. Let
+//         under-min values sit while the field is focused; snap when it commits.
+// Non-numeric input is ignored, and an empty field stays empty (every
+// calculator treats "" as 0 via `parseFloat(x) || 0`). The committed (blurred)
+// value can therefore never be outside [min, max].
 
 import { useId } from 'react'
 
@@ -27,10 +33,19 @@ export default function NumInput({ label, prefix, suffix, value, onChange, hint,
     // or "e"); keep the previous value rather than writing garbage.
     if (!Number.isFinite(num)) return
     if (max != null && num > max) { onChange(String(max)); return }
-    if (min != null && num < min) { onChange(String(min)); return }
-    // In range: keep the raw string so in-progress entry like "0." or "1.0"
-    // survives until the next keystroke.
+    // A negative entry can never become in-range by appending digits when the
+    // range is non-negative — snap it immediately (keeps the old behavior on
+    // the min={0} monetary fields).
+    if (min != null && min >= 0 && num < 0) { onChange(String(min)); return }
+    // In range (or transiently under min while typing): keep the raw string so
+    // in-progress entry like "0." or "1.0" survives until the next keystroke.
     onChange(raw)
+  }
+
+  function handleBlur() {
+    if (value === '' || value == null) return
+    const num = Number(value)
+    if (min != null && Number.isFinite(num) && num < min) onChange(String(min))
   }
 
   return (
@@ -51,6 +66,7 @@ export default function NumInput({ label, prefix, suffix, value, onChange, hint,
           inputMode="decimal"
           value={value}
           onChange={e => handleChange(e.target.value)}
+          onBlur={handleBlur}
           min={min}
           max={max}
           step={step}
