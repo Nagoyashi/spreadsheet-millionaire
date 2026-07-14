@@ -11,6 +11,7 @@ import { analytics } from '../api/analytics'
 export function useIncomeExpenseData(isAuthenticated) {
   const [transactions, setTransactions] = useState([])
   const [summary, setSummary] = useState(null)
+  const [categories, setCategories] = useState([]) // user-scoped, incl. archived
   const [filters, setFilters] = useState({}) // { year?, month? }
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -23,12 +24,13 @@ export function useIncomeExpenseData(isAuthenticated) {
     setLoading(true)
     setError('')
 
-    const [txns, sum] = await Promise.all([
+    const [txns, sum, cats] = await Promise.all([
       incomeExpenseApi.listTransactions(filters),
       incomeExpenseApi.getSummary(filters.year),
+      incomeExpenseApi.listCategories(),
     ])
 
-    const failed = [txns, sum].find((r) => !r.ok)
+    const failed = [txns, sum, cats].find((r) => !r.ok)
     if (failed) {
       setError(describeError(failed))
       setLoading(false)
@@ -37,6 +39,7 @@ export function useIncomeExpenseData(isAuthenticated) {
 
     setTransactions(txns.data.items)
     setSummary(sum.data)
+    setCategories(cats.data.items)
     setLoading(false)
   }, [isAuthenticated, filters])
 
@@ -59,6 +62,7 @@ export function useIncomeExpenseData(isAuthenticated) {
   return {
     transactions,
     summary,
+    categories,
     filters,
     setFilters,
     loading,
@@ -84,5 +88,11 @@ export function useIncomeExpenseData(isAuthenticated) {
         if (result.success && cells.length > 0) analytics.trackerFirstEntry('income-expenses')
         return result
       }),
+
+    // Categories (archive/restore — v0.15.1). A 409 (active duplicate) surfaces
+    // through mutate's error path like any failed write.
+    addCategory: (type, name) => mutate(() => incomeExpenseApi.createCategory({ type, name })),
+    setCategoryArchived: (id, archived) =>
+      mutate(() => incomeExpenseApi.setCategoryArchived(id, archived)),
   }
 }

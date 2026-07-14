@@ -9,18 +9,44 @@ vi.mock('../../api/incomeExpenseApi', () => ({
 }))
 
 import { incomeExpenseApi } from '../../api/incomeExpenseApi'
+import { CATEGORY_OPTIONS } from './incomeExpenseOptions'
 import MonthlyEntryPanel from './MonthlyEntryPanel'
 
 const EMPTY_MONTH = { cells: [], manual_sums: { income: {}, expense: {} } }
+
+// The default seed, shaped like GET /categories rows.
+let _id = 0
+const DEFAULT_CATS = ['expense', 'income'].flatMap((type) =>
+  CATEGORY_OPTIONS[type].map((o) => ({
+    id: ++_id,
+    type,
+    key: o.value,
+    name: o.label,
+    archived: false,
+  }))
+)
 
 function mockMonth(data = EMPTY_MONTH) {
   incomeExpenseApi.getMonth.mockResolvedValue({ ok: true, data })
 }
 
-async function renderPanel({ onSaveMonth = vi.fn() } = {}) {
-  render(<MonthlyEntryPanel availableYears={[2026]} onSaveMonth={onSaveMonth} />)
+async function renderPanel({
+  onSaveMonth = vi.fn(),
+  onAddCategory = vi.fn().mockResolvedValue({ success: true }),
+  onSetCategoryArchived = vi.fn().mockResolvedValue({ success: true }),
+  categories = DEFAULT_CATS,
+} = {}) {
+  render(
+    <MonthlyEntryPanel
+      availableYears={[2026]}
+      categories={categories}
+      onSaveMonth={onSaveMonth}
+      onAddCategory={onAddCategory}
+      onSetCategoryArchived={onSetCategoryArchived}
+    />
+  )
   await waitFor(() => expect(screen.queryByText('Loading…')).not.toBeInTheDocument())
-  return { onSaveMonth }
+  return { onSaveMonth, onAddCategory, onSetCategoryArchived }
 }
 
 beforeEach(() => {
@@ -118,5 +144,57 @@ describe('MonthlyEntryPanel', () => {
     fireEvent.keyDown(salary, { key: 'Enter' })
     expect(document.activeElement).not.toBe(salary)
     expect(document.activeElement.tagName).toBe('INPUT')
+  })
+
+  // Categories — add / archive / restore (v0.15.1)
+  it('adds a category via the inline form', async () => {
+    mockMonth()
+    const { onAddCategory } = await renderPanel()
+    fireEvent.change(screen.getByLabelText('New expense category name'), {
+      target: { value: 'Strom + Gas' },
+    })
+    fireEvent.click(screen.getAllByRole('button', { name: 'Add' })[1]) // expense section
+    await waitFor(() => expect(onAddCategory).toHaveBeenCalledWith('expense', 'Strom + Gas'))
+  })
+
+  it('archives a category from its row', async () => {
+    mockMonth()
+    const { onSetCategoryArchived } = await renderPanel()
+    fireEvent.click(screen.getByLabelText('Archive Housing'))
+    const housing = DEFAULT_CATS.find((c) => c.key === 'housing')
+    await waitFor(() => expect(onSetCategoryArchived).toHaveBeenCalledWith(housing.id, true))
+  })
+
+  it('archived categories drop out of the grid and restore from the Archived list', async () => {
+    mockMonth({
+      cells: [{ type: 'expense', category: 'housing', amount: 750 }],
+      manual_sums: { income: {}, expense: {} },
+    })
+    const categories = DEFAULT_CATS.map((c) => (c.key === 'housing' ? { ...c, archived: true } : c))
+    const { onSetCategoryArchived } = await renderPanel({ categories })
+    // No input for an archived category — its saved amount shows read-only...
+    expect(screen.queryByLabelText('Housing')).not.toBeInTheDocument()
+    expect(screen.getByText('Archived')).toBeInTheDocument()
+    expect(screen.getByText('$750')).toBeInTheDocument()
+    // ...and it never lands in the save payload (backend preserves its rows).
+    fireEvent.click(screen.getByLabelText('Restore Housing'))
+    const housing = DEFAULT_CATS.find((c) => c.key === 'housing')
+    await waitFor(() => expect(onSetCategoryArchived).toHaveBeenCalledWith(housing.id, false))
+  })
+
+  it('an archived category is excluded from the save payload', async () => {
+    mockMonth({
+      cells: [{ type: 'expense', category: 'housing', amount: 750 }],
+      manual_sums: { income: {}, expense: {} },
+    })
+    const categories = DEFAULT_CATS.map((c) => (c.key === 'housing' ? { ...c, archived: true } : c))
+    const onSaveMonth = vi.fn().mockResolvedValue({ success: true, data: EMPTY_MONTH })
+    await renderPanel({ categories, onSaveMonth })
+    fireEvent.change(screen.getByLabelText('Food'), { target: { value: '400' } })
+    fireEvent.click(screen.getByRole('button', { name: /save month/i }))
+    await waitFor(() => expect(onSaveMonth).toHaveBeenCalled())
+    expect(onSaveMonth.mock.calls[0][2]).toEqual([
+      { type: 'expense', category: 'food', amount: 400 },
+    ])
   })
 })

@@ -328,3 +328,122 @@ def test_manual_transactions_default_to_manual_source(auth_client, get_csrf_toke
     # And the client can't smuggle a source through the transaction schema.
     assert client.post("/api/income-expense/transactions", headers=h,
                        json=_txn(source="monthly")).status_code == 422
+
+
+# --------------------------------------------------------------------------- #
+# Categories — user-scoped, archive/restore (v0.15.1)
+# --------------------------------------------------------------------------- #
+def test_categories_seed_defaults_on_first_touch(auth_client):
+    client, _ = auth_client
+    items = client.get("/api/income-expense/categories").get_json()["items"]
+    # 9 expense + 6 income defaults, keys = the pre-v0.15.1 curated slugs.
+    assert len(items) == 15
+    assert {i["key"] for i in items if i["type"] == "expense"} >= {"housing", "food", "other"}
+    assert {i["key"] for i in items if i["type"] == "income"} >= {"salary", "refund", "other"}
+    assert all(i["archived"] is False for i in items)
+    # Idempotent — a second touch doesn't re-seed.
+    assert len(client.get("/api/income-expense/categories").get_json()["items"]) == 15
+
+
+def test_add_custom_category_and_use_it(auth_client, get_csrf_token):
+    client, _ = auth_client
+    h = {"X-CSRF-Token": get_csrf_token(client)}
+
+    resp = client.post("/api/income-expense/categories", headers=h,
+                       json={"type": "expense", "name": "Strom + Gas"})
+    assert resp.status_code == 201, resp.get_data(as_text=True)
+    cat = resp.get_json()["item"]
+    assert cat["key"] == "strom-gas" and cat["name"] == "Strom + Gas"
+
+    # Usable immediately — individual transaction and grid cell.
+    assert client.post("/api/income-expense/transactions", headers=h,
+                       json=_txn(category="strom-gas")).status_code == 201
+    assert client.put("/api/income-expense/months/2026/3", headers=h,
+                      json=_cells(_cell(category="strom-gas"))).status_code == 200
+
+
+def test_duplicate_active_category_conflicts(auth_client, get_csrf_token):
+    client, _ = auth_client
+    h = {"X-CSRF-Token": get_csrf_token(client)}
+    client.post("/api/income-expense/categories", headers=h,
+                json={"type": "expense", "name": "Reisekosten"})
+    # Case-insensitive duplicate of an ACTIVE category → 409.
+    assert client.post("/api/income-expense/categories", headers=h,
+                       json={"type": "expense", "name": "reisekosten"}).status_code == 409
+    # Same name on the OTHER type is a different category — allowed.
+    assert client.post("/api/income-expense/categories", headers=h,
+                       json={"type": "income", "name": "Reisekosten"}).status_code == 201
+
+
+def test_archive_restore_and_no_duplicates(auth_client, get_csrf_token):
+    client, _ = auth_client
+    h = {"X-CSRF-Token": get_csrf_token(client)}
+    cat = client.post("/api/income-expense/categories", headers=h,
+                      json={"type": "expense", "name": "Wohnung"}).get_json()["item"]
+
+    # Archive (soft delete): new transactions in it are rejected...
+    assert client.patch(f"/api/income-expense/categories/{cat['id']}", headers=h,
+                        json={"archived": True}).status_code == 200
+    assert client.post("/api/income-expense/transactions", headers=h,
+                       json=_txn(category="wohnung")).status_code == 422
+    # ...but re-adding the same name RESTORES the row instead of duplicating.
+    resp = client.post("/api/income-expense/categories", headers=h,
+                       json={"type": "expense", "name": "WOHNUNG"})
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["restored"] is True and body["item"]["id"] == cat["id"]
+    assert body["item"]["archived"] is False
+    assert client.post("/api/income-expense/transactions", headers=h,
+                       json=_txn(category="wohnung")).status_code == 201
+
+
+def test_archived_category_history_is_preserved(auth_client, get_csrf_token):
+    client, _ = auth_client
+    h = {"X-CSRF-Token": get_csrf_token(client)}
+    cat = client.post("/api/income-expense/categories", headers=h,
+                      json={"type": "expense", "name": "Altlasten"}).get_json()["item"]
+    client.put("/api/income-expense/months/2026/3", headers=h,
+               json=_cells(_cell(category="altlasten", amount=77), _cell(amount=400)))
+    client.patch(f"/api/income-expense/categories/{cat['id']}", headers=h,
+                 json={"archived": True})
+
+    # Archived cells are rejected in a new PUT...
+    assert client.put("/api/income-expense/months/2026/3", headers=h,
+                      json=_cells(_cell(category="altlasten", amount=1))).status_code == 422
+    # ...and a wholesale re-save of the month PRESERVES the archived cell.
+    client.put("/api/income-expense/months/2026/3", headers=h, json=_cells(_cell(amount=500)))
+    state = client.get("/api/income-expense/months/2026/3").get_json()
+    assert {(c["category"], c["amount"]) for c in state["cells"]} == {
+        ("altlasten", 77.0),
+        ("food", 500.0),
+    }
+    # History keeps aggregating in the summary.
+    summary = client.get("/api/income-expense/summary?year=2026").get_json()
+    assert summary["by_category"]["expense"]["altlasten"] == 77.0
+
+
+def test_category_slug_collision_gets_suffix(auth_client, get_csrf_token):
+    client, _ = auth_client
+    h = {"X-CSRF-Token": get_csrf_token(client)}
+    a = client.post("/api/income-expense/categories", headers=h,
+                    json={"type": "expense", "name": "Café"}).get_json()["item"]
+    b = client.post("/api/income-expense/categories", headers=h,
+                    json={"type": "expense", "name": "Caf-é"}).get_json()["item"]
+    assert a["key"] == "caf" and b["key"] == "caf-2"
+
+
+def test_category_idor_isolation(app, db, get_csrf_token):
+    client_a, token_a = _new_user(app, get_csrf_token, "cat-owner@example.com")
+    client_b, token_b = _new_user(app, get_csrf_token, "cat-attacker@example.com")
+    cat = client_a.post("/api/income-expense/categories",
+                        headers={"X-CSRF-Token": token_a},
+                        json={"type": "expense", "name": "Privat"}).get_json()["item"]
+    # B can't see or archive A's category, and can't post into it.
+    assert all(i["key"] != "privat"
+               for i in client_b.get("/api/income-expense/categories").get_json()["items"])
+    assert client_b.patch(f"/api/income-expense/categories/{cat['id']}",
+                          headers={"X-CSRF-Token": token_b},
+                          json={"archived": True}).status_code == 404
+    assert client_b.post("/api/income-expense/transactions",
+                         headers={"X-CSRF-Token": token_b},
+                         json=_txn(category="privat")).status_code == 422

@@ -38,9 +38,9 @@ from net_worth_types import (
 )
 from income_expense_types import (
     TRANSACTION_TYPES,
-    ALL_CATEGORIES,
     RECURRENCE_UNITS,
     TRANSACTION_SOURCES,
+    CATEGORY_NAME_MAX,
 )
 
 
@@ -543,9 +543,14 @@ def init_db() -> None:
                 cur, "ie_transactions", "ie_transactions_source_check",
                 _in_check("source", TRANSACTION_SOURCES),
             )
+            # Categories are user-scoped since v0.15.1 (ie_categories below), so
+            # the old curated-union CHECK is rebuilt into a plain length bound —
+            # per-user validity is enforced at the model layer at write time.
             _rebuild_check(
                 cur, "ie_transactions", "ie_transactions_category_check",
-                _in_check("category", ALL_CATEGORIES),
+                sql.SQL("char_length(category) BETWEEN 1 AND {}").format(
+                    sql.Literal(CATEGORY_NAME_MAX)
+                ),
             )
             _rebuild_check(
                 cur, "ie_transactions", "ie_transactions_recurrence_unit_check",
@@ -556,6 +561,57 @@ def init_db() -> None:
                 sql.SQL("recurrence_interval >= 1"),
             )
             _attach_updated_at_trigger(cur, "ie_transactions")
+
+            # User-scoped I&E categories (v0.15.1). Users add / archive /
+            # restore their own categories per type; defaults are lazily seeded
+            # per user from income_expense_types.DEFAULT_CATEGORIES with keys
+            # equal to the pre-v0.15.1 curated slugs, so historical
+            # ie_transactions.category values resolve. `key` is an immutable
+            # per-(user, type) slug stored on transactions; `name` is display
+            # only. Archive is a soft delete — history keeps aggregating, and
+            # re-adding a matching name restores the row instead of duplicating
+            # it (unique index on lower(name)). See DECISIONS.md § "Income &
+            # Expense Tracker" (Custom categories).
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS ie_categories (
+                    id         BIGINT  GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                    user_id    BIGINT  NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    type       TEXT    NOT NULL,
+                    key        TEXT    NOT NULL,
+                    name       TEXT    NOT NULL,
+                    archived   BOOLEAN NOT NULL DEFAULT FALSE,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    UNIQUE (user_id, type, key)
+                )
+            """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_ie_categories_user_id
+                ON ie_categories(user_id)
+            """)
+            # Duplicate-avoidance: one row per name (case-insensitive) per
+            # user+type, archived or not — re-adding an archived name restores it.
+            cur.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_ie_categories_user_type_name
+                ON ie_categories(user_id, type, lower(name))
+            """)
+            _rebuild_check(
+                cur, "ie_categories", "ie_categories_type_check",
+                _in_check("type", TRANSACTION_TYPES),
+            )
+            _rebuild_check(
+                cur, "ie_categories", "ie_categories_key_check",
+                sql.SQL("char_length(key) BETWEEN 1 AND {}").format(
+                    sql.Literal(CATEGORY_NAME_MAX)
+                ),
+            )
+            _rebuild_check(
+                cur, "ie_categories", "ie_categories_name_check",
+                sql.SQL("char_length(name) BETWEEN 1 AND {}").format(
+                    sql.Literal(CATEGORY_NAME_MAX)
+                ),
+            )
+            _attach_updated_at_trigger(cur, "ie_categories")
 
         conn.commit()
 

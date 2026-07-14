@@ -17,33 +17,43 @@ TRANSACTION_TYPES = (
     "expense",
 )
 
-# Categories are curated (not free-text) so the by-category breakdown aggregates
-# cleanly. They are type-specific in the UI; the DB CHECK accepts the union and
-# the schema validates per-type.
-EXPENSE_CATEGORIES = (
-    "housing",
-    "food",
-    "transport",
-    "utilities",
-    "health",
-    "entertainment",
-    "shopping",
-    "savings",
-    "other",
+# Categories are user-scoped and customizable since v0.15.1 (the ie_categories
+# table: add / archive / restore, per-user). The sets below are now the DEFAULT
+# seed a new user starts from — (key, display name) pairs whose keys equal the
+# pre-v0.15.1 curated slugs, so every historical ie_transactions.category value
+# resolves against a seeded row. Category validity is checked against the
+# user's active ie_categories rows at write time (model layer), not by a DB
+# CHECK or schema OneOf. See DECISIONS.md § "Income & Expense Tracker"
+# (Custom categories).
+DEFAULT_EXPENSE_CATEGORIES = (
+    ("housing", "Housing"),
+    ("food", "Food"),
+    ("transport", "Transport"),
+    ("utilities", "Utilities"),
+    ("health", "Health"),
+    ("entertainment", "Entertainment"),
+    ("shopping", "Shopping"),
+    ("savings", "Savings"),
+    ("other", "Other"),
 )
 
-INCOME_CATEGORIES = (
-    "salary",
-    "freelance",
-    "investment",
-    "gift",
-    "refund",
-    "other",
+DEFAULT_INCOME_CATEGORIES = (
+    ("salary", "Salary"),
+    ("freelance", "Freelance"),
+    ("investment", "Investment"),
+    ("gift", "Gift"),
+    ("refund", "Refund"),
+    ("other", "Other"),
 )
 
-# Union for the DB CHECK constraint — dedup while preserving order ('other'
-# appears in both).
-ALL_CATEGORIES = tuple(dict.fromkeys(EXPENSE_CATEGORIES + INCOME_CATEGORIES))
+DEFAULT_CATEGORIES = {
+    "expense": DEFAULT_EXPENSE_CATEGORIES,
+    "income": DEFAULT_INCOME_CATEGORIES,
+}
+
+# Bounds shared by the schema validation and the DB CHECKs on category keys
+# and display names (free-form now, but never unbounded).
+CATEGORY_NAME_MAX = 60
 
 # ie_transactions.source — which write path created the row. 'manual' = the
 # per-transaction form/API; 'monthly' = an aggregate row written by the monthly
