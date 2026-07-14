@@ -30,4 +30,10 @@ export const incomeExpenseApi = {
   // replaces the month's aggregate rows wholesale (omitted cell = cleared).
   getMonth: (year, month) => api.get(`/months/${year}/${month}`),
   putMonth: (year, month, cells) => api.put(`/months/${year}/${month}`, { cells }),
+
+  // Categories (user-scoped, archive/restore — v0.15.1). POSTing a name that
+  // matches an archived category restores it instead of duplicating.
+  listCategories: () => api.get('/categories'),
+  createCategory: (body) => api.post('/categories', body),
+  setCategoryArchived: (id, archived) => api.patch(`/categories/${id}`, { archived }),
 }

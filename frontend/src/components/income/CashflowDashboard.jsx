@@ -88,7 +88,13 @@ function Segmented({ options, value, onChange }) {
   )
 }
 
-export default function CashflowDashboard({ summary, transactions = [], filters, setFilters }) {
+export default function CashflowDashboard({
+  summary,
+  transactions = [],
+  categories,
+  filters,
+  setFilters,
+}) {
   const [incomeStat, setIncomeStat] = useState('average') // 'average' | 'median'
   const [categoryMonth, setCategoryMonth] = useState(null) // null = full year, else 1–12
 
@@ -122,16 +128,27 @@ export default function CashflowDashboard({ summary, transactions = [], filters,
   // re-slices the transaction list (the /summary endpoint is year-scoped only).
   const expenseByCategory = (
     categoryMonth == null
-      ? Object.entries(summary.by_category.expense).map(([category, value]) => ({ category, value }))
+      ? Object.entries(summary.by_category.expense).map(([category, value]) => ({
+          category,
+          value,
+        }))
       : categoryBreakdown(transactions, { year, month: categoryMonth, type: 'expense' })
   )
-    .map(({ category, value }) => ({ name: categoryLabel('expense', category), value }))
+    .map(({ category, value }) => ({ name: categoryLabel('expense', category, categories), value }))
     .sort((a, b) => b.value - a.value)
 
   const categoryTotal = expenseByCategory.reduce((sum, e) => sum + e.value, 0)
-  const categoryScopeLabel = categoryMonth == null ? year : `${MONTHS_SHORT[categoryMonth - 1]} ${year}`
+  const categoryScopeLabel =
+    categoryMonth == null ? year : `${MONTHS_SHORT[categoryMonth - 1]} ${year}`
 
-  const yearOptions = Array.from(new Set(summary.available_years)).sort((a, b) => b - a)
+  // Selectable years: any year with data PLUS a window around today — with data
+  // in only one year the selector used to offer nothing to switch to, which
+  // read as "can't select the year" (and back-filling needs empty years too).
+  const currentYear = new Date().getFullYear()
+  const yearWindow = Array.from({ length: 7 }, (_, i) => currentYear - 5 + i)
+  const yearOptions = Array.from(new Set([...summary.available_years, ...yearWindow])).sort(
+    (a, b) => b - a
+  )
 
   return (
     <div className="space-y-6">
@@ -169,7 +186,9 @@ export default function CashflowDashboard({ summary, transactions = [], filters,
               />
             }
             sub={
-              <p className="text-xs text-gray-400 mt-1">{money(totals.income)} total in {year}</p>
+              <p className="text-xs text-gray-400 mt-1">
+                {money(totals.income)} total in {year}
+              </p>
             }
           />
           <StatCard label="Expenses" value={money(totals.expense)} tone="text-rose-600" />

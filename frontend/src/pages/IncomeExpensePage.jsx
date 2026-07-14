@@ -1,17 +1,19 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { LayoutDashboard, CalendarDays, ListOrdered, Menu } from 'lucide-react'
+import { LayoutDashboard, CalendarDays, ListOrdered, Upload, Menu } from 'lucide-react'
 import { useIncomeExpenseData } from '../hooks/useIncomeExpenseData'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { fmt } from '../utils/format'
 import AppShell from '../components/AppShell'
 import TransactionsPanel from '../components/income/TransactionsPanel'
 import MonthlyEntryPanel from '../components/income/MonthlyEntryPanel'
+import BulkUploadTeaser from '../components/income/BulkUploadTeaser'
 import CashflowDashboard from '../components/income/CashflowDashboard'
 
 // Income & Expense tracker page. Auth-gated (the route wraps it in RequireAuth).
 // Header, sticky Income / Expense / Net bar, tabs: the Overview cashflow
-// dashboard, the Monthly-entry bulk grid, and the Transactions management panel.
+// dashboard, the Monthly-entry bulk grid, the Transactions management panel,
+// and the Bulk-upload coming-soon teaser.
 
 const money = (n) => fmt(n, { compact: false })
 
@@ -19,6 +21,7 @@ const TABS = [
   { id: 'overview', label: 'Overview', Icon: LayoutDashboard },
   { id: 'monthly', label: 'Monthly entry', Icon: CalendarDays },
   { id: 'transactions', label: 'Transactions', Icon: ListOrdered },
+  { id: 'bulk', label: 'Bulk upload', Icon: Upload },
 ]
 
 export default function IncomeExpensePage({ auth }) {
@@ -28,6 +31,7 @@ export default function IncomeExpensePage({ auth }) {
   const {
     transactions,
     summary,
+    categories,
     filters,
     setFilters,
     loading,
@@ -37,6 +41,8 @@ export default function IncomeExpensePage({ auth }) {
     updateTransaction,
     deleteTransaction,
     saveMonth,
+    addCategory,
+    setCategoryArchived,
   } = useIncomeExpenseData(auth.isAuthenticated)
   const totals = summary?.totals
 
@@ -136,6 +142,7 @@ export default function IncomeExpensePage({ auth }) {
                     <CashflowDashboard
                       summary={summary}
                       transactions={transactions}
+                      categories={categories}
                       filters={filters}
                       setFilters={setFilters}
                     />
@@ -143,12 +150,16 @@ export default function IncomeExpensePage({ auth }) {
                   {activeTab === 'monthly' && (
                     <MonthlyEntryPanel
                       availableYears={summary?.available_years}
+                      categories={categories}
                       onSaveMonth={saveMonth}
+                      onAddCategory={addCategory}
+                      onSetCategoryArchived={setCategoryArchived}
                     />
                   )}
                   {activeTab === 'transactions' && (
                     <TransactionsPanel
                       transactions={transactions}
+                      categories={categories}
                       filters={filters}
                       setFilters={setFilters}
                       availableYears={summary?.available_years}
@@ -157,6 +168,7 @@ export default function IncomeExpensePage({ auth }) {
                       onDelete={deleteTransaction}
                     />
                   )}
+                  {activeTab === 'bulk' && <BulkUploadTeaser />}
                 </div>
               )}
             </div>

@@ -33,7 +33,26 @@ export const CATEGORY_OPTIONS = {
   ],
 }
 
-export function categoryLabel(type, value) {
+// Since v0.15.1 categories are user-scoped (GET /categories: {id, type, key,
+// name, archived}). The static CATEGORY_OPTIONS above is the DEFAULT set —
+// what the backend seeds a new user with, and the render fallback until the
+// fetch resolves. Pass the fetched list to the helpers below where available.
+
+// Active (non-archived) options per type, shaped like CATEGORY_OPTIONS.
+export function activeCategoryOptions(categories) {
+  if (!categories?.length) return CATEGORY_OPTIONS
+  const opts = { expense: [], income: [] }
+  for (const c of categories) {
+    if (!c.archived && opts[c.type]) opts[c.type].push({ value: c.key, label: c.name })
+  }
+  return opts
+}
+
+export function categoryLabel(type, value, categories) {
+  // The user's own category name wins (archived included — history keeps its
+  // label); fall back to the default set, then to the raw key.
+  const hit = categories?.find((c) => c.type === type && c.key === value)
+  if (hit) return hit.name
   return CATEGORY_OPTIONS[type]?.find((o) => o.value === value)?.label ?? value
 }
 
