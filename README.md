@@ -2,7 +2,7 @@
 
 A personal-finance web app. Use the calculators without an account; sign in to save your inputs.
 
-**Public MVP calculators:** FIRE, Compound Interest, Emergency Fund, Debt Payoff.
+**All 12 calculators are live:** FIRE, Barista FIRE, Coast FIRE, Compound Interest, Cash Flow Sankey, Investment Fee Impact, Inflation, Dividend, Withdrawal Plan, Debt Payoff, Mortgage, Emergency Fund — plus the Net Worth and Income & Expenses trackers. (Publish state is runtime/DB-backed and admin-toggleable, so this reflects production today, not a build-time constant.)
 
 Every calculator is robust to extreme or invalid input: numeric fields are bounded and clamped at the shared input component, so out-of-range or pasted values can't produce `Infinity`/`NaN`, broken charts, or overflowing figures. See `DECISIONS.md` § "Numeric input is bounded and clamped at the shared component".
 
