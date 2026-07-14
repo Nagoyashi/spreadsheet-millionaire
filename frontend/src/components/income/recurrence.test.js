@@ -12,6 +12,19 @@ const txn = (over) => ({
 })
 
 describe('projectRecurring', () => {
+  // Regression (#294): monthly-grid aggregate rows are one-offs (recurrence
+  // 'none') — never projected, but their month counts as real activity, so the
+  // forecast doesn't overwrite a bulk-entered month.
+  it('never projects a monthly-grid aggregate row, and its month counts as actual', () => {
+    const rows = [
+      txn({ occurred_on: '2026-06-01', source: 'monthly', type: 'expense' }),
+      txn({ occurred_on: '2026-01-15', recurrence_unit: 'month' }),
+    ]
+    const months = projectRecurring(rows, 2026).map((p) => p.month)
+    expect(months).not.toContain(6) // June has real (bulk-entered) activity
+    expect(months).toContain(7) // later empty months still forecast
+  })
+
   it('ignores one-off transactions', () => {
     expect(projectRecurring([txn({ recurrence_unit: 'none' })], 2026)).toEqual([])
   })
@@ -28,7 +41,9 @@ describe('projectRecurring', () => {
   })
 
   it('handles a custom interval (every 2 months)', () => {
-    const txns = [txn({ occurred_on: '2026-01-10', recurrence_unit: 'month', recurrence_interval: 2 })]
+    const txns = [
+      txn({ occurred_on: '2026-01-10', recurrence_unit: 'month', recurrence_interval: 2 }),
+    ]
     // Anchor Jan (actual) → Mar, May, Jul, Sep, Nov. lastActualMonth = 1.
     expect(projectRecurring(txns, 2026).map((f) => f.month)).toEqual([3, 5, 7, 9, 11])
   })

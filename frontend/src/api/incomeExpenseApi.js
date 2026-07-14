@@ -25,4 +25,9 @@ export const incomeExpenseApi = {
 
   // GET /api/income-expense/summary?year=
   getSummary: (year) => api.get(`/summary${year != null ? `?year=${year}` : ''}`),
+
+  // Monthly grid (bulk month entry): GET returns {cells, manual_sums}; PUT
+  // replaces the month's aggregate rows wholesale (omitted cell = cleared).
+  getMonth: (year, month) => api.get(`/months/${year}/${month}`),
+  putMonth: (year, month, cells) => api.put(`/months/${year}/${month}`, { cells }),
 }

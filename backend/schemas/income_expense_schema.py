@@ -27,6 +27,15 @@ from income_expense_types import (
 )
 
 
+def _check_category_matches_type(data):
+    """Per-type category validation shared by the transaction + grid-cell schemas."""
+    t, c = data.get("type"), data.get("category")
+    if t and c:
+        valid = EXPENSE_CATEGORIES if t == "expense" else INCOME_CATEGORIES
+        if c not in valid:
+            raise ValidationError(f"'{c}' is not a valid {t} category.", field_name="category")
+
+
 class TransactionSchema(Schema):
     type = fields.Str(required=True, validate=validate.OneOf(TRANSACTION_TYPES))
     category = fields.Str(required=True, validate=validate.OneOf(ALL_CATEGORIES))
@@ -47,13 +56,7 @@ class TransactionSchema(Schema):
 
     @validates_schema
     def _category_matches_type(self, data, **kwargs):
-        t, c = data.get("type"), data.get("category")
-        if t and c:
-            valid = EXPENSE_CATEGORIES if t == "expense" else INCOME_CATEGORIES
-            if c not in valid:
-                raise ValidationError(
-                    f"'{c}' is not a valid {t} category.", field_name="category"
-                )
+        _check_category_matches_type(data)
 
     @post_load
     def _normalise_recurrence(self, data, **kwargs):
@@ -64,3 +67,53 @@ class TransactionSchema(Schema):
         if data.get("recurrence_unit") == "none":
             data["recurrence_interval"] = 1
         return data
+
+
+class MonthCellSchema(Schema):
+    """One monthly-grid cell: a per-(type, category) sum for the month being PUT.
+
+    No occurred_on (the URL's year/month decides it — always first of month), no
+    note/recurrence (aggregate rows are one-offs), and no source (server-set;
+    unknown fields raise). See DECISIONS.md § "Income & Expense Tracker"
+    (Monthly grid bulk entry).
+    """
+
+    type = fields.Str(required=True, validate=validate.OneOf(TRANSACTION_TYPES))
+    category = fields.Str(required=True, validate=validate.OneOf(ALL_CATEGORIES))
+    amount = fields.Decimal(
+        required=True, places=2, validate=validate.Range(min=0, min_inclusive=False)
+    )
+
+    @validates_schema
+    def _category_matches_type(self, data, **kwargs):
+        _check_category_matches_type(data)
+
+
+# Every (type, category) combo at most once — the hard ceiling on a grid payload.
+_MAX_GRID_CELLS = len(EXPENSE_CATEGORIES) + len(INCOME_CATEGORIES)
+
+
+class MonthGridSchema(Schema):
+    """The month PUT body: the full set of non-empty cells for one month.
+
+    A cleared/empty cell is simply absent (the PUT replaces the month's monthly
+    rows wholesale). Duplicate (type, category) cells are rejected — the payload
+    must be a grid, not a transaction stream.
+    """
+
+    cells = fields.List(
+        fields.Nested(MonthCellSchema),
+        required=True,
+        validate=validate.Length(max=_MAX_GRID_CELLS),
+    )
+
+    @validates_schema
+    def _no_duplicate_cells(self, data, **kwargs):
+        seen = set()
+        for cell in data.get("cells") or []:
+            key = (cell.get("type"), cell.get("category"))
+            if key in seen:
+                raise ValidationError(
+                    f"Duplicate cell for {key[0]}/{key[1]}.", field_name="cells"
+                )
+            seen.add(key)

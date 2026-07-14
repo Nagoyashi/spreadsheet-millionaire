@@ -45,6 +45,17 @@ INCOME_CATEGORIES = (
 # appears in both).
 ALL_CATEGORIES = tuple(dict.fromkeys(EXPENSE_CATEGORIES + INCOME_CATEGORIES))
 
+# ie_transactions.source — which write path created the row. 'manual' = the
+# per-transaction form/API; 'monthly' = an aggregate row written by the monthly
+# grid (one row per type+category+month, occurred_on = first of month). Future
+# import paths (CSV/PDF) add 'import' here when they ship. Server-set only —
+# never accepted from a request body. See DECISIONS.md § "Income & Expense
+# Tracker" (Monthly grid bulk entry).
+TRANSACTION_SOURCES = (
+    "manual",
+    "monthly",
+)
+
 # ie_transactions.recurrence_unit — a transaction can repeat. A repeat is
 # expressed as (unit, interval): e.g. ('week', 2) = "every two weeks", ('month', 1)
 # = "monthly". 'none' = a one-off (the default for every existing row). Forecast

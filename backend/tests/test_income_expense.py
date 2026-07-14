@@ -170,3 +170,161 @@ def test_idor_cannot_touch_other_users_transactions(app, db, get_csrf_token):
     assert client_b.delete(f"/api/income-expense/transactions/{txn_id}",
                           headers={"X-CSRF-Token": token_b}).status_code == 404
     assert len(client_a.get("/api/income-expense/transactions").get_json()["items"]) == 1
+
+
+# --------------------------------------------------------------------------- #
+# Monthly grid (bulk month entry)
+# --------------------------------------------------------------------------- #
+def _cells(*over):
+    return {"cells": list(over)}
+
+
+def _cell(**over):
+    base = {"type": "expense", "category": "food", "amount": 420.50}
+    base.update(over)
+    return base
+
+
+def test_month_put_and_get_roundtrip(auth_client, get_csrf_token):
+    client, _ = auth_client
+    h = {"X-CSRF-Token": get_csrf_token(client)}
+
+    resp = client.put("/api/income-expense/months/2026/3", headers=h,
+                      json=_cells(_cell(), _cell(type="income", category="salary", amount=3000)))
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    state = resp.get_json()
+    assert state["year"] == 2026 and state["month"] == 3
+    assert {(c["type"], c["category"], c["amount"]) for c in state["cells"]} == {
+        ("expense", "food", 420.50),
+        ("income", "salary", 3000.0),
+    }
+
+    # GET returns the same state; the aggregate rows land on the first of month
+    # as ordinary transactions with source='monthly'.
+    assert client.get("/api/income-expense/months/2026/3").get_json() == state
+    items = client.get("/api/income-expense/transactions?year=2026&month=3").get_json()["items"]
+    assert {(i["occurred_on"], i["source"]) for i in items} == {("2026-03-01", "monthly")}
+
+
+def test_month_put_replaces_wholesale(auth_client, get_csrf_token):
+    client, _ = auth_client
+    h = {"X-CSRF-Token": get_csrf_token(client)}
+
+    client.put("/api/income-expense/months/2026/3", headers=h,
+               json=_cells(_cell(), _cell(category="transport", amount=99)))
+    # Re-save with one cell changed and the other omitted: omitted = cleared.
+    resp = client.put("/api/income-expense/months/2026/3", headers=h,
+                      json=_cells(_cell(amount=500)))
+    cells = resp.get_json()["cells"]
+    assert [(c["category"], c["amount"]) for c in cells] == [("food", 500.0)]
+
+    # An empty cells list clears the month entirely; other months are untouched.
+    client.put("/api/income-expense/months/2026/4", headers=h, json=_cells(_cell(amount=7)))
+    assert client.put("/api/income-expense/months/2026/3", headers=h,
+                      json=_cells()).get_json()["cells"] == []
+    assert client.get("/api/income-expense/months/2026/4").get_json()["cells"] != []
+
+
+def test_month_put_is_idempotent(auth_client, get_csrf_token):
+    client, _ = auth_client
+    h = {"X-CSRF-Token": get_csrf_token(client)}
+    body = _cells(_cell(), _cell(type="income", category="salary", amount=3000))
+
+    first = client.put("/api/income-expense/months/2026/3", headers=h, json=body).get_json()
+    second = client.put("/api/income-expense/months/2026/3", headers=h, json=body).get_json()
+    assert first["cells"] == second["cells"]
+    # No row accumulation across re-saves.
+    items = client.get("/api/income-expense/transactions?year=2026&month=3").get_json()["items"]
+    assert len(items) == 2
+
+
+def test_month_get_separates_manual_sums(auth_client, get_csrf_token):
+    client, _ = auth_client
+    h = {"X-CSRF-Token": get_csrf_token(client)}
+
+    client.post("/api/income-expense/transactions", headers=h,
+                json=_txn(occurred_on="2026-03-15", amount=10))
+    client.post("/api/income-expense/transactions", headers=h,
+                json=_txn(occurred_on="2026-03-20", amount=5))
+    client.put("/api/income-expense/months/2026/3", headers=h, json=_cells(_cell(amount=100)))
+
+    state = client.get("/api/income-expense/months/2026/3").get_json()
+    # Manual rows are summed read-only, never merged into the grid cells.
+    assert state["manual_sums"]["expense"]["food"] == 15.0
+    assert [(c["category"], c["amount"]) for c in state["cells"]] == [("food", 100.0)]
+    # And a month-edited manual row elsewhere doesn't leak in.
+    assert state["manual_sums"]["income"] == {}
+
+
+def test_month_put_validation(auth_client, get_csrf_token):
+    client, _ = auth_client
+    h = {"X-CSRF-Token": get_csrf_token(client)}
+
+    # Duplicate (type, category) cells rejected.
+    assert client.put("/api/income-expense/months/2026/3", headers=h,
+                      json=_cells(_cell(), _cell(amount=1))).status_code == 422
+    # Category must match the type.
+    assert client.put("/api/income-expense/months/2026/3", headers=h,
+                      json=_cells(_cell(type="income", category="food"))).status_code == 422
+    # Amounts must be positive (a cleared cell is omitted, not zeroed).
+    assert client.put("/api/income-expense/months/2026/3", headers=h,
+                      json=_cells(_cell(amount=0))).status_code == 422
+    # source is server-set — a client sending it is rejected (unknown field).
+    assert client.put("/api/income-expense/months/2026/3", headers=h,
+                      json=_cells(_cell(source="import"))).status_code == 422
+    # Missing body / cells key.
+    assert client.put("/api/income-expense/months/2026/3", headers=h,
+                      json={}).status_code == 422
+    # Nonsense calendar values.
+    assert client.get("/api/income-expense/months/2026/13").status_code == 422
+    assert client.get("/api/income-expense/months/1500/5").status_code == 422
+    assert client.put("/api/income-expense/months/2026/0", headers=h,
+                      json=_cells()).status_code == 422
+
+
+def test_month_endpoints_require_auth(client):
+    assert client.get("/api/income-expense/months/2026/3").status_code == 401
+    assert client.put("/api/income-expense/months/2026/3",
+                      json=_cells()).status_code in (401, 403)  # 403 = CSRF-first
+
+
+def test_month_idor_isolation(app, db, get_csrf_token):
+    client_a, token_a = _new_user(app, get_csrf_token, "grid-owner@example.com")
+    client_b, token_b = _new_user(app, get_csrf_token, "grid-attacker@example.com")
+
+    client_a.put("/api/income-expense/months/2026/3",
+                 headers={"X-CSRF-Token": token_a}, json=_cells(_cell(amount=777)))
+
+    # B sees an empty month, and B's PUT can't clear A's rows.
+    assert client_b.get("/api/income-expense/months/2026/3").get_json()["cells"] == []
+    client_b.put("/api/income-expense/months/2026/3",
+                 headers={"X-CSRF-Token": token_b}, json=_cells())
+    assert client_a.get("/api/income-expense/months/2026/3").get_json()["cells"] != []
+
+
+def test_summary_includes_monthly_grid_rows(auth_client, get_csrf_token):
+    """Regression (#294): aggregate grid rows are ordinary transactions — the
+    year summary must fold them in with manual rows, never filter on source."""
+    client, _ = auth_client
+    h = {"X-CSRF-Token": get_csrf_token(client)}
+
+    client.post("/api/income-expense/transactions", headers=h,
+                json=_txn(occurred_on="2026-03-15", amount=12.50))
+    client.put("/api/income-expense/months/2026/3", headers=h,
+               json=_cells(_cell(amount=400), _cell(type="income", category="salary", amount=3000)))
+
+    summary = client.get("/api/income-expense/summary?year=2026").get_json()
+    assert summary["totals"] == {"income": 3000.0, "expense": 412.50, "net": 2587.50}
+    assert summary["by_month"][2] == {"month": 3, "income": 3000.0, "expense": 412.50}
+    assert summary["by_category"]["expense"]["food"] == 412.50
+
+
+def test_manual_transactions_default_to_manual_source(auth_client, get_csrf_token):
+    client, _ = auth_client
+    h = {"X-CSRF-Token": get_csrf_token(client)}
+    item = client.post("/api/income-expense/transactions", headers=h,
+                       json=_txn()).get_json()["item"]
+    assert item["source"] == "manual"
+    # And the client can't smuggle a source through the transaction schema.
+    assert client.post("/api/income-expense/transactions", headers=h,
+                       json=_txn(source="monthly")).status_code == 422

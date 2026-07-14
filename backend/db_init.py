@@ -36,7 +36,12 @@ from net_worth_types import (
     ASSET_CLASSES,
     PROPERTY_TYPES,
 )
-from income_expense_types import TRANSACTION_TYPES, ALL_CATEGORIES, RECURRENCE_UNITS
+from income_expense_types import (
+    TRANSACTION_TYPES,
+    ALL_CATEGORIES,
+    RECURRENCE_UNITS,
+    TRANSACTION_SOURCES,
+)
 
 
 # A fixed, app-specific key for the Postgres session advisory lock that
@@ -510,9 +515,33 @@ def init_db() -> None:
                     ADD COLUMN IF NOT EXISTS recurrence_interval INTEGER NOT NULL DEFAULT 1
             """)
 
+            # Row provenance (added in the v0.15.0 monthly-grid cycle). 'manual' =
+            # the per-transaction write path; 'monthly' = an aggregate grid row
+            # (one per type+category+month, occurred_on = first of month).
+            # Server-set per write path, never request input; existing rows are
+            # 'manual' by definition. See DECISIONS.md § "Income & Expense
+            # Tracker" (Monthly grid bulk entry).
+            cur.execute("""
+                ALTER TABLE ie_transactions
+                    ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'manual'
+            """)
+            # Integrity guard: at most one monthly aggregate row per
+            # user+type+category+date. The month PUT's delete-then-insert makes
+            # duplicates impossible on the normal path; this backstops date
+            # edits made through the transactions API.
+            cur.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_ie_transactions_monthly_cell
+                ON ie_transactions(user_id, type, category, occurred_on)
+                WHERE source = 'monthly'
+            """)
+
             _rebuild_check(
                 cur, "ie_transactions", "ie_transactions_type_check",
                 _in_check("type", TRANSACTION_TYPES),
+            )
+            _rebuild_check(
+                cur, "ie_transactions", "ie_transactions_source_check",
+                _in_check("source", TRANSACTION_SOURCES),
             )
             _rebuild_check(
                 cur, "ie_transactions", "ie_transactions_category_check",
