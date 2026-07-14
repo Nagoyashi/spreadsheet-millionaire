@@ -83,6 +83,11 @@ def seed_rows_for(uid: int, suffix: str) -> None:
                 "VALUES (%s, 'expense', 'food', 5, %s)",
                 (uid, today),
             )
+            cur.execute(
+                "INSERT INTO ie_categories (user_id, type, key, name) "
+                "VALUES (%s, 'expense', 'food', 'Food')",
+                (uid,),
+            )
         conn.commit()
 
 
