@@ -118,6 +118,78 @@ def delete(txn_id: int, user_id: int) -> bool:
 # (values are always bound as %s). This mirrors the net_worth model's rationale.
 
 
+def _month_bounds(year: int, month: int) -> tuple[date, date]:
+    """[start, end) date bounds for one calendar month."""
+    start = date(year, month, 1)
+    end = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
+    return start, end
+
+
+def get_month(user_id: int, year: int, month: int) -> dict:
+    """The monthly grid's state for one month: the aggregate ('monthly') cells,
+    plus read-only per-(type, category) sums of the individually-entered
+    ('manual') rows so the UI can show what's already tracked.
+
+    Buckets by month RANGE, not the exact first-of-month date, so a monthly row
+    whose date was edited through the transactions API still shows in its month;
+    duplicate rows per cell (only reachable via such edits) are summed here and
+    collapsed by the next replace_month. See DECISIONS.md § "Income & Expense
+    Tracker" (Monthly grid bulk entry).
+    """
+    start, end = _month_bounds(year, month)
+    conn = get_db()
+    rows = conn.execute(
+        """
+        SELECT source, type, category, SUM(amount) AS amount
+        FROM ie_transactions
+        WHERE user_id = %s AND occurred_on >= %s AND occurred_on < %s
+        GROUP BY source, type, category
+        """,
+        (user_id, start, end),
+    ).fetchall()
+
+    cells = []
+    manual_sums = {"income": {}, "expense": {}}
+    for r in rows:
+        if r["source"] == "monthly":
+            cells.append(
+                {"type": r["type"], "category": r["category"], "amount": float(r["amount"])}
+            )
+        else:
+            manual_sums[r["type"]][r["category"]] = (
+                manual_sums[r["type"]].get(r["category"], 0.0) + float(r["amount"])
+            )
+    return {"year": year, "month": month, "cells": cells, "manual_sums": manual_sums}
+
+
+def replace_month(user_id: int, year: int, month: int, cells: list[dict]) -> dict:
+    """Replace one month's aggregate ('monthly') rows wholesale: delete the
+    bucket, insert the submitted cells at the first of the month, commit once
+    (delete + inserts are a single transaction). A cell absent from the payload
+    is cleared — no upsert bookkeeping. Manual rows are untouched.
+    """
+    start, end = _month_bounds(year, month)
+    conn = get_db()
+    conn.execute(
+        """
+        DELETE FROM ie_transactions
+        WHERE user_id = %s AND source = 'monthly'
+          AND occurred_on >= %s AND occurred_on < %s
+        """,
+        (user_id, start, end),
+    )
+    for cell in cells:
+        conn.execute(
+            """
+            INSERT INTO ie_transactions (user_id, type, category, amount, occurred_on, source)
+            VALUES (%s, %s, %s, %s, %s, 'monthly')
+            """,
+            (user_id, cell["type"], cell["category"], cell["amount"], start),
+        )
+    conn.commit()
+    return get_month(user_id, year, month)
+
+
 def get_summary(user_id: int, year: int | None = None) -> dict:
     """Monthly + yearly income-vs-expense and by-category totals for one year,
     plus the list of years that have data (for a year selector)."""
