@@ -1,93 +1,104 @@
 import { Link } from 'react-router-dom'
-import { BookOpen, Scale, LineChart } from 'lucide-react'
-import { CALCULATORS } from '../calculators/registry'
-import { usePublishedTypes } from '../calculators/usePublished'
-import { UPCOMING_FEATURES } from '../upcomingFeatures'
-import Carousel from './Carousel'
+import { BookOpen, TrendingUp, Columns2, LineChart } from 'lucide-react'
 
-// The whole roadmap, as a paginated carousel. Three sources:
-//   - upcoming trackers (UPCOMING_FEATURES — same single source the in-app
-//     teasers use; never duplicated),
-//   - the not-yet-published calculators (everything in the registry that the
-//     runtime publish set doesn't include — they re-enable one at a time), and
-//   - the upcoming marketing sections (Guide / Comparison / ETFs & Stocks),
-//     each with a Beta "coming soon" page.
-// Items with a `to` are links (their coming-soon page); the rest are static.
+// "More than calculators" — the four connected site surfaces (Guide /
+// Calculators / Comparison / ETFs & Stocks). One live (the app), three with
+// Beta coming-soon pages; every status shown is true of the product today
+// (DECISIONS.md § "Marketing page invents nothing"). Copy is final per the
+// marketing redesign handoff. Coming-soon cards get a dashed border; the live
+// card a solid one.
 
-const MARKETING_SOON = [
-  { key: 'guide', label: 'Guide', Icon: BookOpen, blurb: 'In-depth guides and articles on FIRE, investing, debt, and building wealth.', eta: 'Planned', to: '/guide' },
-  { key: 'comparison', label: 'Comparison', Icon: Scale, blurb: 'Side-by-side comparisons of brokers, accounts, and savings products.', eta: 'Planned', to: '/comparison' },
-  { key: 'etfs-stocks', label: 'ETFs & Stocks', Icon: LineChart, blurb: 'A real-time, categorized search across ETFs and stocks.', eta: 'Planned', to: '/etfs-stocks' },
+const SURFACES = [
+  {
+    key: 'guide',
+    label: 'Guide',
+    Icon: BookOpen,
+    live: false,
+    to: '/guide',
+    blurb:
+      'Articles and videos on FIRE, investing and debt — plain-language financial education you can actually act on.',
+  },
+  {
+    key: 'calculators',
+    label: 'Calculators',
+    Icon: TrendingUp,
+    live: true,
+    to: '/app',
+    blurb:
+      'The app: twelve calculators and two trackers, free to use — the planning core of the site.',
+  },
+  {
+    key: 'comparison',
+    label: 'Comparison',
+    Icon: Columns2,
+    live: false,
+    to: '/comparison',
+    blurb:
+      'Side-by-side comparisons of brokers, accounts and savings products — honest recommendations for choosing well.',
+  },
+  {
+    key: 'etfs-stocks',
+    label: 'ETFs & Stocks',
+    Icon: LineChart,
+    live: false,
+    to: '/etfs-stocks',
+    blurb: 'A real-time, categorized lookup across ETFs and stocks, pulled live from market data.',
+  },
 ]
 
-function ComingCard({ Icon, label, blurb, eta, to }) {
-  const className =
-    'group flex flex-col h-full rounded-xl border border-dashed border-white/15 bg-white/[0.02] p-5 ' +
-    (to ? 'hover:border-white/30 hover:bg-white/[0.04] transition' : '')
-  const inner = (
-    <>
-      <div className="flex items-center justify-between mb-3">
-        <div className="inline-flex w-11 h-11 items-center justify-center rounded-lg bg-white/5">
-          <Icon className="w-5 h-5 text-stone-300" />
+function SurfaceCard({ label, Icon, live, to, blurb }) {
+  return (
+    <Link
+      to={to}
+      className={`flex flex-col rounded-xl bg-white p-[22px] transition duration-150 hover:shadow-[0_8px_24px_-8px_rgba(17,24,39,0.15)] hover:-translate-y-0.5 ${
+        live ? 'border border-gray-200' : 'border border-dashed border-gray-300'
+      }`}
+    >
+      <div className="flex items-center justify-between mb-3.5">
+        <div
+          className={`inline-flex w-10 h-10 items-center justify-center rounded-[10px] ${
+            live ? 'bg-blue-50' : 'bg-gray-50'
+          }`}
+        >
+          <Icon className={`w-[19px] h-[19px] ${live ? 'text-blue-600' : 'text-gray-500'}`} />
         </div>
-        <span className="px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider rounded-full bg-amber-400/10 text-amber-300">
-          {eta}
+        <span
+          className={`text-[11px] font-semibold uppercase tracking-[0.04em] px-2.5 py-[3px] rounded-full ${
+            live ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-700'
+          }`}
+        >
+          {live ? 'Live' : 'Coming soon'}
         </span>
       </div>
-      <h3 className="text-base font-bold text-white mb-2">{label}</h3>
-      <p className="text-sm text-stone-400 leading-relaxed">{blurb}</p>
-    </>
-  )
-  return to ? (
-    <Link to={to} className={className}>{inner}</Link>
-  ) : (
-    <div className={className}>{inner}</div>
+      <h3 className="text-[15px] font-bold text-gray-900 mb-2">{label}</h3>
+      <p className="text-[13.5px] text-gray-500 leading-[1.65]">{blurb}</p>
+    </Link>
   )
 }
 
 export default function ComingSoonStrip() {
-  const published = new Set(usePublishedTypes())
-
-  const trackers = UPCOMING_FEATURES.map((f) => ({
-    key: f.slug,
-    label: f.label,
-    Icon: f.Icon,
-    blurb: f.blurb,
-    eta: f.eta,
-    to: `/app/coming-soon/${f.slug}`,
-  }))
-
-  const upcomingCalculators = CALCULATORS.filter((c) => !published.has(c.type)).map((c) => ({
-    key: `calc-${c.type}`,
-    label: c.label,
-    Icon: c.Icon,
-    blurb: c.description,
-    eta: 'Planned',
-  }))
-
-  const items = [...trackers, ...MARKETING_SOON, ...upcomingCalculators]
-
   return (
-    <section className="border-y border-white/10 bg-white/[0.02]">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
-        <div className="text-center mb-10">
-          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-            Where this is going
+    <section>
+      <div className="max-w-6xl mx-auto px-6 py-20 sm:py-[88px]">
+        <div className="text-center mb-12">
+          <p className="text-xs font-bold uppercase tracking-[0.1em] text-amber-600 mb-3">
+            The whole picture
+          </p>
+          <h2 className="text-3xl sm:text-4xl font-bold tracking-[-0.02em] text-gray-900">
+            More than calculators
           </h2>
-          <p className="mt-3 text-sm sm:text-base text-stone-400 max-w-2xl mx-auto">
-            The calculators show you the plan. Net-worth and income &amp; expense
-            trackers are coming next — so you can see where you actually are, not just
-            where the math says you could be. More calculators, a guide, side-by-side
-            comparisons, and a stock &amp; ETF search are on the way too, and the whole
-            project is open source.
+          <p className="mt-3.5 text-base leading-relaxed text-gray-500 max-w-[600px] mx-auto">
+            SpreadsheetMillionaire is growing into four connected surfaces — learn the concepts,
+            plan with your numbers, choose the right products, and look up any instrument. All open
+            source.
           </p>
         </div>
 
-        <Carousel
-          label="Upcoming features"
-          items={items}
-          renderItem={(item) => <ComingCard key={item.key} {...item} />}
-        />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          {SURFACES.map((s) => (
+            <SurfaceCard key={s.key} {...s} />
+          ))}
+        </div>
       </div>
     </section>
   )
