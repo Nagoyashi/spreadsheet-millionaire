@@ -12,9 +12,10 @@ reads at runtime. This replaces the build-time `VITE_*_ENABLED` feature flags �
 revealing a tracker out of "coming soon" is now an admin toggle, not a redeploy.
 
 Tracker slugs match their route segment + their upcomingFeatures.js slug
-(`/app/<slug>`), so the frontend needs no extra mapping. Trackers default
-UNpublished (they ship "coming soon"); the four MVP calculators default
-published (calc_types.DEFAULT_PUBLISHED_TYPES).
+(`/app/<slug>`), so the frontend needs no extra mapping. The build-in-public
+rollout is complete (v0.15.3): all calculators AND both trackers default
+published. The DB stays the runtime source of truth — an admin can still
+unpublish any surface live.
 """
 
 from calc_types import VALID_CALC_TYPES, DEFAULT_PUBLISHED_TYPES
@@ -29,6 +30,6 @@ TRACKER_TYPES = (
 # Everything the Overview screen lists and can toggle.
 PUBLISHABLE_TYPES = tuple(VALID_CALC_TYPES) + TRACKER_TYPES
 
-# Default published set seeds calculator_publish: the four MVP calculators on,
-# everything else (the other calculators + both trackers) off.
-DEFAULT_PUBLISHED_PUBLISHABLE = set(DEFAULT_PUBLISHED_TYPES)
+# Default published set seeds calculator_publish: everything on — all twelve
+# calculators and both trackers (rollout complete).
+DEFAULT_PUBLISHED_PUBLISHABLE = set(DEFAULT_PUBLISHED_TYPES) | set(TRACKER_TYPES)
