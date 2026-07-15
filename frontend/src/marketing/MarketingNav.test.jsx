@@ -7,7 +7,7 @@ const renderNav = (auth) =>
   render(
     <MemoryRouter>
       <MarketingNav auth={auth} />
-    </MemoryRouter>,
+    </MemoryRouter>
   )
 
 describe('MarketingNav', () => {

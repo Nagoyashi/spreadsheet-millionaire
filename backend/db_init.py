@@ -27,8 +27,8 @@ import psycopg
 from psycopg import sql
 
 from config import Config
-from calc_types import VALID_CALC_TYPES, DEFAULT_PUBLISHED_TYPES
-from publishable import PUBLISHABLE_TYPES
+from calc_types import VALID_CALC_TYPES
+from publishable import PUBLISHABLE_TYPES, DEFAULT_PUBLISHED_PUBLISHABLE
 from user_tiers import USER_TIERS, DEFAULT_TIER
 from net_worth_types import (
     ASSET_TYPES,
@@ -215,7 +215,8 @@ def init_db() -> None:
             #   the PK; updated_by references the admin who last flipped it (kept
             #   even if that admin is later deleted, hence ON DELETE SET NULL).
             #   See DECISIONS.md § "Runtime publish state — DB-backed, admin-
-            #   toggleable". The table is SEEDED below from DEFAULT_PUBLISHED_TYPES.
+            #   toggleable". The table is SEEDED below from
+            #   DEFAULT_PUBLISHED_PUBLISHABLE (publishable.py).
             # ---------------------------------------------------------------- #
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS calculator_publish (
@@ -226,7 +227,8 @@ def init_db() -> None:
                 )
             """)
 
-            # Seed one row per known calc type, defaulting to the public MVP set.
+            # Seed one row per publishable type — everything defaults published
+            # now that the build-in-public rollout is complete (v0.15.3).
             # ON CONFLICT DO NOTHING makes this idempotent and — crucially —
             # non-destructive: a later run never resets an admin's live toggle,
             # it only backfills rows for newly-added calc types.
@@ -234,7 +236,7 @@ def init_db() -> None:
                 cur.execute(
                     "INSERT INTO calculator_publish (calc_type, published) "
                     "VALUES (%s, %s) ON CONFLICT (calc_type) DO NOTHING",
-                    (_calc_type, _calc_type in DEFAULT_PUBLISHED_TYPES),
+                    (_calc_type, _calc_type in DEFAULT_PUBLISHED_PUBLISHABLE),
                 )
 
             # ---------------------------------------------------------------- #

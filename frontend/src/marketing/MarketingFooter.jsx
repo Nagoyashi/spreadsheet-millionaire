@@ -10,38 +10,47 @@ export default function MarketingFooter() {
   const year = new Date().getFullYear()
 
   return (
-    <footer className="border-t border-white/10">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
+    <footer className="bg-white border-t border-gray-200">
+      <div className="max-w-6xl mx-auto px-6 pt-12 pb-9">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-6">
           <div>
-            <div className="flex items-center gap-2">
-              <Link to="/" className="text-lg font-bold text-white tracking-tight">
-                Spreadsheet<span className="text-amber-400">Millionaire</span>
+            <div className="flex items-center gap-2.5">
+              <Link to="/" className="text-[17px] font-bold tracking-[-0.02em] text-gray-900">
+                Spreadsheet<span className="text-amber-600">Millionaire</span>
               </Link>
-              <span className="px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider rounded-full bg-amber-400/10 text-amber-300">
+              <span className="px-[9px] py-[3px] text-[11px] font-semibold uppercase tracking-[0.05em] rounded-full bg-amber-50 text-amber-700">
                 Beta
               </span>
             </div>
-            <p className="mt-2 text-xs text-stone-500 max-w-sm leading-relaxed">
+            <p className="mt-2.5 text-[12.5px] text-gray-400 max-w-[340px] leading-relaxed">
               Calculators are educational tools, not financial advice.
             </p>
           </div>
 
-          <nav className="flex flex-wrap items-center gap-x-6 gap-y-3">
-            <Link to="/privacy" className="text-sm text-stone-400 hover:text-white transition">
+          <nav className="flex flex-wrap items-center gap-x-7 gap-y-3">
+            <Link
+              to="/privacy"
+              className="text-[13.5px] text-gray-500 hover:text-gray-900 transition"
+            >
               Privacy
             </Link>
-            <Link to="/terms" className="text-sm text-stone-400 hover:text-white transition">
+            <Link
+              to="/terms"
+              className="text-[13.5px] text-gray-500 hover:text-gray-900 transition"
+            >
               Terms
             </Link>
-            <Link to="/imprint" className="text-sm text-stone-400 hover:text-white transition">
+            <Link
+              to="/imprint"
+              className="text-[13.5px] text-gray-500 hover:text-gray-900 transition"
+            >
               Imprint
             </Link>
             <a
               href={GITHUB_URL}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-2 min-h-[44px] px-5 rounded-lg border border-white/15 text-sm font-semibold text-white hover:bg-white/5 transition"
+              className="inline-flex items-center gap-2 min-h-[40px] px-4 rounded-lg border border-gray-300 text-[13.5px] font-semibold text-gray-900 hover:border-gray-400 transition"
             >
               <Github className="w-4 h-4" />
               View source on GitHub
@@ -49,7 +58,7 @@ export default function MarketingFooter() {
           </nav>
         </div>
 
-        <p className="mt-8 text-xs text-stone-600">
+        <p className="mt-9 text-xs text-gray-300">
           © {year} SpreadsheetMillionaire. All rights reserved.
         </p>
       </div>

@@ -18,7 +18,7 @@ function perViewFor(width) {
 
 function usePerView() {
   const [n, setN] = useState(() =>
-    typeof window === 'undefined' ? 4 : perViewFor(window.innerWidth),
+    typeof window === 'undefined' ? 4 : perViewFor(window.innerWidth)
   )
   useEffect(() => {
     const onResize = () => setN(perViewFor(window.innerWidth))
@@ -134,7 +134,7 @@ function Arrow({ dir, onClick }) {
       aria-label={dir < 0 ? 'Previous' : 'Next'}
       className={`hidden md:flex absolute top-1/2 -translate-y-1/2 ${
         dir < 0 ? 'left-0 -translate-x-1/2' : 'right-0 translate-x-1/2'
-      } z-10 w-10 h-10 items-center justify-center rounded-full bg-stone-800 border border-white/10 text-stone-200 shadow-lg transition hover:bg-stone-700 hover:text-white`}
+      } z-10 w-10 h-10 items-center justify-center rounded-full bg-white border border-gray-200 text-gray-600 shadow-[0_4px_12px_rgba(17,24,39,0.12)] transition hover:text-gray-900 hover:border-gray-400`}
     >
       <Icon className="w-5 h-5" />
     </button>

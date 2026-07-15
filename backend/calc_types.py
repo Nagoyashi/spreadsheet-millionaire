@@ -30,15 +30,10 @@ VALID_CALC_TYPES = (
     'barista_fire',
 )
 
-# Default published set — the public MVP four. This SEEDS the runtime publish
+# Default published set — the build-in-public rollout is complete (v0.15.3),
+# so every calculator defaults published. This SEEDS the runtime publish
 # state (the calculator_publish table in db_init.py); after seeding, the DB is
 # the source of truth and the admin portal toggles it live. It mirrors the
-# `published: true` entries in frontend/src/calculators/registry.js at launch —
-# the same four (FIRE, Compound Interest, Debt Payoff, Emergency Fund).
+# `published: true` entries in frontend/src/calculators/registry.js.
 # See DECISIONS.md § "Runtime publish state — DB-backed, admin-toggleable".
-DEFAULT_PUBLISHED_TYPES = (
-    'fire',
-    'compound',
-    'debt_payoff',
-    'emergency_fund',
-)
+DEFAULT_PUBLISHED_TYPES = VALID_CALC_TYPES

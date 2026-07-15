@@ -27,12 +27,15 @@ export default function AppShell({ auth, sidebar = null, children }) {
         <AppSidebar auth={auth}>{sidebar}</AppSidebar>
       </div>
 
-      {/* Mobile drawer */}
+      {/* Mobile drawer — the light panel needs a shadow for separation now that
+          the dark background no longer provides it against the dimmed page */}
       {mobileOpen && (
         <div className="fixed inset-0 z-50 flex lg:hidden">
-          <AppSidebar auth={auth} onClose={closeSidebar}>
-            {sidebar}
-          </AppSidebar>
+          <div className="h-full shadow-xl">
+            <AppSidebar auth={auth} onClose={closeSidebar}>
+              {sidebar}
+            </AppSidebar>
+          </div>
           <div className="flex-1 bg-black/50" onClick={closeSidebar} />
         </div>
       )}
