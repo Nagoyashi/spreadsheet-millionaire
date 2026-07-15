@@ -101,3 +101,22 @@ export function forecastByMonth(transactions, year) {
   }
   return months
 }
+
+// Per-(type, category) recurring sums for ONE month — what the Monthly-entry
+// grid shows read-only ("+ $X recurring") and fills via "Apply recurring".
+// Counts each rule's occurrences that land in (year, month) STRICTLY AFTER its
+// anchor date (the anchor row itself is a real transaction — its own month
+// already carries it in the manual sums). Unlike projectRecurring, this does
+// NOT skip months with real activity: the grid wants the expectation for the
+// selected month regardless. Returns { income: {cat: sum}, expense: {...} }.
+export function recurringByCategoryForMonth(transactions = [], year, month) {
+  const out = { income: {}, expense: {} }
+  for (const t of transactions) {
+    const interval = Number(t.recurrence_interval) || 1
+    if (!t.recurrence_unit || t.recurrence_unit === 'none' || interval < 1) continue
+    const hits = occurrenceMonths(t, year).filter((m) => m === month).length
+    if (!hits) continue
+    out[t.type][t.category] = (out[t.type][t.category] ?? 0) + hits * Number(t.amount)
+  }
+  return out
+}

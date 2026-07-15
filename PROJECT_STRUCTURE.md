@@ -41,7 +41,7 @@ backend/
 ├── logging_config.py           # Structured request logging (stdlib) — configure_logging() (JSON in prod / plain in dev) + install_request_logging() (request id, timing, status→level, X-Request-ID header, skips /api/health). DECISIONS.md § "Structured request logging"
 ├── calc_types.py               # Single source of truth for VALID_CALC_TYPES (imported by schema + db_init)
 ├── net_worth_types.py          # Single source of truth for Net Worth enum sets (ASSET_TYPES/LIABILITY_TYPES/ASSET_CLASSES/PROPERTY_TYPES) — imported by nw schema + db_init
-├── income_expense_types.py     # Single source of truth for Income & Expense enums (TRANSACTION_TYPES/RECURRENCE_UNITS/TRANSACTION_SOURCES) + DEFAULT_CATEGORIES seed (categories are user-scoped ie_categories rows since v0.15.1) + CATEGORY_NAME_MAX — imported by ie schema + db_init
+├── income_expense_types.py     # Single source of truth for Income & Expense enums (TRANSACTION_TYPES/RECURRENCE_UNITS/TRANSACTION_SOURCES) + DEFAULT_CATEGORIES seed (categories are user-scoped ie_categories rows since v0.15.1) + CATEGORY_NAME_MAX + CATEGORY_ACTIVE_LIMIT — imported by ie schema + db_init + routes
 ├── user_tiers.py               # Single source of truth for account tiers (USER_TIERS = free/pro/elite, DEFAULT_TIER) — imported by admin route + db_init (users.tier CHECK)
 ├── publishable.py              # The toggleable surface = VALID_CALC_TYPES + TRACKER_TYPES (net-worth, income-expenses). Seeds calculator_publish (trackers default unpublished); admin publish route validates against it
 ├── db.py                       # Per-request psycopg connection on Flask g, closed on teardown (no in-process pool)
@@ -56,20 +56,20 @@ backend/
 │   ├── calculator_publish.py   # Runtime publish-state access (global, not user-scoped) — list_all/published_types/set_published; admin portal writes it, public /app reads it
 │   ├── admin_audit.py          # Append-only admin audit trail — record(admin_id, action, target_user_id, detail JSONB); written on tier/suspend changes
 │   ├── net_worth.py            # Net Worth data-access — generic NetWorthTable CRUD (assets/liabilities/investments/real-estate) + SQL summary + snapshots; all queries filter user_id
-│   ├── income_expense.py       # Income & Expense data-access — ie_transactions CRUD (year/month filters) + SQL monthly/yearly summary + monthly grid (get_month cells/manual_sums, replace_month delete-then-insert scoped to ACTIVE categories) + user-scoped categories (lazy default seed, create-or-restore, archive, active_category_keys write-time validity); all queries filter user_id
+│   ├── income_expense.py       # Income & Expense data-access — ie_transactions CRUD (year/month filters) + SQL monthly/yearly summary + monthly grid (get_month cells/manual_sums, replace_month delete-then-insert scoped to ACTIVE categories) + user-scoped categories (lazy default seed, create-or-restore, archive/rename via update_category, reorder_categories full-list position writes, active-per-type cap, active_category_keys write-time validity); all queries filter user_id
 │   └── password_reset.py       # PasswordResetToken model — stores only the SHA-256 hash; create/find-valid-by-hash/mark-used/invalidate-all-for-user/delete-expired
 ├── routes/
 │   ├── auth.py                 # /api/auth/* — register (+welcome email), login, logout, status, delete account, GET account/export (download-my-data JSON attachment, #180), csrf-token, forgot-password, reset-password, change-password, change-email
 │   ├── calculators.py          # /api/calculators/* — CRUD for saved calculations + GET /published (public runtime publish surface)
 │   ├── admin.py                # /api/admin/* — admin-only (admin_required, 404 for non-admins). Overview: GET /calculators, PATCH /calculators/:type {published} (calcs + trackers). Users: GET /users (search/tier), PATCH /users/:id {tier?,suspended?}, PATCH /users/:id/admin {is_admin} (superadmin_required). Support (#182): GET /users/:id/export (attachment) + DELETE /users/:id (via account_deletion; guards: not self / never superadmin / admins only by superadmin) — all audit-logged. Analytics: GET /analytics?range= (DB signups + GA4 proxy + PostHog funnel)
 │   ├── net_worth.py            # /api/net-worth/* — CRUD for assets/liabilities/investments/real-estate + /summary + /snapshots (login_required, CSRF, rate-limited writes)
-│   ├── income_expense.py       # /api/income-expense/* — transactions CRUD (year/month filters, category validated against the user's active set) + /summary + /months/<year>/<month> GET/PUT (monthly grid) + /categories GET/POST/PATCH (add-or-restore, archive) (login_required, CSRF, rate-limited writes)
+│   ├── income_expense.py       # /api/income-expense/* — transactions CRUD (year/month filters, category validated against the user's active set) + /summary + /months/<year>/<month> GET/PUT (monthly grid) + /categories GET/POST/PATCH (add-or-restore, archive/rename, cap 409s) + /categories/order PUT (login_required, CSRF, rate-limited writes)
 │   └── health.py               # GET /api/health — dumb liveness probe (no DB/Redis) · GET /api/health/ready — readiness probe (SELECT 1 → 200 / 503 degraded) for external uptime monitoring; both rate-limit exempt. DECISIONS.md § "Liveness vs readiness health probes"
 ├── schemas/
 │   ├── user_schema.py          # Shared validate_password (8+ chars, 1 letter, 1 number) + Register/Login/ResetPassword/ChangePassword/ChangeEmail schemas
 │   ├── calculator_schema.py    # Imports VALID_CALC_TYPES from calc_types.py
 │   ├── net_worth_schema.py     # Asset/Liability/Investment/RealEstate/Snapshot schemas — enums from net_worth_types.py
-│   └── income_expense_schema.py # TransactionSchema + MonthCellSchema/MonthGridSchema (grid PUT: dedupe + cell cap) + CategorySchema/CategoryArchiveSchema — enums from income_expense_types.py; category strings shape-bounded here, per-user validity checked at the model layer
+│   └── income_expense_schema.py # TransactionSchema + MonthCellSchema/MonthGridSchema (grid PUT: dedupe + cell cap) + CategorySchema/CategoryPatchSchema/CategoryOrderSchema — enums from income_expense_types.py; category strings shape-bounded here, per-user validity checked at the model layer
 ├── services/
 │   ├── account_deletion.py     # The single account-deletion path (#179) — USER_SCOPED_TABLES registry (8 tables), delete_account() (count → delete → verify-empty → commit; CascadeIntegrityError + rollback on survivors), verify_cascade_coverage() drift guard. DECISIONS.md § "Account deletion — explicit, verified cascade"
 │   ├── data_export.py          # Download-my-data (#180) — export_account() dumps account + every USER_SCOPED_TABLES row as plain JSON (secrets stripped: password_hash, token_hash); table list derived from the deletion registry
@@ -140,7 +140,7 @@ frontend/
     │   ├── adminApi.js         # /api/admin/* — getCalculators / setPublished / getUsers / updateUser / setUserAdmin (superadmin) / deleteUser (#182) / getAnalytics
     │   ├── adminApi.test.js    # vitest — admin endpoint verb + path + body wiring
     │   ├── netWorthApi.js      # /api/net-worth/* — assets/liabilities/investments/realEstate CRUD + getSummary + snapshots
-    │   ├── incomeExpenseApi.js # /api/income-expense/* — transactions CRUD (year/month filters) + getSummary + getMonth/putMonth (monthly grid) + listCategories/createCategory/setCategoryArchived
+    │   ├── incomeExpenseApi.js # /api/income-expense/* — transactions CRUD (year/month filters) + getSummary + getMonth/putMonth (monthly grid) + listCategories/createCategory/patchCategory (archive/rename)/reorderCategories
     │   └── netWorthApi.test.js # vitest — asserts each endpoint's verb + path + body wiring
     ├── utils/
     │   ├── format.js           # Shared fmt() — replaces 12 local copies, supports custom currency
@@ -183,12 +183,13 @@ frontend/
     │   │   └── Dashboard.test.jsx         # RTL — summary figures, chart sections, snapshot action
     │   ├── income/                        # Income & Expense tracker components (consumed by IncomeExpensePage)
     │   │   ├── incomeExpenseOptions.js    # TYPE_OPTIONS + default CATEGORY_OPTIONS (fallback; live options come from /categories via activeCategoryOptions/categoryLabel) + RECURRENCE_UNIT_OPTIONS/recurrenceLabel + MONTH_NAMES
-    │   │   ├── TransactionsPanel.jsx      # Year/month/type filters + table + add/edit form (category + recurrence rule, options depend on type)
-    │   │   ├── MonthlyEntryPanel.jsx      # Monthly-entry tab — bulk month grid: month/year picker, per-category toned NumInputs (income emerald / expense rose, Enter advances), read-only manual sums, inline add-category + archive/restore (recoverable soft delete), section totals + net, "Save month" → hook saveMonth (PUT replaces the month's source='monthly' rows for ACTIVE categories)
+    │   │   ├── TransactionsPanel.jsx      # Filters (year/month server-side + type/category/amount-range/date-range client-side) → add/edit form → paginated table (30/page)
+    │   │   ├── MonthlyEntryPanel.jsx      # Monthly-entry tab — bulk month grid: month/year picker + top/bottom Save, per-category toned NumInputs (Enter advances), read-only manual sums + recurring projections ("Apply recurring" fills empty fields), inline add (capped 20/type) / rename / drag-reorder / archive-restore (collapsed Archived list), section totals + net → hook saveMonth
+    │   │   ├── BudgetsTeaser.jsx           # Budgets tab — static coming-soon teaser for per-category budgets fed by tracker data (project.md § Future backlog)
     │   │   ├── BulkUploadTeaser.jsx        # Bulk-upload tab — static coming-soon teaser for bank-statement import (CSV v0.16.1 / PDF backlog #296); no upload surface wired
     │   │   ├── cashflowSelectors.js       # Pure Overview derivation — monthlyIncomeStats (avg/median), categoryBreakdown (year/month slice of the txn list); single source for month/year filtering
-    │   │   ├── recurrence.js              # Pure forecast projection — projectRecurring/forecastByMonth: project recurring txns into the empty future months (read-time only, never persisted)
-    │   │   └── CashflowDashboard.jsx      # Overview tab — recharts: per-month income (avg/median toggle), monthly income-vs-expense bar (with recurrence forecast), spending-by-category pie (year or month-scoped), year selector
+    │   │   ├── recurrence.js              # Pure forecast projection — projectRecurring/forecastByMonth + recurringByCategoryForMonth (per-category sums for one month, feeds the grid's recurring display): read-time only, never persisted
+    │   │   └── CashflowDashboard.jsx      # Overview tab — recharts: per-month income AND expenses (one avg/median toggle), monthly income-vs-expense bar (with recurrence forecast), category pie with Expenses/Income toggle (year or month-scoped; forecast-only months explained), windowed year selector
     │   ├── AppFooter.jsx                  # Compact single-row legal footer (© line + Privacy/Terms/Imprint/Source) — rendered once by AppShell, so it appears on every /app page
     │   ├── AppShell.jsx                   # In-app layout shell — renders AppSidebar (desktop slot + mobile drawer) + content + AppFooter; render-prop children get { openSidebar }. Wraps every /app page
     │   ├── AppSidebar.jsx                 # THE shared sidebar — three sibling top-level categories (Calculators expandable→muted calcs, Net Worth, Income & Expenses, all flag-gated) + collapse toggle + optional saved-calcs slot + UserFooter
@@ -204,7 +205,7 @@ frontend/
     │   ├── useAuth.js                 # login / logout / register / deleteAccount + session rehydration
     │   ├── useCalculatorData.js       # Saved-calculations CRUD via API
     │   ├── useNetWorthData.js         # Net Worth data layer — fetches resources + summary + snapshots; CRUD methods that refetch on success
-    │   ├── useIncomeExpenseData.js    # Income & Expense data layer — year/month-filtered transactions + summary + user categories; CRUD + saveMonth (monthly grid) + addCategory/setCategoryArchived that refetch
+    │   ├── useIncomeExpenseData.js    # Income & Expense data layer — year/month-filtered transactions + summary + user categories; CRUD + saveMonth (monthly grid) + addCategory/setCategoryArchived/renameCategory/reorderCategories that refetch in the BACKGROUND (panels stay mounted — unsaved grid input survives)
     │   ├── useCalculatorInputs.js     # Input state plumbing (state + sync + onChange + version migration)
     │   ├── useSave.js                 # Save flow + status states. Strips version key before sending. Resets on type change.
     │   ├── useFavourites.js           # Per-user favourites via localStorage

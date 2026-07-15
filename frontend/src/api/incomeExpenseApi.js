@@ -31,9 +31,10 @@ export const incomeExpenseApi = {
   getMonth: (year, month) => api.get(`/months/${year}/${month}`),
   putMonth: (year, month, cells) => api.put(`/months/${year}/${month}`, { cells }),
 
-  // Categories (user-scoped, archive/restore — v0.15.1). POSTing a name that
-  // matches an archived category restores it instead of duplicating.
+  // Categories (user-scoped — v0.15.1; rename/reorder v0.15.2). POSTing a name
+  // that matches an archived category restores it instead of duplicating.
   listCategories: () => api.get('/categories'),
   createCategory: (body) => api.post('/categories', body),
-  setCategoryArchived: (id, archived) => api.patch(`/categories/${id}`, { archived }),
+  patchCategory: (id, body) => api.patch(`/categories/${id}`, body), // {archived} and/or {name}
+  reorderCategories: (type, ids) => api.put('/categories/order', { type, ids }),
 }

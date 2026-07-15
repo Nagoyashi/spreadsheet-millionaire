@@ -125,7 +125,31 @@ class CategorySchema(Schema):
         return data
 
 
-class CategoryArchiveSchema(Schema):
-    """PATCH /categories/<id> — archive (soft delete) or restore."""
+class CategoryPatchSchema(Schema):
+    """PATCH /categories/<id> — archive (soft delete), restore, and/or rename.
+    The key never changes on rename (transaction rows keep resolving)."""
 
-    archived = fields.Bool(required=True)
+    archived = fields.Bool()
+    name = fields.Str(validate=validate.Length(min=1, max=CATEGORY_NAME_MAX))
+
+    @validates_schema
+    def _at_least_one(self, data, **kwargs):
+        if not data:
+            raise ValidationError("Nothing to update.")
+
+    @post_load
+    def _strip_name(self, data, **kwargs):
+        if "name" in data:
+            data["name"] = data["name"].strip()
+            if not data["name"]:
+                raise ValidationError("Name must not be blank.", field_name="name")
+        return data
+
+
+class CategoryOrderSchema(Schema):
+    """PUT /categories/order — the full desired order of one type's categories."""
+
+    type = fields.Str(required=True, validate=validate.OneOf(TRANSACTION_TYPES))
+    ids = fields.List(
+        fields.Int(), required=True, validate=validate.Length(min=1, max=200)
+    )
