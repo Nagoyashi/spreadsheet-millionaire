@@ -212,13 +212,15 @@ frontend/
     │   └── useDocumentTitle.js        # Sets a distinct document.title per route (SPA SEO); resets to default on unmount
     ├── marketing/                     # Public marketing surface (parallel to calculators/) — consumed only by the landing + legal pages
     │   ├── links.js                   # Single source for GITHUB_URL + CONTACT_EMAIL placeholder (used by nav/strip/footer/legal)
-    │   ├── MarketingNav.jsx           # Sticky full-width 3-col top nav: wordmark left · centered sections (Guide/Calculators/Comparison/ETFs and Stocks) · "Login App" hover-menu (Login/Register) right, or "Open app" when authed; mobile disclosure menu
-    │   ├── Carousel.jsx               # Paginated card carousel (responsive N-per-page, autoplay + arrows + dots; no cut-off cards) — used by CalculatorShowcase + ComingSoonStrip
-    │   ├── Hero.jsx                   # Headline + subline + primary CTA → /app, secondary → /register
-    │   ├── CalculatorShowcase.jsx     # One card per PUBLISHED_CALCULATORS; links straight to /app/calculator/:type
-    │   ├── ComingSoonStrip.jsx        # Trackers from UPCOMING_FEATURES ("More on the way")
-    │   ├── ValueProps.jsx             # Four true value props (free, no-signup, save, privacy)
-    │   ├── MarketingFooter.jsx        # Privacy/Terms links + "View source on GitHub" button, © line, not-financial-advice line
+    │   ├── MarketingNav.jsx           # Sticky light 3-col top nav (max-w-6xl): wordmark left · centered sections (Guide/Calculators/Comparison/ETFs and Stocks) · "Log in" + blue "Open app" right ("Open app" only when authed); mobile disclosure menu
+    │   ├── Carousel.jsx               # Paginated card carousel (responsive N-per-page, autoplay + arrows; no cut-off cards) — used by CalculatorShowcase
+    │   ├── Hero.jsx                   # Badge + headline + subline + CTAs (primary → /app, secondary → /register) + trust row; mounts HeroAppPreview
+    │   ├── HeroAppPreview.jsx         # Interactive 1060×420 miniature of the app (3 switchable views via local state, inline-SVG charts); scales whole via ResizeObserver below ~1108px
+    │   ├── CalculatorShowcase.jsx     # One card per published calculator (usePublishedCalculators + registry); links straight to /app/calculator/:type; + two live tracker cards + "see all" link
+    │   ├── ComingSoonStrip.jsx        # "More than calculators" — the four site surfaces (Guide/Calculators/Comparison/ETFs & Stocks) with Live/Coming-soon status pills
+    │   ├── ValueProps.jsx             # Four true value props (free, no-signup, save, privacy) on a gray-50 band
+    │   ├── CtaBand.jsx                # Dark slate-900 closing CTA band (decorative emerald growth curve + amber target line SVG)
+    │   ├── MarketingFooter.jsx        # Privacy/Terms/Imprint links + "View source on GitHub" button, © line, not-financial-advice line
     │   └── LegalLayout.jsx            # Shared prose chrome for legal pages (reuses MarketingNav + MarketingFooter)
     └── pages/
         ├── MarketingLandingPage.jsx # / — public marketing landing; composes src/marketing/*; auth-adaptive nav (no redirect for logged-in visitors)
