@@ -43,3 +43,5 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+# Claude Code agent worktrees (local tooling artifacts)
+.claude/worktrees/
