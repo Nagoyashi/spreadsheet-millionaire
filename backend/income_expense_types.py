@@ -55,6 +55,12 @@ DEFAULT_CATEGORIES = {
 # and display names (free-form now, but never unbounded).
 CATEGORY_NAME_MAX = 60
 
+# Max ACTIVE categories per type per user (v0.15.2) — a grid with more rows
+# than this stops being scannable. Archived rows don't count; restoring past
+# the cap is blocked like creating. Mirrored in the UI's add-form warning
+# (frontend/src/components/income/incomeExpenseOptions.js).
+CATEGORY_ACTIVE_LIMIT = 20
+
 # ie_transactions.source — which write path created the row. 'manual' = the
 # per-transaction form/API; 'monthly' = an aggregate row written by the monthly
 # grid (one row per type+category+month, occurred_on = first of month). Future

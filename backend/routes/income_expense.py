@@ -13,11 +13,13 @@ from flask import Blueprint, request, jsonify, session
 from marshmallow import ValidationError
 
 from models import income_expense as ie
+from income_expense_types import CATEGORY_ACTIVE_LIMIT
 from schemas.income_expense_schema import (
     TransactionSchema,
     MonthGridSchema,
     CategorySchema,
-    CategoryArchiveSchema,
+    CategoryPatchSchema,
+    CategoryOrderSchema,
 )
 from utils.auth_helpers import login_required, csrf_protect
 from app import limiter
@@ -28,7 +30,10 @@ _WRITE_LIMIT = "120 per hour; 30 per minute"
 _schema = TransactionSchema()
 _grid_schema = MonthGridSchema()
 _category_schema = CategorySchema()
-_category_archive_schema = CategoryArchiveSchema()
+_category_patch_schema = CategoryPatchSchema()
+_category_order_schema = CategoryOrderSchema()
+
+_LIMIT_MSG = f"Reached the maximum of {CATEGORY_ACTIVE_LIMIT} categories."
 
 
 def _category_error(cat_type: str, category: str):
@@ -182,6 +187,8 @@ def create_category():
     item, outcome = ie.create_category(session["user_id"], payload["type"], payload["name"])
     if outcome == "conflict":
         return jsonify({"error": f"Category '{item['name']}' already exists.", "item": item}), 409
+    if outcome == "limit":
+        return jsonify({"error": _LIMIT_MSG}), 409
     return jsonify({"item": item, "restored": outcome == "restored"}), (
         200 if outcome == "restored" else 201
     )
@@ -193,10 +200,29 @@ def create_category():
 @limiter.limit(_WRITE_LIMIT)
 def patch_category(cat_id: int):
     try:
-        payload = _category_archive_schema.load(request.get_json(silent=True) or {})
+        payload = _category_patch_schema.load(request.get_json(silent=True) or {})
     except ValidationError as err:
         return jsonify({"errors": err.messages}), 422
-    item = ie.set_category_archived(cat_id, session["user_id"], payload["archived"])
-    if not item:
+    item, outcome = ie.update_category(cat_id, session["user_id"], payload)
+    if outcome == "not_found":
         return jsonify({"error": "Not found."}), 404
+    if outcome == "conflict":
+        return jsonify({"error": f"Category '{item['name']}' already exists.", "item": item}), 409
+    if outcome == "limit":
+        return jsonify({"error": _LIMIT_MSG}), 409
     return jsonify({"item": item}), 200
+
+
+@bp.route("/categories/order", methods=["PUT"])
+@login_required
+@csrf_protect
+@limiter.limit(_WRITE_LIMIT)
+def reorder_categories():
+    try:
+        payload = _category_order_schema.load(request.get_json(silent=True) or {})
+    except ValidationError as err:
+        return jsonify({"errors": err.messages}), 422
+    items = ie.reorder_categories(session["user_id"], payload["type"], payload["ids"])
+    if items is None:
+        return jsonify({"error": "The id list doesn't match your categories — reload and retry."}), 409
+    return jsonify({"items": items}), 200

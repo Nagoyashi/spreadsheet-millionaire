@@ -6,11 +6,13 @@
 //   value   — controlled value
 //   onChange — (value: string) => void
 //   hint    — muted label suffix, e.g. "per year" (string, optional)
-//   min, max, step — passed to <input type="number"> AND enforced on change
+//   min, max — enforced on change/blur (step is accepted but unused since the
+//              v0.15.2 switch to a text input: no native spinner to step)
 //
-// Clamping (the actual robustness guard): native min/max only constrain the
-// spinner — they do NOT stop typed or pasted values like "8e31" or "-5", which
-// is the real failure mode. So we clamp in JS too, split by bound:
+// The input is type="text" + inputMode="decimal" (since v0.15.2) so comma
+// decimals ("1,5") reach handleChange and are normalised to dots — a
+// type="number" input swallows the comma keystroke entirely. All bounds are
+// enforced in JS, split by bound:
 //   max — clamped on CHANGE. Typing appends digits, so a prefix of an in-range
 //         number never overshoots it; snapping immediately is safe.
 //   min — clamped on BLUR. Prefixes of in-range numbers ARE below a raised min
@@ -44,6 +46,8 @@ const TONES = {
   },
 }
 
+// Call sites may still pass `step`; it's ignored — the text input has no
+// native spinner to step (destructuring simply doesn't pick it up).
 export default function NumInput({
   label,
   prefix,
@@ -53,21 +57,25 @@ export default function NumInput({
   hint,
   min,
   max,
-  step = 'any',
   tone = 'default',
 }) {
   const id = useId()
   const t = TONES[tone] ?? TONES.default
   const hasValue = value !== '' && value != null
   function handleChange(raw) {
+    // Comma decimals (v0.15.2): "1,5" is normalised to "1.5" — the input is
+    // type="text" + inputMode="decimal" (a type="number" input never even
+    // delivers a comma keystroke), and every consumer parses with Number().
+    raw = raw.replace(',', '.')
     // Empty field → defined fallback (calculators read "" as 0).
     if (raw === '') {
       onChange('')
       return
     }
+    // A trailing separator ("12.") is a number mid-entry — Number() accepts it.
     const num = Number(raw)
-    // Ignore keystrokes that don't parse to a finite number (e.g. a lone "-"
-    // or "e"); keep the previous value rather than writing garbage.
+    // Ignore keystrokes that don't parse to a finite number (e.g. a lone "-",
+    // "e", or a second separator); keep the previous value rather than garbage.
     if (!Number.isFinite(num)) return
     if (max != null && num > max) {
       onChange(String(max))
@@ -105,16 +113,17 @@ export default function NumInput({
             {prefix}
           </span>
         )}
+        {/* type="text" (not "number") so comma decimals reach handleChange;
+            inputMode keeps the numeric keyboard on mobile. Bounds are enforced
+            in JS above — native min/max only ever constrained the spinner. */}
         <input
           id={id}
-          type="number"
+          type="text"
           inputMode="decimal"
+          autoComplete="off"
           value={value}
           onChange={(e) => handleChange(e.target.value)}
           onBlur={handleBlur}
-          min={min}
-          max={max}
-          step={step}
           className="flex-1 min-w-0 px-3 py-2.5 sm:py-2 text-base sm:text-sm text-gray-800 bg-transparent focus:outline-none"
         />
         {suffix && (

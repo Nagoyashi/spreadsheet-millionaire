@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { projectRecurring, forecastByMonth } from './recurrence'
+import { projectRecurring, forecastByMonth, recurringByCategoryForMonth } from './recurrence'
 
 // Helper to build a transaction row.
 const txn = (over) => ({
@@ -84,5 +84,48 @@ describe('forecastByMonth', () => {
     expect(fc).toHaveLength(12)
     expect(fc[1]).toEqual({ income: 5000, expense: 0 }) // February
     expect(fc[0]).toEqual({ income: 0, expense: 0 }) // January (anchor month, excluded)
+  })
+})
+
+describe('recurringByCategoryForMonth', () => {
+  it('sums a monthly rule into a later month, per category', () => {
+    const rows = [
+      txn({
+        occurred_on: '2026-01-15',
+        recurrence_unit: 'month',
+        category: 'salary',
+        amount: 3000,
+      }),
+      txn({
+        occurred_on: '2026-01-01',
+        recurrence_unit: 'month',
+        type: 'expense',
+        category: 'housing',
+        amount: 750,
+      }),
+    ]
+    const out = recurringByCategoryForMonth(rows, 2026, 6)
+    expect(out.income).toEqual({ salary: 3000 })
+    expect(out.expense).toEqual({ housing: 750 })
+  })
+
+  it('excludes the anchor month (the anchor row is already a real transaction)', () => {
+    const rows = [txn({ occurred_on: '2026-06-15', recurrence_unit: 'month', category: 'salary' })]
+    expect(recurringByCategoryForMonth(rows, 2026, 6)).toEqual({ income: {}, expense: {} })
+    expect(recurringByCategoryForMonth(rows, 2026, 7).income.salary).toBe(1000)
+  })
+
+  it('counts multiple weekly occurrences within one month', () => {
+    // Weekly from Jan 5 → June 2026 contains 4-5 Mondays worth of occurrences.
+    const rows = [
+      txn({ occurred_on: '2026-01-05', recurrence_unit: 'week', category: 'freelance' }),
+    ]
+    const out = recurringByCategoryForMonth(rows, 2026, 6)
+    expect(out.income.freelance).toBeGreaterThanOrEqual(4000)
+  })
+
+  it('ignores one-off transactions entirely', () => {
+    const rows = [txn({ occurred_on: '2026-01-15', recurrence_unit: 'none' })]
+    expect(recurringByCategoryForMonth(rows, 2026, 6)).toEqual({ income: {}, expense: {} })
   })
 })
