@@ -611,6 +611,14 @@ def init_db() -> None:
                     sql.Literal(CATEGORY_NAME_MAX)
                 ),
             )
+            # Drag-and-drop ordering (v0.15.2): user-controlled sort position,
+            # per (user, type). Existing rows default 0 and keep their id order
+            # (list_categories orders by position, id); new/seeded rows get
+            # explicit ordinals.
+            cur.execute("""
+                ALTER TABLE ie_categories
+                    ADD COLUMN IF NOT EXISTS position INTEGER NOT NULL DEFAULT 0
+            """)
             _attach_updated_at_trigger(cur, "ie_categories")
 
         conn.commit()

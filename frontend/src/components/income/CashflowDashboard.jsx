@@ -14,7 +14,7 @@ import {
 } from 'recharts'
 import { fmt, fmtPct } from '../../utils/format'
 import { categoryLabel } from './incomeExpenseOptions'
-import { monthlyIncomeStats, categoryBreakdown } from './cashflowSelectors'
+import { monthlyTypeStats, categoryBreakdown } from './cashflowSelectors'
 import { forecastByMonth } from './recurrence'
 
 // Income & Expense Overview dashboard (recharts, already a dep): summary cards
@@ -95,8 +95,9 @@ export default function CashflowDashboard({
   filters,
   setFilters,
 }) {
-  const [incomeStat, setIncomeStat] = useState('average') // 'average' | 'median'
+  const [monthStat, setMonthStat] = useState('average') // 'average' | 'median'
   const [categoryMonth, setCategoryMonth] = useState(null) // null = full year, else 1–12
+  const [pieType, setPieType] = useState('expense') // 'expense' | 'income'
 
   if (!summary) return null
   const { totals } = summary
@@ -104,9 +105,13 @@ export default function CashflowDashboard({
 
   const savingsRate = totals.income > 0 ? (totals.net / totals.income) * 100 : null
 
-  // Per-month income, summarised (average vs median) over active months.
-  const incomeStats = monthlyIncomeStats(summary.by_month)
-  const perMonthIncome = incomeStat === 'average' ? incomeStats.average : incomeStats.median
+  // Per-month income AND expenses, summarised (average vs median) over the same
+  // active-month set — one toggle drives both cards so they stay comparable
+  // (pre-v0.15.2 only income was per-month, next to a year-total Expenses).
+  const incomeStats = monthlyTypeStats(summary.by_month, 'income')
+  const expenseStats = monthlyTypeStats(summary.by_month, 'expense')
+  const perMonthIncome = monthStat === 'average' ? incomeStats.average : incomeStats.median
+  const perMonthExpense = monthStat === 'average' ? expenseStats.average : expenseStats.median
 
   // Forecast: recurring transactions projected into the empty future months of
   // the year (read-side only — nothing persisted). An empty month with a
@@ -124,22 +129,32 @@ export default function CashflowDashboard({
   })
   const hasForecast = monthlyData.some((m) => m.forecast)
 
-  // Category pie — full year reads the year-complete summary; a specific month
-  // re-slices the transaction list (the /summary endpoint is year-scoped only).
-  const expenseByCategory = (
+  // Category pie (income OR expense via the card's toggle) — full year reads
+  // the year-complete summary; a specific month re-slices the transaction list
+  // (the /summary endpoint is year-scoped only).
+  const pieByCategory = (
     categoryMonth == null
-      ? Object.entries(summary.by_category.expense).map(([category, value]) => ({
+      ? Object.entries(summary.by_category[pieType]).map(([category, value]) => ({
           category,
           value,
         }))
-      : categoryBreakdown(transactions, { year, month: categoryMonth, type: 'expense' })
+      : categoryBreakdown(transactions, { year, month: categoryMonth, type: pieType })
   )
-    .map(({ category, value }) => ({ name: categoryLabel('expense', category, categories), value }))
+    .map(({ category, value }) => ({ name: categoryLabel(pieType, category, categories), value }))
     .sort((a, b) => b.value - a.value)
 
-  const categoryTotal = expenseByCategory.reduce((sum, e) => sum + e.value, 0)
+  const categoryTotal = pieByCategory.reduce((sum, e) => sum + e.value, 0)
   const categoryScopeLabel =
     categoryMonth == null ? year : `${MONTHS_SHORT[categoryMonth - 1]} ${year}`
+
+  // A selected month can LOOK filled on the bar chart while holding no recorded
+  // rows — forecast bars are projections from recurring transactions, and
+  // projections are never transactions. Say so instead of a bare "no data".
+  const selectedMonthIsForecastOnly =
+    categoryMonth != null &&
+    summary.by_month[categoryMonth - 1]?.income === 0 &&
+    summary.by_month[categoryMonth - 1]?.expense === 0 &&
+    (forecast[categoryMonth - 1]?.income > 0 || forecast[categoryMonth - 1]?.expense > 0)
 
   // Selectable years: any year with data PLUS a window around today — with data
   // in only one year the selector used to offer nothing to switch to, which
@@ -181,8 +196,8 @@ export default function CashflowDashboard({
                   { value: 'average', label: 'Avg' },
                   { value: 'median', label: 'Median' },
                 ]}
-                value={incomeStat}
-                onChange={setIncomeStat}
+                value={monthStat}
+                onChange={setMonthStat}
               />
             }
             sub={
@@ -191,16 +206,27 @@ export default function CashflowDashboard({
               </p>
             }
           />
-          <StatCard label="Expenses" value={money(totals.expense)} tone="text-rose-600" />
           <StatCard
-            label="Net"
-            value={money(totals.net)}
-            tone={totals.net >= 0 ? 'text-gray-800' : 'text-rose-600'}
+            label="Expenses / month"
+            value={perMonthExpense != null ? money(perMonthExpense) : '—'}
+            tone="text-rose-600"
+            sub={
+              <p className="text-xs text-gray-400 mt-1">
+                {money(totals.expense)} total in {year}
+              </p>
+            }
           />
           <StatCard
-            label="Savings rate"
+            label={`Net — ${year}`}
+            value={money(totals.net)}
+            tone={totals.net >= 0 ? 'text-gray-800' : 'text-rose-600'}
+            sub={<p className="text-xs text-gray-400 mt-1">income − expenses, full year</p>}
+          />
+          <StatCard
+            label={`Savings rate — ${year}`}
             value={savingsRate != null ? fmtPct(savingsRate, { fromPercent: true }) : '—'}
             tone={savingsRate != null && savingsRate >= 0 ? 'text-emerald-600' : 'text-rose-600'}
+            sub={<p className="text-xs text-gray-400 mt-1">net ÷ income, full year</p>}
           />
         </div>
       </div>
@@ -214,9 +240,11 @@ export default function CashflowDashboard({
               data={monthlyData}
               margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
               onClick={(state) => {
-                const m = state?.activeTooltipIndex
-                if (m == null) return
-                setCategoryMonth((cur) => (cur === m + 1 ? null : m + 1))
+                // recharts may deliver the index as a string — coerce before
+                // arithmetic, or "0" + 1 becomes "01" and the slice goes empty.
+                const idx = Number(state?.activeTooltipIndex)
+                if (!Number.isInteger(idx) || idx < 0 || idx > 11) return
+                setCategoryMonth((cur) => (cur === idx + 1 ? null : idx + 1))
               }}
             >
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -252,38 +280,52 @@ export default function CashflowDashboard({
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center justify-between mb-4 gap-2">
-            <h3 className="text-lg font-bold text-gray-800">Spending by category</h3>
-            <select
-              value={categoryMonth ?? ''}
-              onChange={(e) => setCategoryMonth(e.target.value ? Number(e.target.value) : null)}
-              className="px-2.5 py-1.5 text-xs text-gray-800 bg-white rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            >
-              <option value="">Full year</option>
-              {MONTHS_SHORT.map((m, i) => (
-                <option key={m} value={i + 1}>
-                  {m}
-                </option>
-              ))}
-            </select>
+          <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
+            <h3 className="text-lg font-bold text-gray-800">
+              {pieType === 'expense' ? 'Spending by category' : 'Income by category'}
+            </h3>
+            <div className="flex items-center gap-2">
+              <Segmented
+                options={[
+                  { value: 'expense', label: 'Expenses' },
+                  { value: 'income', label: 'Income' },
+                ]}
+                value={pieType}
+                onChange={setPieType}
+              />
+              <select
+                value={categoryMonth ?? ''}
+                onChange={(e) => setCategoryMonth(e.target.value ? Number(e.target.value) : null)}
+                className="px-2.5 py-1.5 text-xs text-gray-800 bg-white rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              >
+                <option value="">Full year</option>
+                {MONTHS_SHORT.map((m, i) => (
+                  <option key={m} value={i + 1}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
-          {expenseByCategory.length === 0 ? (
-            <div className="h-[300px] flex items-center justify-center text-sm text-gray-500">
-              No expenses recorded for {categoryScopeLabel}.
+          {pieByCategory.length === 0 ? (
+            <div className="h-[300px] flex items-center justify-center text-center text-sm text-gray-500 px-6">
+              {selectedMonthIsForecastOnly
+                ? `${categoryScopeLabel} has no recorded transactions yet — its bars on the chart are projections from your recurring transactions.`
+                : `No ${pieType === 'expense' ? 'expenses' : 'income'} recorded for ${categoryScopeLabel}.`}
             </div>
           ) : (
             <>
               <ResponsiveContainer width="100%" height={260}>
                 <PieChart>
                   <Pie
-                    data={expenseByCategory}
+                    data={pieByCategory}
                     dataKey="value"
                     nameKey="name"
                     cx="50%"
                     cy="50%"
                     outerRadius={90}
                   >
-                    {expenseByCategory.map((entry, i) => (
+                    {pieByCategory.map((entry, i) => (
                       <Cell key={entry.name} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                     ))}
                   </Pie>
@@ -291,7 +333,7 @@ export default function CashflowDashboard({
                 </PieChart>
               </ResponsiveContainer>
               <div className="mt-2 space-y-1.5">
-                {expenseByCategory.map((entry, i) => (
+                {pieByCategory.map((entry, i) => (
                   <div key={entry.name} className="flex items-center justify-between text-sm">
                     <span className="flex items-center text-gray-700">
                       <span

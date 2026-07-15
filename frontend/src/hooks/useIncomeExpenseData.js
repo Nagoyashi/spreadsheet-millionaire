@@ -16,32 +16,38 @@ export function useIncomeExpenseData(isAuthenticated) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  const fetchAll = useCallback(async () => {
-    if (!isAuthenticated) {
+  // `background` skips the loading flip: mutations refetch silently so the tab
+  // panels stay MOUNTED — flipping `loading` unmounts them, which wiped a
+  // user's unsaved grid amounts when they added a category mid-entry (#v0.15.2).
+  const fetchAll = useCallback(
+    async (background = false) => {
+      if (!isAuthenticated) {
+        setLoading(false)
+        return
+      }
+      if (!background) setLoading(true)
+      setError('')
+
+      const [txns, sum, cats] = await Promise.all([
+        incomeExpenseApi.listTransactions(filters),
+        incomeExpenseApi.getSummary(filters.year),
+        incomeExpenseApi.listCategories(),
+      ])
+
+      const failed = [txns, sum, cats].find((r) => !r.ok)
+      if (failed) {
+        setError(describeError(failed))
+        setLoading(false)
+        return
+      }
+
+      setTransactions(txns.data.items)
+      setSummary(sum.data)
+      setCategories(cats.data.items)
       setLoading(false)
-      return
-    }
-    setLoading(true)
-    setError('')
-
-    const [txns, sum, cats] = await Promise.all([
-      incomeExpenseApi.listTransactions(filters),
-      incomeExpenseApi.getSummary(filters.year),
-      incomeExpenseApi.listCategories(),
-    ])
-
-    const failed = [txns, sum, cats].find((r) => !r.ok)
-    if (failed) {
-      setError(describeError(failed))
-      setLoading(false)
-      return
-    }
-
-    setTransactions(txns.data.items)
-    setSummary(sum.data)
-    setCategories(cats.data.items)
-    setLoading(false)
-  }, [isAuthenticated, filters])
+    },
+    [isAuthenticated, filters]
+  )
 
   useEffect(() => {
     fetchAll()
@@ -53,7 +59,7 @@ export function useIncomeExpenseData(isAuthenticated) {
       if (!res.ok) {
         return { success: false, error: describeError(res), errors: res.data?.errors }
       }
-      await fetchAll()
+      await fetchAll(true) // background — keep panels mounted (unsaved grid input survives)
       return { success: true, item: res.data?.item, data: res.data }
     },
     [fetchAll]
@@ -89,10 +95,12 @@ export function useIncomeExpenseData(isAuthenticated) {
         return result
       }),
 
-    // Categories (archive/restore — v0.15.1). A 409 (active duplicate) surfaces
-    // through mutate's error path like any failed write.
+    // Categories (v0.15.1; rename/reorder v0.15.2). 409s (duplicate name,
+    // category limit, stale order) surface through mutate's error path.
     addCategory: (type, name) => mutate(() => incomeExpenseApi.createCategory({ type, name })),
     setCategoryArchived: (id, archived) =>
-      mutate(() => incomeExpenseApi.setCategoryArchived(id, archived)),
+      mutate(() => incomeExpenseApi.patchCategory(id, { archived })),
+    renameCategory: (id, name) => mutate(() => incomeExpenseApi.patchCategory(id, { name })),
+    reorderCategories: (type, ids) => mutate(() => incomeExpenseApi.reorderCategories(type, ids)),
   }
 }

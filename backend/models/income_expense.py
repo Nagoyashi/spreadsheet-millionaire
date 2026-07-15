@@ -14,7 +14,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from db import get_db
-from income_expense_types import DEFAULT_CATEGORIES
+from income_expense_types import DEFAULT_CATEGORIES, CATEGORY_ACTIVE_LIMIT
 
 # Insert/update allow-list (server-side, never request input).
 _COLUMNS = (
@@ -121,13 +121,26 @@ def delete(txn_id: int, user_id: int) -> bool:
 
 
 # --------------------------------------------------------------------------- #
-# Categories — user-scoped, customizable (v0.15.1). Archive is a soft delete;
-# re-adding a case-insensitively matching name restores the archived row rather
-# than duplicating it. See DECISIONS.md § "Income & Expense Tracker".
+# Categories — user-scoped, customizable (v0.15.1; rename/reorder/cap v0.15.2).
+# Archive is a soft delete; re-adding a case-insensitively matching name
+# restores the archived row rather than duplicating it. Active categories are
+# capped per type (CATEGORY_ACTIVE_LIMIT). `position` is the user's drag order
+# within a type. See DECISIONS.md § "Income & Expense Tracker".
 # --------------------------------------------------------------------------- #
+_CATEGORY_COLS = "id, type, key, name, archived, position"
+
+
 def _slugify(name: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
     return slug or "category"
+
+
+def _active_count(conn, user_id: int, cat_type: str) -> int:
+    return conn.execute(
+        "SELECT COUNT(*) AS n FROM ie_categories "
+        "WHERE user_id = %s AND type = %s AND archived = FALSE",
+        (user_id, cat_type),
+    ).fetchone()["n"]
 
 
 def ensure_categories_seeded(user_id: int) -> None:
@@ -142,23 +155,23 @@ def ensure_categories_seeded(user_id: int) -> None:
     if row:
         return
     for cat_type, defaults in DEFAULT_CATEGORIES.items():
-        for key, name in defaults:
+        for position, (key, name) in enumerate(defaults):
             conn.execute(
-                "INSERT INTO ie_categories (user_id, type, key, name) "
-                "VALUES (%s, %s, %s, %s) ON CONFLICT DO NOTHING",
-                (user_id, cat_type, key, name),
+                "INSERT INTO ie_categories (user_id, type, key, name, position) "
+                "VALUES (%s, %s, %s, %s, %s) ON CONFLICT DO NOTHING",
+                (user_id, cat_type, key, name, position),
             )
     conn.commit()
 
 
 def list_categories(user_id: int) -> list[dict]:
-    """All of a user's categories (active + archived), seed order then creation
-    order. Seeds the defaults on first touch."""
+    """All of a user's categories (active + archived), in the user's drag order
+    (position, then creation order for ties). Seeds the defaults on first touch."""
     ensure_categories_seeded(user_id)
     conn = get_db()
     rows = conn.execute(
-        "SELECT id, type, key, name, archived FROM ie_categories "
-        "WHERE user_id = %s ORDER BY id",
+        f"SELECT {_CATEGORY_COLS} FROM ie_categories "
+        "WHERE user_id = %s ORDER BY position, id",
         (user_id,),
     ).fetchall()
     return [_row_to_dict(r) for r in rows]
@@ -168,25 +181,30 @@ def create_category(user_id: int, cat_type: str, name: str) -> tuple[dict | None
     """Create a category, or restore the archived one whose name matches
     case-insensitively (duplicate-avoidance). Returns (row, outcome) where
     outcome is 'created' | 'restored' | 'conflict' (row is the existing active
-    duplicate for 'conflict')."""
+    duplicate) | 'limit' (row is None — the active-per-type cap is hit; a
+    restore counts against it too)."""
     ensure_categories_seeded(user_id)
     name = name.strip()
     conn = get_db()
     existing = conn.execute(
-        "SELECT id, type, key, name, archived FROM ie_categories "
+        f"SELECT {_CATEGORY_COLS} FROM ie_categories "
         "WHERE user_id = %s AND type = %s AND lower(name) = lower(%s)",
         (user_id, cat_type, name),
     ).fetchone()
-    if existing:
-        if existing["archived"]:
-            conn.execute(
-                "UPDATE ie_categories SET archived = FALSE "
-                "WHERE id = %s AND user_id = %s",
-                (existing["id"], user_id),
-            )
-            conn.commit()
-            return get_category(existing["id"], user_id), "restored"
+    if existing and not existing["archived"]:
         return _row_to_dict(existing), "conflict"
+
+    if _active_count(conn, user_id, cat_type) >= CATEGORY_ACTIVE_LIMIT:
+        return None, "limit"
+
+    if existing:  # archived match → restore instead of duplicating
+        conn.execute(
+            "UPDATE ie_categories SET archived = FALSE "
+            "WHERE id = %s AND user_id = %s",
+            (existing["id"], user_id),
+        )
+        conn.commit()
+        return get_category(existing["id"], user_id), "restored"
 
     # Immutable key: slug of the name, suffixed until unique per (user, type) —
     # archived rows included, since a key on old transaction rows must never be
@@ -206,9 +224,12 @@ def create_category(user_id: int, cat_type: str, name: str) -> tuple[dict | None
         suffix += 1
 
     row = conn.execute(
-        "INSERT INTO ie_categories (user_id, type, key, name) "
-        "VALUES (%s, %s, %s, %s) RETURNING id",
-        (user_id, cat_type, key, name),
+        "INSERT INTO ie_categories (user_id, type, key, name, position) "
+        "VALUES (%s, %s, %s, %s, "
+        "  (SELECT COALESCE(MAX(position), -1) + 1 FROM ie_categories "
+        "   WHERE user_id = %s AND type = %s)"
+        ") RETURNING id",
+        (user_id, cat_type, key, name, user_id, cat_type),
     ).fetchone()
     conn.commit()
     return get_category(row["id"], user_id), "created"
@@ -217,22 +238,77 @@ def create_category(user_id: int, cat_type: str, name: str) -> tuple[dict | None
 def get_category(cat_id: int, user_id: int) -> dict | None:
     conn = get_db()
     row = conn.execute(
-        "SELECT id, type, key, name, archived FROM ie_categories "
-        "WHERE id = %s AND user_id = %s",
+        f"SELECT {_CATEGORY_COLS} FROM ie_categories WHERE id = %s AND user_id = %s",
         (cat_id, user_id),
     ).fetchone()
     return _row_to_dict(row) if row else None
 
 
-def set_category_archived(cat_id: int, user_id: int, archived: bool) -> dict | None:
-    """Soft delete / restore. None if not found / wrong user."""
+def update_category(cat_id: int, user_id: int, data: dict) -> tuple[dict | None, str]:
+    """Partial update: `archived` (soft delete / restore) and/or `name`
+    (rename — the key never changes, so transaction rows keep resolving).
+    Returns (row, outcome): 'updated' | 'not_found' | 'conflict' (rename
+    collides with another category's name, case-insensitive; row is the
+    colliding category) | 'limit' (restore would exceed the active cap)."""
     conn = get_db()
-    cursor = conn.execute(
-        "UPDATE ie_categories SET archived = %s WHERE id = %s AND user_id = %s",
-        (archived, cat_id, user_id),
-    )
+    current = conn.execute(
+        f"SELECT {_CATEGORY_COLS} FROM ie_categories WHERE id = %s AND user_id = %s",
+        (cat_id, user_id),
+    ).fetchone()
+    if not current:
+        return None, "not_found"
+
+    if "name" in data:
+        name = data["name"].strip()
+        clash = conn.execute(
+            f"SELECT {_CATEGORY_COLS} FROM ie_categories "
+            "WHERE user_id = %s AND type = %s AND lower(name) = lower(%s) AND id != %s",
+            (user_id, current["type"], name, cat_id),
+        ).fetchone()
+        if clash:
+            return _row_to_dict(clash), "conflict"
+        conn.execute(
+            "UPDATE ie_categories SET name = %s WHERE id = %s AND user_id = %s",
+            (name, cat_id, user_id),
+        )
+
+    if "archived" in data:
+        if (
+            data["archived"] is False
+            and current["archived"]
+            and _active_count(conn, user_id, current["type"]) >= CATEGORY_ACTIVE_LIMIT
+        ):
+            conn.rollback()
+            return None, "limit"
+        conn.execute(
+            "UPDATE ie_categories SET archived = %s WHERE id = %s AND user_id = %s",
+            (data["archived"], cat_id, user_id),
+        )
+
     conn.commit()
-    return get_category(cat_id, user_id) if cursor.rowcount else None
+    return get_category(cat_id, user_id), "updated"
+
+
+def reorder_categories(user_id: int, cat_type: str, ids: list[int]) -> list[dict] | None:
+    """Set the drag order for one type: `ids` is the full desired order of the
+    user's categories of that type (active and archived alike). None if the id
+    set doesn't exactly match the user's categories of the type — a stale or
+    forged list must not partially apply."""
+    ensure_categories_seeded(user_id)
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT id FROM ie_categories WHERE user_id = %s AND type = %s",
+        (user_id, cat_type),
+    ).fetchall()
+    if {r["id"] for r in rows} != set(ids) or len(ids) != len(rows):
+        return None
+    for position, cat_id in enumerate(ids):
+        conn.execute(
+            "UPDATE ie_categories SET position = %s WHERE id = %s AND user_id = %s",
+            (position, cat_id, user_id),
+        )
+    conn.commit()
+    return list_categories(user_id)
 
 
 def active_category_keys(user_id: int, cat_type: str) -> set[str]:

@@ -89,8 +89,8 @@ describe('TransactionsPanel', () => {
 
   it('submits a coerced payload via onAdd', () => {
     const { onAdd } = setup([])
-    fireEvent.change(within(form()).getByRole('spinbutton'), { target: { value: '100' } })
-    fireEvent.change(document.querySelector('input[type="date"]'), {
+    fireEvent.change(within(form()).getByLabelText('Amount'), { target: { value: '100' } })
+    fireEvent.change(form().querySelector('input[type="date"]'), {
       target: { value: '2026-05-01' },
     })
     fireEvent.click(within(form()).getByRole('button', { name: /add/i }))
@@ -106,8 +106,8 @@ describe('TransactionsPanel', () => {
 
   it('submits a recurrence rule when set', () => {
     const { onAdd } = setup([])
-    fireEvent.change(within(form()).getByRole('spinbutton'), { target: { value: '100' } })
-    fireEvent.change(document.querySelector('input[type="date"]'), {
+    fireEvent.change(within(form()).getByLabelText('Amount'), { target: { value: '100' } })
+    fireEvent.change(form().querySelector('input[type="date"]'), {
       target: { value: '2026-05-01' },
     })
     // The 3rd combobox in the form is the Repeat unit selector.
@@ -124,8 +124,8 @@ describe('TransactionsPanel', () => {
   it('keeps Add disabled until amount and date are set', () => {
     setup([])
     expect(within(form()).getByRole('button', { name: /add/i })).toBeDisabled()
-    fireEvent.change(within(form()).getByRole('spinbutton'), { target: { value: '5' } })
-    fireEvent.change(document.querySelector('input[type="date"]'), {
+    fireEvent.change(within(form()).getByLabelText('Amount'), { target: { value: '5' } })
+    fireEvent.change(form().querySelector('input[type="date"]'), {
       target: { value: '2026-05-01' },
     })
     expect(within(form()).getByRole('button', { name: /add/i })).toBeEnabled()
@@ -145,5 +145,94 @@ describe('TransactionsPanel', () => {
     // First select in the document is the year filter.
     fireEvent.change(document.querySelectorAll('select')[0], { target: { value: '2025' } })
     expect(setFilters).toHaveBeenCalledWith(expect.objectContaining({ year: 2025 }))
+  })
+})
+
+describe('TransactionsPanel — v0.15.2 additions', () => {
+  const many = (n) =>
+    Array.from({ length: n }, (_, i) => ({
+      id: i + 1,
+      type: 'expense',
+      category: 'food',
+      amount: i + 1,
+      occurred_on: `2026-03-${String((i % 28) + 1).padStart(2, '0')}`,
+      note: '',
+    }))
+
+  it('paginates at 30 rows per page', () => {
+    setup(many(31))
+    expect(document.querySelectorAll('tbody tr')).toHaveLength(30)
+    expect(screen.getByText(/31 transactions · page 1 of 2/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '2' }))
+    expect(document.querySelectorAll('tbody tr')).toHaveLength(1)
+  })
+
+  it('filter changes snap back to page 1', () => {
+    setup(many(31))
+    fireEvent.click(screen.getByRole('button', { name: '2' }))
+    // Amount filter shrinks the set below one page — page resets.
+    fireEvent.change(screen.getByLabelText('Minimum amount'), { target: { value: '30' } })
+    // 2 matching rows fit one page — if the page hadn't snapped back to 1,
+    // the slice for page 2 would be empty.
+    expect(document.querySelectorAll('tbody tr')).toHaveLength(2)
+  })
+
+  it('filters by category and by amount range', () => {
+    const cats = [
+      { id: 1, type: 'expense', key: 'food', name: 'Food', archived: false },
+      { id: 2, type: 'expense', key: 'housing', name: 'Housing', archived: false },
+    ]
+    setup(
+      [
+        {
+          id: 1,
+          type: 'expense',
+          category: 'food',
+          amount: 10,
+          occurred_on: '2026-03-01',
+          note: '',
+        },
+        {
+          id: 2,
+          type: 'expense',
+          category: 'housing',
+          amount: 900,
+          occurred_on: '2026-03-02',
+          note: '',
+        },
+      ],
+      { categories: cats }
+    )
+    fireEvent.change(screen.getByLabelText('Category filter'), { target: { value: 'housing' } })
+    expect(document.querySelectorAll('tbody tr')).toHaveLength(1)
+    fireEvent.change(screen.getByLabelText('Category filter'), { target: { value: 'all' } })
+    fireEvent.change(screen.getByLabelText('Maximum amount'), { target: { value: '100' } })
+    expect(document.querySelectorAll('tbody tr')).toHaveLength(1)
+  })
+
+  it('filters by a date range (comma decimals accepted in amount filters)', () => {
+    setup([
+      {
+        id: 1,
+        type: 'expense',
+        category: 'food',
+        amount: 10.5,
+        occurred_on: '2026-03-01',
+        note: '',
+      },
+      { id: 2, type: 'expense', category: 'food', amount: 20, occurred_on: '2026-06-15', note: '' },
+    ])
+    fireEvent.change(screen.getByLabelText('From date'), { target: { value: '2026-05-01' } })
+    expect(document.querySelectorAll('tbody tr')).toHaveLength(1)
+    fireEvent.change(screen.getByLabelText('From date'), { target: { value: '' } })
+    fireEvent.change(screen.getByLabelText('Minimum amount'), { target: { value: '10,6' } })
+    expect(document.querySelectorAll('tbody tr')).toHaveLength(1)
+  })
+
+  it('renders the form above the table', () => {
+    setup(many(2))
+    const formEl = document.querySelector('form')
+    const tableEl = document.querySelector('table')
+    expect(formEl.compareDocumentPosition(tableEl) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 })

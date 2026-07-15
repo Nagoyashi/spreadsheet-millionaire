@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { LayoutDashboard, CalendarDays, ListOrdered, Upload, Menu } from 'lucide-react'
+import { LayoutDashboard, CalendarDays, ListOrdered, Target, Upload, Menu } from 'lucide-react'
 import { useIncomeExpenseData } from '../hooks/useIncomeExpenseData'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { fmt } from '../utils/format'
@@ -8,6 +8,7 @@ import AppShell from '../components/AppShell'
 import TransactionsPanel from '../components/income/TransactionsPanel'
 import MonthlyEntryPanel from '../components/income/MonthlyEntryPanel'
 import BulkUploadTeaser from '../components/income/BulkUploadTeaser'
+import BudgetsTeaser from '../components/income/BudgetsTeaser'
 import CashflowDashboard from '../components/income/CashflowDashboard'
 
 // Income & Expense tracker page. Auth-gated (the route wraps it in RequireAuth).
@@ -21,6 +22,7 @@ const TABS = [
   { id: 'overview', label: 'Overview', Icon: LayoutDashboard },
   { id: 'monthly', label: 'Monthly entry', Icon: CalendarDays },
   { id: 'transactions', label: 'Transactions', Icon: ListOrdered },
+  { id: 'budgets', label: 'Budgets', Icon: Target },
   { id: 'bulk', label: 'Bulk upload', Icon: Upload },
 ]
 
@@ -43,6 +45,8 @@ export default function IncomeExpensePage({ auth }) {
     saveMonth,
     addCategory,
     setCategoryArchived,
+    renameCategory,
+    reorderCategories,
   } = useIncomeExpenseData(auth.isAuthenticated)
   const totals = summary?.totals
 
@@ -151,9 +155,12 @@ export default function IncomeExpensePage({ auth }) {
                     <MonthlyEntryPanel
                       availableYears={summary?.available_years}
                       categories={categories}
+                      transactions={transactions}
                       onSaveMonth={saveMonth}
                       onAddCategory={addCategory}
                       onSetCategoryArchived={setCategoryArchived}
+                      onRenameCategory={renameCategory}
+                      onReorderCategories={reorderCategories}
                     />
                   )}
                   {activeTab === 'transactions' && (
@@ -168,6 +175,7 @@ export default function IncomeExpensePage({ auth }) {
                       onDelete={deleteTransaction}
                     />
                   )}
+                  {activeTab === 'budgets' && <BudgetsTeaser />}
                   {activeTab === 'bulk' && <BulkUploadTeaser />}
                 </div>
               )}
