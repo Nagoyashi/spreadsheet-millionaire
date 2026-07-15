@@ -24,15 +24,18 @@ describe('MarketingNav', () => {
     expect(screen.getByRole('link', { name: 'Calculators' })).toHaveAttribute('href', '/app')
   })
 
-  it('an anonymous visitor sees Log in + Open app', () => {
+  it('Login App is a non-clickable button revealing Login + Register links', () => {
     renderNav({ isAuthenticated: false })
-    expect(screen.getByRole('link', { name: 'Log in' })).toHaveAttribute('href', '/login')
-    expect(screen.getByRole('link', { name: 'Open app' })).toHaveAttribute('href', '/app')
+    const trigger = screen.getByText('Login App')
+    expect(trigger.tagName).toBe('BUTTON') // not an <a> — never navigates
+    expect(trigger.closest('a')).toBeNull()
+    expect(screen.getByRole('link', { name: 'Login' })).toHaveAttribute('href', '/login')
+    expect(screen.getByRole('link', { name: 'Register' })).toHaveAttribute('href', '/register')
   })
 
-  it('an authenticated visitor sees Open app without Log in', () => {
+  it('an authenticated visitor sees Open app instead of Login App', () => {
     renderNav({ isAuthenticated: true })
     expect(screen.getByRole('link', { name: 'Open app' })).toHaveAttribute('href', '/app')
-    expect(screen.queryByText('Log in')).toBeNull()
+    expect(screen.queryByText('Login App')).toBeNull()
   })
 })
