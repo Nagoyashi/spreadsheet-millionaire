@@ -102,7 +102,7 @@ export default function AppSidebar({ auth, onClose, children }) {
     <aside className="w-64 shrink-0 bg-white border-r border-gray-200 flex flex-col h-full">
       {/* Brand + collapse / mobile-close controls */}
       <div className="px-5 py-5 border-b border-gray-200 flex items-center justify-between gap-2">
-        <Link to="/" className="text-xl font-bold text-gray-900 tracking-tight truncate">
+        <Link to="/" className="text-base font-bold text-gray-900 tracking-tight truncate">
           Spreadsheet<span className="text-amber-600">Millionaire</span>
         </Link>
         <div className="flex items-center gap-1 shrink-0">
