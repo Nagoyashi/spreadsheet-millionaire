@@ -432,6 +432,72 @@ def test_category_slug_collision_gets_suffix(auth_client, get_csrf_token):
     assert a["key"] == "caf" and b["key"] == "caf-2"
 
 
+def test_rename_category_keeps_key_and_history(auth_client, get_csrf_token):
+    client, _ = auth_client
+    h = {"X-CSRF-Token": get_csrf_token(client)}
+    client.post("/api/income-expense/transactions", headers=h, json=_txn())  # 'food'
+
+    cats = client.get("/api/income-expense/categories").get_json()["items"]
+    food = next(c for c in cats if c["key"] == "food")
+    resp = client.patch(f"/api/income-expense/categories/{food['id']}", headers=h,
+                        json={"name": "Lebensmittel"})
+    assert resp.status_code == 200
+    item = resp.get_json()["item"]
+    # Key is immutable — the historical row still resolves; only the label moved.
+    assert item["key"] == "food" and item["name"] == "Lebensmittel"
+    assert client.get("/api/income-expense/transactions").get_json()["items"][0]["category"] == "food"
+    # Renaming onto another category's name (case-insensitive) conflicts.
+    housing = next(c for c in cats if c["key"] == "housing")
+    assert client.patch(f"/api/income-expense/categories/{housing['id']}", headers=h,
+                        json={"name": "lebensmittel"}).status_code == 409
+
+
+def test_reorder_categories(auth_client, get_csrf_token):
+    client, _ = auth_client
+    h = {"X-CSRF-Token": get_csrf_token(client)}
+    cats = client.get("/api/income-expense/categories").get_json()["items"]
+    expense_ids = [c["id"] for c in cats if c["type"] == "expense"]
+
+    reversed_ids = list(reversed(expense_ids))
+    resp = client.put("/api/income-expense/categories/order", headers=h,
+                      json={"type": "expense", "ids": reversed_ids})
+    assert resp.status_code == 200
+    after = [c["id"] for c in resp.get_json()["items"] if c["type"] == "expense"]
+    assert after == reversed_ids
+    # Income order is untouched.
+    income_before = [c["id"] for c in cats if c["type"] == "income"]
+    income_after = [c["id"] for c in resp.get_json()["items"] if c["type"] == "income"]
+    assert income_after == income_before
+    # A stale/partial id list is rejected wholesale.
+    assert client.put("/api/income-expense/categories/order", headers=h,
+                      json={"type": "expense", "ids": reversed_ids[:-1]}).status_code == 409
+
+
+def test_active_category_limit(auth_client, get_csrf_token):
+    client, _ = auth_client
+    h = {"X-CSRF-Token": get_csrf_token(client)}
+    # Seed = 9 active expense categories; the cap is 20 → 11 more fit.
+    for i in range(11):
+        assert client.post("/api/income-expense/categories", headers=h,
+                           json={"type": "expense", "name": f"Extra {i}"}).status_code == 201
+    resp = client.post("/api/income-expense/categories", headers=h,
+                       json={"type": "expense", "name": "One too many"})
+    assert resp.status_code == 409
+    assert "maximum" in resp.get_json()["error"]
+    # The other type has its own cap — income still has room.
+    assert client.post("/api/income-expense/categories", headers=h,
+                       json={"type": "income", "name": "Side hustle"}).status_code == 201
+    # At the cap, restoring an archived category is blocked too...
+    cats = client.get("/api/income-expense/categories").get_json()["items"]
+    extra0 = next(c for c in cats if c["name"] == "Extra 0")
+    client.patch(f"/api/income-expense/categories/{extra0['id']}", headers=h,
+                 json={"archived": True})
+    assert client.post("/api/income-expense/categories", headers=h,
+                       json={"type": "expense", "name": "One too many"}).status_code == 201
+    assert client.patch(f"/api/income-expense/categories/{extra0['id']}", headers=h,
+                        json={"archived": False}).status_code == 409
+
+
 def test_category_idor_isolation(app, db, get_csrf_token):
     client_a, token_a = _new_user(app, get_csrf_token, "cat-owner@example.com")
     client_b, token_b = _new_user(app, get_csrf_token, "cat-attacker@example.com")

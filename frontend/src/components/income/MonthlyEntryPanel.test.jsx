@@ -70,7 +70,7 @@ describe('MonthlyEntryPanel', () => {
       manual_sums: { income: {}, expense: { food: 15 } },
     })
     await renderPanel()
-    expect(screen.getByLabelText('Food')).toHaveValue(420.5)
+    expect(screen.getByLabelText('Food')).toHaveValue('420.5')
     expect(screen.getByText(/\$15 already tracked as individual transactions/)).toBeInTheDocument()
   })
 
@@ -92,9 +92,9 @@ describe('MonthlyEntryPanel', () => {
 
     fireEvent.change(screen.getByLabelText('Salary'), { target: { value: '3000' } })
     fireEvent.change(screen.getByLabelText('Food'), { target: { value: '400' } })
-    fireEvent.click(screen.getByRole('button', { name: /save month/i }))
+    fireEvent.click(screen.getAllByRole('button', { name: /save month/i })[0])
 
-    await waitFor(() => expect(screen.getByText('Saved')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getAllByText('Saved').length).toBeGreaterThan(0))
     const now = new Date()
     expect(onSaveMonth).toHaveBeenCalledWith(now.getFullYear(), now.getMonth() + 1, [
       { type: 'income', category: 'salary', amount: 3000 },
@@ -111,7 +111,7 @@ describe('MonthlyEntryPanel', () => {
     await renderPanel({ onSaveMonth })
 
     fireEvent.change(screen.getByLabelText('Food'), { target: { value: '' } })
-    fireEvent.click(screen.getByRole('button', { name: /save month/i }))
+    fireEvent.click(screen.getAllByRole('button', { name: /save month/i })[0])
     await waitFor(() => expect(onSaveMonth).toHaveBeenCalled())
     expect(onSaveMonth.mock.calls[0][2]).toEqual([])
   })
@@ -131,7 +131,7 @@ describe('MonthlyEntryPanel', () => {
       .fn()
       .mockResolvedValue({ success: false, error: 'Could not reach the server.' })
     await renderPanel({ onSaveMonth })
-    fireEvent.click(screen.getByRole('button', { name: /save month/i }))
+    fireEvent.click(screen.getAllByRole('button', { name: /save month/i })[0])
     await waitFor(() => expect(screen.getByText('Could not reach the server.')).toBeInTheDocument())
     expect(screen.queryByText('Saved')).not.toBeInTheDocument()
   })
@@ -174,7 +174,8 @@ describe('MonthlyEntryPanel', () => {
     const { onSetCategoryArchived } = await renderPanel({ categories })
     // No input for an archived category — its saved amount shows read-only...
     expect(screen.queryByLabelText('Housing')).not.toBeInTheDocument()
-    expect(screen.getByText('Archived')).toBeInTheDocument()
+    const toggle = screen.getByRole('button', { name: /archived \(1\)/i })
+    fireEvent.click(toggle) // collapsed by default (v0.15.2)
     expect(screen.getByText('$750')).toBeInTheDocument()
     // ...and it never lands in the save payload (backend preserves its rows).
     fireEvent.click(screen.getByLabelText('Restore Housing'))
@@ -191,10 +192,96 @@ describe('MonthlyEntryPanel', () => {
     const onSaveMonth = vi.fn().mockResolvedValue({ success: true, data: EMPTY_MONTH })
     await renderPanel({ categories, onSaveMonth })
     fireEvent.change(screen.getByLabelText('Food'), { target: { value: '400' } })
-    fireEvent.click(screen.getByRole('button', { name: /save month/i }))
+    fireEvent.click(screen.getAllByRole('button', { name: /save month/i })[0])
     await waitFor(() => expect(onSaveMonth).toHaveBeenCalled())
     expect(onSaveMonth.mock.calls[0][2]).toEqual([
       { type: 'expense', category: 'food', amount: 400 },
     ])
+  })
+})
+
+describe('MonthlyEntryPanel — v0.15.2 additions', () => {
+  const now = new Date()
+  const recurringTxn = {
+    id: 99,
+    type: 'income',
+    category: 'salary',
+    amount: 3000,
+    // Anchored in the previous year so every month of the current year projects.
+    occurred_on: `${now.getFullYear() - 1}-01-15`,
+    recurrence_unit: 'month',
+    recurrence_interval: 1,
+  }
+
+  it('shows recurring projections read-only and applies them to empty fields', async () => {
+    mockMonth()
+    render(
+      <MonthlyEntryPanel
+        availableYears={[now.getFullYear()]}
+        categories={DEFAULT_CATS}
+        transactions={[recurringTxn]}
+        onSaveMonth={vi.fn()}
+        onAddCategory={vi.fn()}
+        onSetCategoryArchived={vi.fn()}
+        onRenameCategory={vi.fn()}
+        onReorderCategories={vi.fn()}
+      />
+    )
+    await waitFor(() => expect(screen.queryByText('Loading…')).not.toBeInTheDocument())
+    // Read-only note on the category, and the banner with the Apply button.
+    expect(screen.getByText(/\+ \$3,000 recurring/)).toBeInTheDocument()
+    expect(screen.getByLabelText('Salary')).toHaveValue('')
+    fireEvent.click(screen.getByRole('button', { name: /apply recurring/i }))
+    expect(screen.getByLabelText('Salary')).toHaveValue('3000')
+  })
+
+  it('renames a category through the inline editor', async () => {
+    mockMonth()
+    const onRenameCategory = vi.fn().mockResolvedValue({ success: true })
+    render(
+      <MonthlyEntryPanel
+        availableYears={[2026]}
+        categories={DEFAULT_CATS}
+        transactions={[]}
+        onSaveMonth={vi.fn()}
+        onAddCategory={vi.fn()}
+        onSetCategoryArchived={vi.fn()}
+        onRenameCategory={onRenameCategory}
+        onReorderCategories={vi.fn()}
+      />
+    )
+    await waitFor(() => expect(screen.queryByText('Loading…')).not.toBeInTheDocument())
+    fireEvent.click(screen.getByLabelText('Rename Food'))
+    const input = screen.getByLabelText('Rename Food', { selector: 'input' })
+    fireEvent.change(input, { target: { value: 'Lebensmittel' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    const food = DEFAULT_CATS.find((c) => c.key === 'food')
+    await waitFor(() => expect(onRenameCategory).toHaveBeenCalledWith(food.id, 'Lebensmittel'))
+  })
+
+  it('replaces the add form with a warning at the category cap', async () => {
+    mockMonth()
+    let id = 100
+    const packed = [
+      ...DEFAULT_CATS,
+      ...Array.from({ length: 11 }, (_, i) => ({
+        id: ++id,
+        type: 'expense',
+        key: `extra-${i}`,
+        name: `Extra ${i}`,
+        archived: false,
+      })),
+    ] // 9 + 11 = 20 active expense categories
+    await renderPanel({ categories: packed })
+    expect(screen.getByText(/reached the maximum of 20 categories/i)).toBeInTheDocument()
+    expect(screen.queryByLabelText('New expense category name')).not.toBeInTheDocument()
+    // Income is under its own cap — its add form stays.
+    expect(screen.getByLabelText('New income category name')).toBeInTheDocument()
+  })
+
+  it('offers Save month at the top and the bottom', async () => {
+    mockMonth()
+    await renderPanel()
+    expect(screen.getAllByRole('button', { name: /save month/i })).toHaveLength(2)
   })
 })

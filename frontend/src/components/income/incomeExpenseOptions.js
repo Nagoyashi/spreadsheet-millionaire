@@ -33,6 +33,11 @@ export const CATEGORY_OPTIONS = {
   ],
 }
 
+// Max ACTIVE categories per type — mirrors backend
+// income_expense_types.CATEGORY_ACTIVE_LIMIT (the server enforces it; this
+// constant only drives the add-form warning).
+export const CATEGORY_ACTIVE_LIMIT = 20
+
 // Since v0.15.1 categories are user-scoped (GET /categories: {id, type, key,
 // name, archived}). The static CATEGORY_OPTIONS above is the DEFAULT set —
 // what the backend seeds a new user with, and the render fallback until the

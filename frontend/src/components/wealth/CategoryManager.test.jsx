@@ -44,9 +44,9 @@ describe('CategoryManager', () => {
   it('submits a coerced payload via onAdd', async () => {
     const { onAdd } = setup([])
     const form = document.querySelector('form')
-    // name (first textbox) + current_value (first spinbutton); asset_type defaults to 'cash'
+    // name (first textbox) + current_value (the labeled NumInput, a decimal textbox since v0.15.2); asset_type defaults to 'cash'
     fireEvent.change(within(form).getAllByRole('textbox')[0], { target: { value: 'Savings' } })
-    fireEvent.change(within(form).getAllByRole('spinbutton')[0], { target: { value: '2500' } })
+    fireEvent.change(within(form).getByLabelText(/current value/i), { target: { value: '2500' } })
     fireEvent.click(within(form).getByRole('button', { name: /add/i }))
 
     expect(onAdd).toHaveBeenCalledTimes(1)
@@ -60,7 +60,7 @@ describe('CategoryManager', () => {
     const form = document.querySelector('form')
     expect(within(form).getByRole('button', { name: /add/i })).toBeDisabled()
     fireEvent.change(within(form).getAllByRole('textbox')[0], { target: { value: 'X' } })
-    fireEvent.change(within(form).getAllByRole('spinbutton')[0], { target: { value: '1' } })
+    fireEvent.change(within(form).getByLabelText(/current value/i), { target: { value: '1' } })
     expect(within(form).getByRole('button', { name: /add/i })).toBeEnabled()
   })
 
@@ -115,7 +115,7 @@ describe('CategoryManager', () => {
     const form = document.querySelector('form')
     expect(within(form).getByText('Add liability')).toBeInTheDocument() // singular label, not "liabilitie"
     fireEvent.change(within(form).getAllByRole('textbox')[0], { target: { value: 'Visa' } })
-    fireEvent.change(within(form).getAllByRole('spinbutton')[0], { target: { value: '2000' } })
+    fireEvent.change(within(form).getByLabelText(/^balance$/i), { target: { value: '2000' } })
     const addBtn = within(form).getByRole('button', { name: /add/i })
     expect(addBtn).toBeEnabled()
     fireEvent.click(addBtn)

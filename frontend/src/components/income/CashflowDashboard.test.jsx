@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, within, fireEvent } from '@testing-library/react'
 import CashflowDashboard from './CashflowDashboard'
 
 const SUMMARY = {
@@ -20,7 +20,7 @@ describe('CashflowDashboard', () => {
     expect(screen.getByText('Cashflow — 2026')).toBeInTheDocument()
     // Income card shows per-month income (avg over the 2 active months: [5000, 0] → 2500).
     expect(screen.getByText('$2,500')).toBeInTheDocument()
-    expect(screen.getByText(/total in 2026/)).toBeInTheDocument() // $5,000 annual total sub
+    expect(screen.getAllByText(/total in 2026/)).toHaveLength(2) // income + expense annual subs
     expect(screen.getByText('$3,000')).toBeInTheDocument() // net
     expect(screen.getByText('60.0%')).toBeInTheDocument() // savings rate 3000/5000
   })
@@ -51,5 +51,48 @@ describe('CashflowDashboard', () => {
       <CashflowDashboard summary={null} filters={{}} setFilters={vi.fn()} />
     )
     expect(container).toBeEmptyDOMElement()
+  })
+})
+
+describe('CashflowDashboard — v0.15.2 additions', () => {
+  it('the Avg/Median toggle drives BOTH per-month cards', () => {
+    render(<CashflowDashboard summary={SUMMARY} filters={{}} setFilters={vi.fn()} />)
+    // Two active months (Jan, Feb): income avg = 2500, expense avg = 1000.
+    expect(screen.getByText('$2,500')).toBeInTheDocument()
+    expect(screen.getByText('$1,000')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Median' }))
+    // Medians of [5000, 0] and [1500, 500].
+    expect(screen.getByText('$2,500')).toBeInTheDocument()
+    expect(screen.getByText('$1,000')).toBeInTheDocument()
+    expect(screen.getByText('Expenses / month')).toBeInTheDocument()
+  })
+
+  it('the pie toggles to income by category', () => {
+    render(<CashflowDashboard summary={SUMMARY} filters={{}} setFilters={vi.fn()} />)
+    expect(screen.getByText('Spending by category')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Income' }))
+    expect(screen.getByText('Income by category')).toBeInTheDocument()
+    expect(screen.getByText('Salary')).toBeInTheDocument()
+  })
+
+  it('explains a forecast-only month instead of a bare "no data"', () => {
+    const txns = [
+      {
+        id: 1,
+        type: 'expense',
+        category: 'housing',
+        amount: 750,
+        occurred_on: '2026-01-01',
+        recurrence_unit: 'month',
+        recurrence_interval: 1,
+      },
+    ]
+    render(
+      <CashflowDashboard summary={SUMMARY} transactions={txns} filters={{}} setFilters={vi.fn()} />
+    )
+    // October has no recorded rows but the recurring rule projects into it.
+    const monthSelect = screen.getAllByRole('combobox')[1] // year select is first
+    fireEvent.change(monthSelect, { target: { value: '10' } })
+    expect(screen.getByText(/projections from your recurring transactions/)).toBeInTheDocument()
   })
 })
