@@ -1,8 +1,16 @@
 import { lazy } from 'react'
 import {
-  TrendingUp, DollarSign, BarChart2,
-  Percent, TrendingDown, Divide,
-  CreditCard, Home, Anchor, Shield, Coffee,
+  TrendingUp,
+  DollarSign,
+  BarChart2,
+  Percent,
+  TrendingDown,
+  Divide,
+  CreditCard,
+  Home,
+  Anchor,
+  Shield,
+  Coffee,
 } from 'lucide-react'
 
 // ─── THE ONLY FILE YOU TOUCH TO ADD A NEW CALCULATOR ─────────────────────────
@@ -15,12 +23,13 @@ import {
 // 2. Add one entry to CALCULATORS below using lazy() for the component.
 //    Pick a category from: 'Retirement' | 'Investing' | 'Budgeting' | 'Debt & Property'
 //    New categories are picked up automatically by the LandingPage filter bar.
-//    Set `published: true` to show it in the public app, `false` to keep it in
-//    the codebase but hidden from the sidebar, landing grid, and routing guard.
-//    `published` is REQUIRED on every entry. The four-calculator public MVP is
-//    the only set with `published: true`; the rest re-enable one at a time as
-//    build-in-public patches by flipping the flag. See DECISIONS.md
-//    § "MVP narrowing via `published` flag".
+//    Set `published: true` to show it in the public app by default, `false` to
+//    keep it in the codebase but hidden from the sidebar, landing grid, and
+//    routing guard. `published` is REQUIRED on every entry. The build-in-public
+//    rollout is complete (v0.15.3): all twelve are `published: true`, and the
+//    flag is only the offline fallback / fresh-DB seed — live visibility is the
+//    runtime DB toggle. See DECISIONS.md § "MVP narrowing via `published` flag"
+//    and § "Runtime publish state".
 //
 // 3. Add the new type string to VALID_CALC_TYPES in backend/calc_types.py.
 //    This is the single backend source — both schemas/calculator_schema.py
@@ -66,13 +75,14 @@ export const CALCULATORS = [
   },
   {
     type: 'sankey',
-    published: false,
+    published: true,
     label: 'Cash Flow Sankey',
     subtitle: 'Cash Flow Diagram',
-    description: 'Visualise where your money comes from and where it goes. Every dollar accounted for.',
+    description:
+      'Visualise where your money comes from and where it goes. Every dollar accounted for.',
     explainer: {
       heading: 'What is a Sankey diagram?',
-      body: "A flow chart where the width of each stream is proportional to the amount it carries. Map your income on the left and your spending on the right to see exactly where every dollar lands.",
+      body: 'A flow chart where the width of each stream is proportional to the amount it carries. Map your income on the left and your spending on the right to see exactly where every dollar lands.',
     },
     category: 'Budgeting',
     Icon: BarChart2,
@@ -83,10 +93,11 @@ export const CALCULATORS = [
   },
   {
     type: 'investment_fee',
-    published: false,
+    published: true,
     label: 'Investment Fee Impact',
     subtitle: 'Fee Comparison',
-    description: 'See exactly how fund fees silently erode your wealth over time. Small % = big money.',
+    description:
+      'See exactly how fund fees silently erode your wealth over time. Small % = big money.',
     explainer: {
       heading: 'Why do fees matter?',
       body: 'A 1% fee sounds small but compounds against you the same way returns compound for you. Over 30 years, the difference between a 0.1% and 1% expense ratio can cost you a quarter of your final portfolio.',
@@ -100,13 +111,14 @@ export const CALCULATORS = [
   },
   {
     type: 'inflation',
-    published: false,
+    published: true,
     label: 'Inflation Calculator',
     subtitle: 'Purchasing Power',
-    description: "Understand what today's money will be worth in the future — and how much you need to stay ahead.",
+    description:
+      "Understand what today's money will be worth in the future — and how much you need to stay ahead.",
     explainer: {
       heading: 'What does inflation do to your money?',
-      body: "Cash sitting still loses value every year. At 3% inflation, $100 today buys what $74 will buy in a decade — your savings need to outpace this just to stand still.",
+      body: 'Cash sitting still loses value every year. At 3% inflation, $100 today buys what $74 will buy in a decade — your savings need to outpace this just to stand still.',
     },
     category: 'Budgeting',
     Icon: TrendingDown,
@@ -117,13 +129,14 @@ export const CALCULATORS = [
   },
   {
     type: 'dividend',
-    published: false,
+    published: true,
     label: 'Dividend Calculator',
     subtitle: 'Passive Income',
-    description: 'Model your dividend income stream. See how reinvestment compounds your passive income over time.',
+    description:
+      'Model your dividend income stream. See how reinvestment compounds your passive income over time.',
     explainer: {
       heading: 'What is dividend investing?',
-      body: "Some companies pay shareholders a slice of profits each quarter. Reinvest those payments and your share count grows on its own — eventually the dividends alone can cover your living expenses.",
+      body: 'Some companies pay shareholders a slice of profits each quarter. Reinvest those payments and your share count grows on its own — eventually the dividends alone can cover your living expenses.',
     },
     category: 'Investing',
     Icon: Divide,
@@ -134,10 +147,11 @@ export const CALCULATORS = [
   },
   {
     type: 'withdrawal',
-    published: false,
+    published: true,
     label: 'Withdrawal Plan',
     subtitle: 'Decumulation',
-    description: "The other side of FIRE. Model how long your portfolio lasts and whether your withdrawal rate is safe.",
+    description:
+      'The other side of FIRE. Model how long your portfolio lasts and whether your withdrawal rate is safe.',
     explainer: {
       heading: 'What is a withdrawal plan?',
       body: 'Once you stop saving and start spending your portfolio, the question becomes: how much can you take each year without running out? The classic "4% rule" gives you a starting point — your real plan depends on market conditions and lifespan.',
@@ -154,9 +168,10 @@ export const CALCULATORS = [
     published: true,
     label: 'Debt Payoff',
     subtitle: 'Avalanche vs Snowball',
-    description: 'Compare the two debt payoff strategies side by side. See which saves more and which motivates more.',
+    description:
+      'Compare the two debt payoff strategies side by side. See which saves more and which motivates more.',
     explainer: {
-      heading: 'Avalanche vs snowball — what\'s the difference?',
+      heading: "Avalanche vs snowball — what's the difference?",
       body: 'Avalanche targets the highest interest rate first and minimises total interest paid. Snowball targets the smallest balance first and gives you quick wins to keep momentum. Math favours avalanche; psychology often favours snowball.',
     },
     category: 'Debt & Property',
@@ -168,7 +183,7 @@ export const CALCULATORS = [
   },
   {
     type: 'mortgage',
-    published: false,
+    published: true,
     label: 'Mortgage Calculator',
     subtitle: 'Home Loan',
     description: 'Calculate your monthly payments, total interest, and full amortisation schedule.',
@@ -185,13 +200,14 @@ export const CALCULATORS = [
   },
   {
     type: 'coast_fire',
-    published: false,
+    published: true,
     label: 'Coast FIRE',
     subtitle: 'Semi-Retirement Path',
-    description: 'Find out when you can stop contributing and let compounding do the rest of the work.',
+    description:
+      'Find out when you can stop contributing and let compounding do the rest of the work.',
     explainer: {
       heading: 'What is Coast FIRE?',
-      body: "The point where your invested savings will grow into a full retirement nest egg on their own — even if you never add another dollar. After that, you only need to earn enough to cover your living expenses; the heavy lifting is done.",
+      body: 'The point where your invested savings will grow into a full retirement nest egg on their own — even if you never add another dollar. After that, you only need to earn enough to cover your living expenses; the heavy lifting is done.',
     },
     category: 'Retirement',
     Icon: Anchor,
@@ -205,7 +221,8 @@ export const CALCULATORS = [
     published: true,
     label: 'Emergency Fund',
     subtitle: 'Financial Safety Net',
-    description: 'How much do you need? How long to get there? Build your financial foundation first.',
+    description:
+      'How much do you need? How long to get there? Build your financial foundation first.',
     explainer: {
       heading: 'What is an emergency fund?',
       body: "A buffer of easily-accessible cash — typically 3–6 months of essential expenses — that keeps a job loss, medical bill, or broken car from forcing you into debt. It's the foundation everything else sits on.",
@@ -219,10 +236,11 @@ export const CALCULATORS = [
   },
   {
     type: 'barista_fire',
-    published: false,
+    published: true,
     label: 'Barista FIRE',
     subtitle: 'Semi-Retirement',
-    description: 'Semi-retire early with part-time work. Smaller portfolio needed, more freedom sooner.',
+    description:
+      'Semi-retire early with part-time work. Smaller portfolio needed, more freedom sooner.',
     explainer: {
       heading: 'What is Barista FIRE?',
       body: 'Semi-retire early with a smaller portfolio by working part-time to cover some expenses. Your investments cover the rest — and you keep growing until full FIRE if you choose.',
@@ -237,8 +255,8 @@ export const CALCULATORS = [
 ]
 
 // Derived lookups — computed once, consumed everywhere. Never write by hand.
-export const CALC_MAP    = Object.fromEntries(CALCULATORS.map(c => [c.type, c]))
-export const VALID_TYPES = CALCULATORS.map(c => c.type)
+export const CALC_MAP = Object.fromEntries(CALCULATORS.map((c) => [c.type, c]))
+export const VALID_TYPES = CALCULATORS.map((c) => c.type)
 
 // Build-time DEFAULT publish surface — the seed/fallback only. Publish state is
 // now RUNTIME (DB-backed, admin-toggleable): consumers read it via usePublished.js
@@ -247,13 +265,12 @@ export const VALID_TYPES = CALCULATORS.map(c => c.type)
 // the backend seed (calc_types.DEFAULT_PUBLISHED_TYPES). The single-source rule
 // still holds — consumers derive from one published set; the source just moved
 // from compile-time to runtime. See DECISIONS.md § "Runtime publish state".
-export const DEFAULT_PUBLISHED_CALCULATORS = CALCULATORS.filter(c => c.published)
-export const DEFAULT_PUBLISHED_TYPES       = DEFAULT_PUBLISHED_CALCULATORS.map(c => c.type)
+export const DEFAULT_PUBLISHED_CALCULATORS = CALCULATORS.filter((c) => c.published)
+export const DEFAULT_PUBLISHED_TYPES = DEFAULT_PUBLISHED_CALCULATORS.map((c) => c.type)
 
 // Categories for an arbitrary published set, in first-appearance order. Deriving
 // from the published set means a category with no published calculator never
 // renders as an empty group. usePublished.js calls this with the runtime set;
 // DEFAULT_CATEGORIES is the build-time fallback.
-export const categoriesFor = (published) =>
-  ['All', ...new Set(published.map(c => c.category))]
+export const categoriesFor = (published) => ['All', ...new Set(published.map((c) => c.category))]
 export const DEFAULT_CATEGORIES = categoriesFor(DEFAULT_PUBLISHED_CALCULATORS)

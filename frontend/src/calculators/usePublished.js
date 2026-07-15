@@ -12,8 +12,18 @@
 import { useState, useEffect } from 'react'
 import { calculatorApi } from '../api/calculatorApi'
 import { CALCULATORS, DEFAULT_PUBLISHED_TYPES, categoriesFor } from './registry'
+import { UPCOMING_FEATURES } from '../upcomingFeatures'
 
-let publishedTypes = DEFAULT_PUBLISHED_TYPES // optimistic default until fetched
+// Build-time fallback: default-published calculators (registry) + default-
+// published tracker slugs (upcomingFeatures) — together mirroring the backend
+// seed (publishable.DEFAULT_PUBLISHED_PUBLISHABLE), so an offline/failed fetch
+// still renders the full production surface.
+const DEFAULT_PUBLISHED = [
+  ...DEFAULT_PUBLISHED_TYPES,
+  ...UPCOMING_FEATURES.filter((f) => f.published).map((f) => f.slug),
+]
+
+let publishedTypes = DEFAULT_PUBLISHED // optimistic default until fetched
 let fetched = false
 let inflight = null
 const listeners = new Set()

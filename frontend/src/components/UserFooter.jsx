@@ -41,8 +41,8 @@ export default function UserFooter({ auth, variant = 'compact' }) {
 
   const isCompact   = variant === 'compact'
   const containerCls = isCompact ? 'space-y-1' : 'space-y-2'
-  const emailIconCls = isCompact ? 'w-3.5 h-3.5 text-gray-500'  : 'w-4 h-4 text-gray-400'
-  const emailTextCls = isCompact ? 'text-xs text-gray-500'       : 'text-xs text-gray-400'
+  const emailIconCls = isCompact ? 'w-3.5 h-3.5 text-gray-400'  : 'w-4 h-4 text-gray-400'
+  const emailTextCls = isCompact ? 'text-xs text-gray-500'       : 'text-xs text-gray-500'
 
   return (
     <>
@@ -53,21 +53,21 @@ export default function UserFooter({ auth, variant = 'compact' }) {
         </div>
         <Link
           to="/app/settings"
-          className="flex items-center gap-2 w-full px-3 py-2.5 sm:py-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition text-sm"
+          className="flex items-center gap-2 w-full px-3 py-2.5 sm:py-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition text-sm"
         >
           <Settings className="w-4 h-4" />
           Settings
         </Link>
         <button
           onClick={auth.logout}
-          className="flex items-center gap-2 w-full px-3 py-2.5 sm:py-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition text-sm"
+          className="flex items-center gap-2 w-full px-3 py-2.5 sm:py-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition text-sm"
         >
           <LogOut className="w-4 h-4" />
           Sign out
         </button>
         <button
           onClick={() => { setDeleteError(null); setShowDeleteModal(true) }}
-          className="flex items-center gap-2 w-full px-3 py-2.5 sm:py-2 rounded-lg text-gray-600 hover:text-red-400 hover:bg-white/10 transition text-sm"
+          className="flex items-center gap-2 w-full px-3 py-2.5 sm:py-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition text-sm"
         >
           <Trash2 className="w-4 h-4" />
           Delete account

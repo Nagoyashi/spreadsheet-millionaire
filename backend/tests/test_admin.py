@@ -11,8 +11,7 @@ import os
 import psycopg
 import pytest
 
-from calc_types import DEFAULT_PUBLISHED_TYPES
-from publishable import PUBLISHABLE_TYPES
+from publishable import PUBLISHABLE_TYPES, DEFAULT_PUBLISHED_PUBLISHABLE
 
 _TEST_DB_URL = os.environ.get("TEST_DATABASE_URL", "").strip()
 
@@ -34,7 +33,7 @@ def _reset_publish_to_defaults() -> None:
             conn.execute(
                 "INSERT INTO calculator_publish (calc_type, published) VALUES (%s, %s) "
                 "ON CONFLICT (calc_type) DO UPDATE SET published = EXCLUDED.published",
-                (calc_type, calc_type in DEFAULT_PUBLISHED_TYPES),
+                (calc_type, calc_type in DEFAULT_PUBLISHED_PUBLISHABLE),
             )
         conn.commit()
 
@@ -108,7 +107,18 @@ def test_toggle_publishes_and_drives_public_endpoint(admin_client, get_csrf_toke
     client, _ = admin_client
     token = get_csrf_token(client)
 
-    # sankey starts unpublished; publishing it must surface on the PUBLIC list.
+    # sankey starts published (everything defaults on); unpublish must drop it
+    # from the PUBLIC list, republish must restore it — the toggle drives the
+    # public endpoint in both directions.
+    assert "sankey" in client.get("/api/calculators/published").get_json()["published"]
+
+    resp = client.patch(
+        "/api/admin/calculators/sankey",
+        headers={"X-CSRF-Token": token},
+        json={"published": False},
+    )
+    assert resp.status_code == 200
+    assert resp.get_json()["calculator"]["published"] is False
     assert "sankey" not in client.get("/api/calculators/published").get_json()["published"]
 
     resp = client.patch(
@@ -177,7 +187,7 @@ def test_published_endpoint_is_public(client, db):
     """No auth required — anonymous visitors read the published surface."""
     _reset_publish_to_defaults()
     body = client.get("/api/calculators/published").get_json()
-    assert set(body["published"]) == set(DEFAULT_PUBLISHED_TYPES)
+    assert set(body["published"]) == DEFAULT_PUBLISHED_PUBLISHABLE
 
 
 # ---------------------------------------------------------------------------- #
@@ -423,7 +433,15 @@ def test_analytics_labels_posthog_error_without_500(admin_client, monkeypatch):
 def test_tracker_publish_toggle_drives_public(admin_client, get_csrf_token):
     client, _ = admin_client
     token = get_csrf_token(client)
-    # Trackers ship dark — unpublished by default.
+    # Trackers default published (rollout complete) — but stay admin-toggleable
+    # live: unpublish drops them from the public surface, republish restores.
+    assert "net-worth" in client.get("/api/calculators/published").get_json()["published"]
+    resp = client.patch(
+        "/api/admin/calculators/net-worth",
+        headers={"X-CSRF-Token": token},
+        json={"published": False},
+    )
+    assert resp.status_code == 200 and resp.get_json()["calculator"]["published"] is False
     assert "net-worth" not in client.get("/api/calculators/published").get_json()["published"]
     resp = client.patch(
         "/api/admin/calculators/net-worth",
