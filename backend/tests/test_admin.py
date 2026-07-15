@@ -107,7 +107,18 @@ def test_toggle_publishes_and_drives_public_endpoint(admin_client, get_csrf_toke
     client, _ = admin_client
     token = get_csrf_token(client)
 
-    # sankey starts unpublished; publishing it must surface on the PUBLIC list.
+    # sankey starts published (everything defaults on); unpublish must drop it
+    # from the PUBLIC list, republish must restore it — the toggle drives the
+    # public endpoint in both directions.
+    assert "sankey" in client.get("/api/calculators/published").get_json()["published"]
+
+    resp = client.patch(
+        "/api/admin/calculators/sankey",
+        headers={"X-CSRF-Token": token},
+        json={"published": False},
+    )
+    assert resp.status_code == 200
+    assert resp.get_json()["calculator"]["published"] is False
     assert "sankey" not in client.get("/api/calculators/published").get_json()["published"]
 
     resp = client.patch(
