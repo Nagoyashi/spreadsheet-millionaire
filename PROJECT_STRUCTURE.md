@@ -213,7 +213,11 @@ frontend/
     │   └── useDocumentTitle.js        # Sets a distinct document.title per route (SPA SEO); resets to default on unmount
     ├── marketing/                     # Public marketing surface (parallel to calculators/) — consumed only by the landing + legal pages
     │   ├── links.js                   # Single source for GITHUB_URL + CONTACT_EMAIL placeholder (used by nav/strip/footer/legal)
-    │   ├── MarketingNav.jsx           # Sticky light 3-col top nav (max-w-6xl): wordmark left · centered sections (Guide/Calculators/Comparison/ETFs and Stocks) · "Log in" + blue "Open app" right ("Open app" only when authed); mobile disclosure menu
+    │   ├── MarketingNav.jsx           # Sticky light 3-col top nav (max-w-6xl): wordmark left · centered sections (Guide/Calculators/Comparison/ETFs and Stocks, current page gray-900 semibold + aria-current) · "Log in" + blue "Open app" right ("Open app" only when authed); mobile disclosure menu
+    │   ├── MarketingNav.test.jsx      # vitest/RTL — sections + auth control + active-state marking
+    │   ├── MarketingPageHero.jsx      # Shared hero for the section pages (Guide/Comparison/ETFs): amber eyebrow → 44px H1 → gray sub, centered, 72px top pad; page extras via children
+    │   ├── SuperadminPreview.jsx      # Route-level gate for marketing drafts (auth.user.is_superadmin → preview, else fallback) + SuperadminPreviewBanner (amber under-nav notice). UI-only content preview — no backend data, deliberately not three-layer gated
+    │   ├── SuperadminPreview.test.jsx # vitest/RTL — anonymous/normal/admin → coming-soon; superadmin → draft page + banner
     │   ├── Carousel.jsx               # Paginated card carousel (responsive N-per-page, autoplay + arrows; no cut-off cards) — used by CalculatorShowcase
     │   ├── Hero.jsx                   # Badge + headline + subline + CTAs (primary → /app, secondary → /register) + trust row; mounts HeroAppPreview
     │   ├── HeroAppPreview.jsx         # Interactive 1060×420 miniature of the app (3 switchable views via local state, inline-SVG charts); scales whole via ResizeObserver below ~1108px
@@ -221,11 +225,17 @@ frontend/
     │   ├── ComingSoonStrip.jsx        # "More than calculators" — the four site surfaces (Guide/Calculators/Comparison/ETFs & Stocks) with Live/Coming-soon status pills
     │   ├── ValueProps.jsx             # Four true value props (free, no-signup, save, privacy) on a gray-50 band
     │   ├── CtaBand.jsx                # Dark slate-900 closing CTA band (decorative emerald growth curve + amber target line SVG)
-    │   ├── MarketingFooter.jsx        # Privacy/Terms/Imprint links + "View source on GitHub" button, © line, not-financial-advice line
+    │   ├── MarketingFooter.jsx        # Privacy/Terms/Imprint links + "View source on GitHub" button, © line, not-financial-advice line; `slim` prop = one-row variant (wordmark + legal links + ©) for the section pages
     │   └── LegalLayout.jsx            # Shared prose chrome for legal pages (reuses MarketingNav + MarketingFooter)
     └── pages/
         ├── MarketingLandingPage.jsx # / — public marketing landing; composes src/marketing/*; auth-adaptive nav (no redirect for logged-in visitors)
-        ├── MarketingComingSoonPage.jsx # /guide, /comparison, /etfs-stocks — Beta "coming soon" placeholders (one component, title/blurb per route); full surfaces are later cycles (project.md § Future)
+        ├── MarketingComingSoonPage.jsx # /guide, /comparison, /etfs-stocks — Beta "coming soon" placeholders (one component, title/blurb per route); the PUBLIC face of those routes (SuperadminPreview fallback); full surfaces are later cycles (project.md § Future)
+        ├── GuidePage.jsx          # /guide draft (superadmin-only via SuperadminPreview) — education hub: hero + search + category chips (client-side filter), featured article, 3-col grid, video strip, newsletter band; all content local placeholders pending a CMS pipeline
+        ├── GuidePage.test.jsx     # RTL — hero/sections smoke + chip/search filtering + empty state
+        ├── ComparisonPage.jsx     # /comparison draft (superadmin-only) — affiliate comparisons: hero + above-the-fold disclosure pill, 4 category tiles, brokers table w/ OUR PICK row, "How we rate"; placeholder data; affiliate placeholders rel="sponsored nofollow"
+        ├── ComparisonPage.test.jsx # RTL — hero/disclosure/tiles/table/OUR PICK/rel attribute/How-we-rate
+        ├── EtfsStocksPage.jsx     # /etfs-stocks draft (superadmin-only) — instrument lookup: hero + search + static filter pills, quick-links, results table (type pills, signed 1Y/5Y perf), cross-sell band → /app; static local placeholders, NO market-data API yet
+        ├── EtfsStocksPage.test.jsx # RTL — hero/pills/quick-links/results table/cross-sell smoke
         ├── PrivacyPage.jsx        # /privacy — privacy policy on LegalLayout; written against actual data practices
         ├── TermsPage.jsx          # /terms — terms of service on LegalLayout; educational-tools-not-advice disclaimer
         ├── ImprintPage.jsx        # /imprint — imprint/Impressum on LegalLayout; placeholder operator details to complete before launch
@@ -269,6 +279,9 @@ existing links and staging bookmarks survive. The Vercel SPA fallback
 | Path | Page / behaviour | Guard |
 |------|------------------|-------|
 | `/` | `MarketingLandingPage` (logged-in users see it too — no redirect) | — |
+| `/guide` | `GuidePage` draft for superadmins; `MarketingComingSoonPage` for everyone else | `SuperadminPreview` (UI-only content preview) |
+| `/comparison` | `ComparisonPage` draft for superadmins; coming-soon otherwise | `SuperadminPreview` |
+| `/etfs-stocks` | `EtfsStocksPage` draft for superadmins; coming-soon otherwise | `SuperadminPreview` |
 | `/privacy` | `PrivacyPage` | — |
 | `/terms` | `TermsPage` | — |
 | `/imprint` | `ImprintPage` | — |
