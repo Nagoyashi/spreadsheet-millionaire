@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { Menu, X, ChevronDown } from 'lucide-react'
 
 // Top navigation for the public marketing surface — light fintech restyle.
@@ -73,17 +73,27 @@ function LoginAppMenu({ onNavigate }) {
 export default function MarketingNav({ auth }) {
   const [open, setOpen] = useState(false)
   const close = () => setOpen(false)
+  // Current-page section link reads as active (design handoff: gray-900 +
+  // semibold, others gray-600). /app never matches here — the nav only renders
+  // on marketing routes.
+  const { pathname } = useLocation()
 
-  const sectionLinks = SECTIONS.map((s) => (
-    <Link
-      key={s.label}
-      to={s.to}
-      onClick={close}
-      className="flex items-center min-h-[44px] text-sm text-gray-600 hover:text-gray-900 transition"
-    >
-      {s.label}
-    </Link>
-  ))
+  const sectionLinks = SECTIONS.map((s) => {
+    const active = pathname === s.to
+    return (
+      <Link
+        key={s.label}
+        to={s.to}
+        onClick={close}
+        aria-current={active ? 'page' : undefined}
+        className={`flex items-center min-h-[44px] text-sm transition ${
+          active ? 'text-gray-900 font-semibold' : 'text-gray-600 hover:text-gray-900'
+        }`}
+      >
+        {s.label}
+      </Link>
+    )
+  })
 
   const openAppCta = (
     <Link

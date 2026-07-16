@@ -4,6 +4,10 @@ import { useAuth } from './hooks/useAuth'
 import { authApi } from './api/authApi'
 import MarketingLandingPage from './pages/MarketingLandingPage'
 import MarketingComingSoonPage from './pages/MarketingComingSoonPage'
+import GuidePage from './pages/GuidePage'
+import ComparisonPage from './pages/ComparisonPage'
+import EtfsStocksPage from './pages/EtfsStocksPage'
+import SuperadminPreview from './marketing/SuperadminPreview'
 import PrivacyPage from './pages/PrivacyPage'
 import TermsPage from './pages/TermsPage'
 import ImprintPage from './pages/ImprintPage'
@@ -91,126 +95,147 @@ export default function App() {
   return (
     <BrowserRouter>
       <ErrorBoundary>
-      <Routes>
-        {/* ── Public marketing surface ─────────────────────────────────────── */}
-        <Route path="/" element={<MarketingLandingPage auth={auth} />} />
-        <Route path="/privacy" element={<PrivacyPage auth={auth} />} />
-        <Route path="/terms" element={<TermsPage auth={auth} />} />
-        <Route path="/imprint" element={<ImprintPage auth={auth} />} />
+        <Routes>
+          {/* ── Public marketing surface ─────────────────────────────────────── */}
+          <Route path="/" element={<MarketingLandingPage auth={auth} />} />
+          <Route path="/privacy" element={<PrivacyPage auth={auth} />} />
+          <Route path="/terms" element={<TermsPage auth={auth} />} />
+          <Route path="/imprint" element={<ImprintPage auth={auth} />} />
 
-        {/* Marketing sections — Beta "coming soon"; full surfaces are later cycles */}
-        <Route
-          path="/guide"
-          element={
-            <MarketingComingSoonPage
-              auth={auth}
-              title="Guide"
-              blurb="Our resource center — in-depth guides and articles on FIRE, investing, debt, and building wealth — is on the way. Until then, jump straight into the calculators."
-            />
-          }
-        />
-        <Route
-          path="/comparison"
-          element={
-            <MarketingComingSoonPage
-              auth={auth}
-              title="Comparison"
-              blurb="Side-by-side comparisons of brokers, accounts, and savings products — so you can pick the right one with confidence — are coming soon."
-            />
-          }
-        />
-        <Route
-          path="/etfs-stocks"
-          element={
-            <MarketingComingSoonPage
-              auth={auth}
-              title="ETFs and Stocks"
-              blurb="A real-time, categorized search of ETFs and stocks is in the works — explore and compare holdings in one place. Coming soon."
-            />
-          }
-        />
+          {/* Marketing sections — Beta "coming soon" for the public; superadmins
+            see the new draft pages via SuperadminPreview (a UI-only content
+            preview — no backend data involved; see SuperadminPreview.jsx).
+            When a surface ships publicly, unwrap its route here. */}
+          <Route
+            path="/guide"
+            element={
+              <SuperadminPreview
+                auth={auth}
+                preview={<GuidePage auth={auth} />}
+                fallback={
+                  <MarketingComingSoonPage
+                    auth={auth}
+                    title="Guide"
+                    blurb="Our resource center — in-depth guides and articles on FIRE, investing, debt, and building wealth — is on the way. Until then, jump straight into the calculators."
+                  />
+                }
+              />
+            }
+          />
+          <Route
+            path="/comparison"
+            element={
+              <SuperadminPreview
+                auth={auth}
+                preview={<ComparisonPage auth={auth} />}
+                fallback={
+                  <MarketingComingSoonPage
+                    auth={auth}
+                    title="Comparison"
+                    blurb="Side-by-side comparisons of brokers, accounts, and savings products — so you can pick the right one with confidence — are coming soon."
+                  />
+                }
+              />
+            }
+          />
+          <Route
+            path="/etfs-stocks"
+            element={
+              <SuperadminPreview
+                auth={auth}
+                preview={<EtfsStocksPage auth={auth} />}
+                fallback={
+                  <MarketingComingSoonPage
+                    auth={auth}
+                    title="ETFs and Stocks"
+                    blurb="A real-time, categorized search of ETFs and stocks is in the works — explore and compare holdings in one place. Coming soon."
+                  />
+                }
+              />
+            }
+          />
 
-        {/* ── The app, namespaced under /app ───────────────────────────────── */}
-        <Route path="/app" element={<LandingPage auth={auth} />} />
-        <Route path="/app/calculator/:type" element={<CalculatorPage auth={auth} />} />
-        <Route path="/app/coming-soon/:slug" element={<ComingSoonPage />} />
-        <Route
-          path="/app/net-worth"
-          element={
-            // Runtime publish: reachable only when an admin has published the
-            // tracker (DB-backed, via /admin Overview); otherwise fall back to its
-            // "coming soon" teaser. Replaces the old build-time flag. See
-            // trackers.js / DECISIONS.md § "Runtime publish state".
-            publishedTypes.includes('net-worth') ? (
+          {/* ── The app, namespaced under /app ───────────────────────────────── */}
+          <Route path="/app" element={<LandingPage auth={auth} />} />
+          <Route path="/app/calculator/:type" element={<CalculatorPage auth={auth} />} />
+          <Route path="/app/coming-soon/:slug" element={<ComingSoonPage />} />
+          <Route
+            path="/app/net-worth"
+            element={
+              // Runtime publish: reachable only when an admin has published the
+              // tracker (DB-backed, via /admin Overview); otherwise fall back to its
+              // "coming soon" teaser. Replaces the old build-time flag. See
+              // trackers.js / DECISIONS.md § "Runtime publish state".
+              publishedTypes.includes('net-worth') ? (
+                <RequireAuth isAuthenticated={auth.isAuthenticated}>
+                  <WealthPage auth={auth} />
+                </RequireAuth>
+              ) : (
+                <Navigate to="/app/coming-soon/net-worth" replace />
+              )
+            }
+          />
+          <Route
+            path="/app/income-expenses"
+            element={
+              // Runtime publish like Net Worth — teaser fallback until published.
+              publishedTypes.includes('income-expenses') ? (
+                <RequireAuth isAuthenticated={auth.isAuthenticated}>
+                  <IncomeExpensePage auth={auth} />
+                </RequireAuth>
+              ) : (
+                <Navigate to="/app/coming-soon/income-expenses" replace />
+              )
+            }
+          />
+          <Route
+            path="/app/settings"
+            element={
               <RequireAuth isAuthenticated={auth.isAuthenticated}>
-                <WealthPage auth={auth} />
+                <SettingsPage auth={auth} />
               </RequireAuth>
-            ) : (
-              <Navigate to="/app/coming-soon/net-worth" replace />
-            )
-          }
-        />
-        <Route
-          path="/app/income-expenses"
-          element={
-            // Runtime publish like Net Worth — teaser fallback until published.
-            publishedTypes.includes('income-expenses') ? (
-              <RequireAuth isAuthenticated={auth.isAuthenticated}>
-                <IncomeExpensePage auth={auth} />
-              </RequireAuth>
-            ) : (
-              <Navigate to="/app/coming-soon/income-expenses" replace />
-            )
-          }
-        />
-        <Route
-          path="/app/settings"
-          element={
-            <RequireAuth isAuthenticated={auth.isAuthenticated}>
-              <SettingsPage auth={auth} />
-            </RequireAuth>
-          }
-        />
+            }
+          />
 
-        {/* ── Internal admin portal — admin-only, invisible to everyone else ── */}
-        <Route
-          path="/admin"
-          element={
-            <RequireAdmin user={auth.user}>
-              <AdminPage auth={auth} />
-            </RequireAdmin>
-          }
-        />
+          {/* ── Internal admin portal — admin-only, invisible to everyone else ── */}
+          <Route
+            path="/admin"
+            element={
+              <RequireAdmin user={auth.user}>
+                <AdminPage auth={auth} />
+              </RequireAdmin>
+            }
+          />
 
-        {/* ── Redirects from the old top-level app paths (param-preserving) ─── */}
-        <Route path="/calculator/:type" element={<RedirectCalculator />} />
-        <Route path="/coming-soon/:slug" element={<RedirectComingSoon />} />
-        <Route path="/settings" element={<Navigate to="/app/settings" replace />} />
+          {/* ── Redirects from the old top-level app paths (param-preserving) ─── */}
+          <Route path="/calculator/:type" element={<RedirectCalculator />} />
+          <Route path="/coming-soon/:slug" element={<RedirectComingSoon />} />
+          <Route path="/settings" element={<Navigate to="/app/settings" replace />} />
 
-        {/* ── Shared auth doors — top-level, reachable from marketing and app ─ */}
-        <Route
-          path="/login"
-          element={
-            <RequireGuest isAuthenticated={auth.isAuthenticated}>
-              <LoginPage auth={auth} />
-            </RequireGuest>
-          }
-        />
-        <Route
-          path="/register"
-          element={
-            <RequireGuest isAuthenticated={auth.isAuthenticated}>
-              <RegisterPage auth={auth} />
-            </RequireGuest>
-          }
-        />
+          {/* ── Shared auth doors — top-level, reachable from marketing and app ─ */}
+          <Route
+            path="/login"
+            element={
+              <RequireGuest isAuthenticated={auth.isAuthenticated}>
+                <LoginPage auth={auth} />
+              </RequireGuest>
+            }
+          />
+          <Route
+            path="/register"
+            element={
+              <RequireGuest isAuthenticated={auth.isAuthenticated}>
+                <RegisterPage auth={auth} />
+              </RequireGuest>
+            }
+          />
 
-        {/* Password reset — public; reachable while logged out via the email link */}
-        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-        <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+          {/* Password reset — public; reachable while logged out via the email link */}
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
 
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
       </ErrorBoundary>
     </BrowserRouter>
   )
