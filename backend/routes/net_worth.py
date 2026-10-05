@@ -24,6 +24,7 @@ from schemas.net_worth_schema import (
     InvestmentSchema,
     RealEstateSchema,
     SnapshotSchema,
+    SnapshotUpdateSchema,
 )
 from utils.auth_helpers import login_required, csrf_protect
 from app import limiter
@@ -124,3 +125,33 @@ def create_snapshot():
         session["user_id"], payload.get("snapshot_date"), payload.get("notes")
     )
     return jsonify({"item": snapshot}), 201
+
+
+_snapshot_update_schema = SnapshotUpdateSchema()
+
+
+@bp.route("/snapshots/<int:item_id>", methods=["PUT"])
+@login_required
+@csrf_protect
+@limiter.limit(_WRITE_LIMIT)
+def update_snapshot(item_id: int):
+    try:
+        payload = _snapshot_update_schema.load(request.get_json(silent=True) or {}, partial=True)
+    except ValidationError as err:
+        return jsonify({"errors": err.messages}), 422
+    if not payload:
+        return jsonify({"error": "Nothing to update."}), 400
+    item = nw.update_snapshot(item_id, session["user_id"], payload)
+    if not item:
+        return jsonify({"error": "Not found."}), 404
+    return jsonify({"item": item}), 200
+
+
+@bp.route("/snapshots/<int:item_id>", methods=["DELETE"])
+@login_required
+@csrf_protect
+@limiter.limit(_WRITE_LIMIT)
+def delete_snapshot(item_id: int):
+    if not nw.delete_snapshot(item_id, session["user_id"]):
+        return jsonify({"error": "Not found."}), 404
+    return "", 204

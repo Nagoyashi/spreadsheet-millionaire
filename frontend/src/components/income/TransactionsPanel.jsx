@@ -43,6 +43,8 @@ export default function TransactionsPanel({
   onAdd,
   onUpdate,
   onDelete,
+  editRequest = null,
+  onEditRequestConsumed,
 }) {
   const options = activeCategoryOptions(categories)
   const emptyForm = () => ({
@@ -82,6 +84,17 @@ export default function TransactionsPanel({
     setEditingId(null)
     setFormError('')
   }
+
+  // The Recurring overview (#317) can hand us a transaction to edit: open the
+  // form pre-filled the moment the request arrives, then hand the token back so
+  // re-visiting this tab doesn't re-open it.
+  useEffect(() => {
+    if (editRequest) {
+      startEdit(editRequest)
+      onEditRequestConsumed?.()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editRequest])
 
   function startEdit(t) {
     setForm({

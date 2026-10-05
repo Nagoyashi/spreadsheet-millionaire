@@ -34,5 +34,8 @@ export const netWorthApi = {
     list: () => api.get('/snapshots'),
     // Totals are computed server-side; the body is just an optional date + notes
     create: (body = {}) => api.post('/snapshots', body),
+    // Corrections to history — totals editable here; net_worth recomputed server-side
+    update: (id, body) => api.put(`/snapshots/${id}`, body),
+    remove: (id) => api.delete(`/snapshots/${id}`),
   },
 }

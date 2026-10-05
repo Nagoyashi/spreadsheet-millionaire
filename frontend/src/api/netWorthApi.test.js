@@ -65,4 +65,15 @@ describe('netWorthApi summary + snapshots', () => {
     await netWorthApi.snapshots.create()
     expect(calls).toEqual([['post', '/snapshots', {}]])
   })
+
+  it('snapshots.update -> PUT /snapshots/:id with body', async () => {
+    const body = { total_assets: '201000' }
+    await netWorthApi.snapshots.update(4, body)
+    expect(calls).toEqual([['put', '/snapshots/4', body]])
+  })
+
+  it('snapshots.remove -> DELETE /snapshots/:id', async () => {
+    await netWorthApi.snapshots.remove(4)
+    expect(calls).toEqual([['delete', '/snapshots/4']])
+  })
 })

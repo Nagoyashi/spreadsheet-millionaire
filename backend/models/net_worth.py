@@ -145,6 +145,13 @@ REAL_ESTATE = NetWorthTable(
      "purchase_date", "mortgage_balance", "mortgage_interest_rate",
      "mortgage_payment", "mortgage_term_years", "monthly_rent", "address", "notes"),
 )
+# net_worth is in the allow-list so update_snapshot() can write its recomputed
+# value — the API schema exposes no net_worth field, so it never comes from
+# user input.
+SNAPSHOTS = NetWorthTable(
+    "nw_snapshots",
+    ("snapshot_date", "total_assets", "total_liabilities", "net_worth", "notes"),
+)
 
 # Liquid = these asset_types; the rest ('custom') are collectibles.
 _LIQUID_ASSET_TYPES = ("cash", "brokerage", "crypto", "pension")
@@ -299,3 +306,22 @@ def create_snapshot(user_id: int, snapshot_date, notes: str | None) -> dict:
         (row["id"], user_id),
     ).fetchone()
     return _row_to_dict(created)
+
+
+def update_snapshot(snapshot_id: int, user_id: int, data: dict) -> dict | None:
+    """Correct a past snapshot (date, totals, notes). net_worth is always
+    recomputed from the (new or existing) totals — it can't drift from them.
+    Returns None if the snapshot doesn't exist or belongs to another user."""
+    if "total_assets" in data or "total_liabilities" in data:
+        existing = SNAPSHOTS.get(snapshot_id, user_id)
+        if not existing:
+            return None
+        assets = data.get("total_assets", existing["total_assets"])
+        liabilities = data.get("total_liabilities", existing["total_liabilities"])
+        data = {**data, "net_worth": Decimal(str(assets)) - Decimal(str(liabilities))}
+    return SNAPSHOTS.update(snapshot_id, user_id, data)
+
+
+def delete_snapshot(snapshot_id: int, user_id: int) -> bool:
+    """True if the snapshot was deleted, False if not found / wrong user."""
+    return SNAPSHOTS.delete(snapshot_id, user_id)

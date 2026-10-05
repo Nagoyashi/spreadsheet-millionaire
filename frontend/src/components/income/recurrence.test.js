@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { projectRecurring, forecastByMonth, recurringByCategoryForMonth } from './recurrence'
+import { projectRecurring, forecastByMonth, recurringByCategoryForMonth, nextOccurrence } from './recurrence'
 
 // Helper to build a transaction row.
 const txn = (over) => ({
@@ -127,5 +127,26 @@ describe('recurringByCategoryForMonth', () => {
   it('ignores one-off transactions entirely', () => {
     const rows = [txn({ occurred_on: '2026-01-15', recurrence_unit: 'none' })]
     expect(recurringByCategoryForMonth(rows, 2026, 6)).toEqual({ income: {}, expense: {} })
+  })
+})
+
+describe('nextOccurrence (#317 — the Recurring overview "next" column)', () => {
+  it('monthly rule: first occurrence strictly after `from`', () => {
+    expect(nextOccurrence('2026-07-01', 'month', 1, '2026-07-26')).toBe('2026-08-01')
+    // `from` ON an occurrence is not "next" — strictly after.
+    expect(nextOccurrence('2026-07-01', 'month', 1, '2026-08-01')).toBe('2026-09-01')
+  })
+
+  it('month-end anchors clamp instead of skipping (Jan 31 → Feb 28)', () => {
+    expect(nextOccurrence('2026-01-31', 'month', 1, '2026-02-01')).toBe('2026-02-28')
+  })
+
+  it('multi-interval week + year cadences step correctly', () => {
+    expect(nextOccurrence('2026-07-06', 'week', 2, '2026-07-21')).toBe('2026-08-03')
+    expect(nextOccurrence('2025-03-10', 'year', 1, '2026-07-26')).toBe('2027-03-10')
+  })
+
+  it('one-off rules have no next occurrence', () => {
+    expect(nextOccurrence('2026-07-01', 'none', 1, '2026-07-26')).toBeNull()
   })
 })

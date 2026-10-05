@@ -10,6 +10,7 @@ import MonthlyEntryPanel from '../components/income/MonthlyEntryPanel'
 import BulkUploadTeaser from '../components/income/BulkUploadTeaser'
 import BudgetsTeaser from '../components/income/BudgetsTeaser'
 import CashflowDashboard from '../components/income/CashflowDashboard'
+import RecurringPanel from '../components/income/RecurringPanel'
 
 // Income & Expense tracker page. Auth-gated (the route wraps it in RequireAuth).
 // Header, sticky Income / Expense / Net bar, tabs: the Overview cashflow
@@ -29,6 +30,8 @@ const TABS = [
 export default function IncomeExpensePage({ auth }) {
   useDocumentTitle('Income & Expense Tracker — SpreadsheetMillionaire')
   const [activeTab, setActiveTab] = useState('overview')
+  // A transaction the Recurring overview asked us to edit on the Transactions tab.
+  const [editRequest, setEditRequest] = useState(null)
 
   const {
     transactions,
@@ -143,13 +146,23 @@ export default function IncomeExpensePage({ auth }) {
               ) : (
                 <div className="min-h-[400px]">
                   {activeTab === 'overview' && (
-                    <CashflowDashboard
-                      summary={summary}
-                      transactions={transactions}
-                      categories={categories}
-                      filters={filters}
-                      setFilters={setFilters}
-                    />
+                    <div className="space-y-6">
+                      <CashflowDashboard
+                        summary={summary}
+                        transactions={transactions}
+                        categories={categories}
+                        filters={filters}
+                        setFilters={setFilters}
+                      />
+                      <RecurringPanel
+                        transactions={transactions}
+                        onUpdate={updateTransaction}
+                        onEdit={(t) => {
+                          setEditRequest(t)
+                          setActiveTab('transactions')
+                        }}
+                      />
+                    </div>
                   )}
                   {activeTab === 'monthly' && (
                     <MonthlyEntryPanel
@@ -173,6 +186,8 @@ export default function IncomeExpensePage({ auth }) {
                       onAdd={addTransaction}
                       onUpdate={updateTransaction}
                       onDelete={deleteTransaction}
+                      editRequest={editRequest}
+                      onEditRequestConsumed={() => setEditRequest(null)}
                     />
                   )}
                   {activeTab === 'budgets' && <BudgetsTeaser />}

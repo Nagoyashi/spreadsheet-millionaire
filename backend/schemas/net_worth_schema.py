@@ -76,3 +76,14 @@ class SnapshotSchema(Schema):
     summary, so the client only optionally supplies a date + notes."""
     snapshot_date = fields.Date(allow_none=True, load_default=None)
     notes = fields.Str(**_NOTES)
+
+
+class SnapshotUpdateSchema(Schema):
+    """PUT /snapshots/<id> — correct a past snapshot. Totals ARE editable here
+    (unlike create, which computes them): the whole point is fixing history,
+    e.g. a snapshot taken right after an accidental deletion. net_worth is
+    never accepted — the model recomputes it from the totals."""
+    snapshot_date = fields.Date()
+    total_assets = fields.Decimal(**_MONEY)
+    total_liabilities = fields.Decimal(**_MONEY)
+    notes = fields.Str(validate=validate.Length(max=1000), allow_none=True)

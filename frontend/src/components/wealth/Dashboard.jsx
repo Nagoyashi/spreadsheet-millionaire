@@ -16,6 +16,7 @@ import {
 import { Camera, TrendingUp, TrendingDown } from 'lucide-react'
 import { fmt, fmtPct } from '../../utils/format'
 import { debtToAssetRatio, snapshotDelta, liabilitiesBreakdown } from './overviewSelectors'
+import SnapshotManager from './SnapshotManager'
 
 // Net Worth overview dashboard (the Overview tab). Built on recharts (already a
 // dependency). Renders the global summary, an asset-allocation pie, a category
@@ -59,6 +60,8 @@ export default function Dashboard({
   summary,
   snapshots,
   onSnapshot,
+  onUpdateSnapshot,
+  onDeleteSnapshot,
   liabilities = [],
   properties = [],
 }) {
@@ -332,6 +335,11 @@ export default function Dashboard({
                 Take a second snapshot to unlock the trend line.
               </p>
             )}
+            <SnapshotManager
+              snapshots={snapshots}
+              onUpdate={onUpdateSnapshot}
+              onDelete={onDeleteSnapshot}
+            />
           </>
         )}
       </div>

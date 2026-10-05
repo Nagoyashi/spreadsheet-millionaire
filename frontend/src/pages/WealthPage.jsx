@@ -197,6 +197,8 @@ export default function WealthPage({ auth }) {
                   summary={summary}
                   snapshots={snapshots}
                   onSnapshot={nw.createSnapshot}
+                  onUpdateSnapshot={nw.updateSnapshot}
+                  onDeleteSnapshot={nw.deleteSnapshot}
                   liabilities={liabilities}
                   properties={properties}
                 />

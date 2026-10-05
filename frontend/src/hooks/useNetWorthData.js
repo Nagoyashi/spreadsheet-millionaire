@@ -117,5 +117,7 @@ export function useNetWorthData(isAuthenticated) {
 
     // Snapshots
     createSnapshot: (body) => mutate(() => netWorthApi.snapshots.create(body)),
+    updateSnapshot: (id, body) => mutate(() => netWorthApi.snapshots.update(id, body)),
+    deleteSnapshot: (id) => mutate(() => netWorthApi.snapshots.remove(id)),
   }
 }

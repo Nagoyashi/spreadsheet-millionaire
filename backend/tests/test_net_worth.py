@@ -183,3 +183,82 @@ def test_idor_cannot_touch_other_users_rows(app, db, get_csrf_token, path, body)
                           headers={"X-CSRF-Token": token_b}).status_code == 404
     # A's row is intact
     assert len(client_a.get(f"/api/net-worth/{path}").get_json()["items"]) == 1
+
+
+# --------------------------------------------------------------------------- #
+# Snapshot editing — correcting history (#318)
+# --------------------------------------------------------------------------- #
+def _take_snapshot(client, h, value):
+    """Give the user a portfolio worth `value` and snapshot it."""
+    resp = client.post("/api/net-worth/assets", headers=h, json={
+        "asset_type": "cash", "name": f"Cash {value}", "current_value": value})
+    assert resp.status_code == 201
+    resp = client.post("/api/net-worth/snapshots", headers=h, json={})
+    assert resp.status_code == 201
+    return resp.get_json()["item"]
+
+
+def test_snapshot_update_recomputes_net_worth(auth_client, get_csrf_token):
+    client, _ = auth_client
+    h = {"X-CSRF-Token": get_csrf_token(client)}
+    snap = _take_snapshot(client, h, 1000)
+
+    # Editing a total recomputes net_worth server-side; net_worth in the
+    # payload is ignored (unknown field -> 422 would break correction UIs, so
+    # the schema simply doesn't define it — marshmallow rejects unknowns).
+    resp = client.put(f"/api/net-worth/snapshots/{snap['id']}", headers=h,
+                      json={"total_assets": 201000, "total_liabilities": 1000})
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    item = resp.get_json()["item"]
+    assert item["total_assets"] == 201000.0
+    assert item["net_worth"] == 200000.0
+
+    # Date + notes are editable on their own; totals stay put.
+    resp = client.put(f"/api/net-worth/snapshots/{snap['id']}", headers=h,
+                      json={"snapshot_date": "2026-01-15", "notes": "corrected"})
+    assert resp.status_code == 200
+    item = resp.get_json()["item"]
+    assert item["snapshot_date"] == "2026-01-15"
+    assert item["net_worth"] == 200000.0
+
+
+def test_snapshot_update_rejects_net_worth_field(auth_client, get_csrf_token):
+    client, _ = auth_client
+    h = {"X-CSRF-Token": get_csrf_token(client)}
+    snap = _take_snapshot(client, h, 1000)
+    resp = client.put(f"/api/net-worth/snapshots/{snap['id']}", headers=h,
+                      json={"net_worth": 999999})
+    assert resp.status_code == 422  # unknown field — never user-writable
+
+
+def test_snapshot_update_empty_payload_400(auth_client, get_csrf_token):
+    client, _ = auth_client
+    h = {"X-CSRF-Token": get_csrf_token(client)}
+    snap = _take_snapshot(client, h, 1000)
+    resp = client.put(f"/api/net-worth/snapshots/{snap['id']}", headers=h, json={})
+    assert resp.status_code == 400
+
+
+def test_snapshot_delete(auth_client, get_csrf_token):
+    client, _ = auth_client
+    h = {"X-CSRF-Token": get_csrf_token(client)}
+    snap = _take_snapshot(client, h, 1000)
+    resp = client.delete(f"/api/net-worth/snapshots/{snap['id']}", headers=h)
+    assert resp.status_code == 204
+    assert client.get("/api/net-worth/snapshots").get_json()["items"] == []
+    # Deleting again -> 404
+    resp = client.delete(f"/api/net-worth/snapshots/{snap['id']}", headers=h)
+    assert resp.status_code == 404
+
+
+def test_snapshot_idor_isolation(app, db, get_csrf_token):
+    client_a, token_a = _new_user(app, get_csrf_token, "snap-owner@example.com")
+    client_b, token_b = _new_user(app, get_csrf_token, "snap-attacker@example.com")
+    snap = _take_snapshot(client_a, {"X-CSRF-Token": token_a}, 1000)
+
+    assert client_b.put(f"/api/net-worth/snapshots/{snap['id']}",
+                        headers={"X-CSRF-Token": token_b},
+                        json={"total_assets": 0}).status_code == 404
+    assert client_b.delete(f"/api/net-worth/snapshots/{snap['id']}",
+                           headers={"X-CSRF-Token": token_b}).status_code == 404
+    assert len(client_a.get("/api/net-worth/snapshots").get_json()["items"]) == 1

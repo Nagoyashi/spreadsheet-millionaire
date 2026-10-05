@@ -120,3 +120,40 @@ export function recurringByCategoryForMonth(transactions = [], year, month) {
   }
   return out
 }
+
+// The next occurrence of a rule STRICTLY AFTER `fromIso` — what the Recurring
+// overview shows as "next". Month/year cadences use month-index arithmetic with
+// a day clamp (a Jan-31 monthly rule hits Feb-28, never skips to March); day/
+// week cadences step real dates. Returns an ISO date, or null for one-offs.
+export function nextOccurrence(anchorIso, unit, interval, fromIso) {
+  if (!unit || unit === 'none') return null
+  const step = Math.max(1, Number(interval) || 1)
+  const from = parseUTC(fromIso)
+  let guard = 0
+
+  if (unit === 'month' || unit === 'year') {
+    const stepMonths = unit === 'year' ? step * 12 : step
+    const anchor = parseUTC(anchorIso)
+    const day = anchor.getUTCDate()
+    let idx = anchor.getUTCFullYear() * 12 + anchor.getUTCMonth()
+    while (guard < SAFETY) {
+      guard++
+      idx += stepMonths
+      const y = Math.floor(idx / 12)
+      const m = idx % 12
+      const daysInMonth = new Date(Date.UTC(y, m + 1, 0)).getUTCDate()
+      const occ = new Date(Date.UTC(y, m, Math.min(day, daysInMonth)))
+      if (occ > from) return occ.toISOString().slice(0, 10)
+    }
+    return null
+  }
+
+  const days = unit === 'week' ? step * 7 : step
+  const d = parseUTC(anchorIso)
+  while (guard < SAFETY) {
+    guard++
+    d.setUTCDate(d.getUTCDate() + days)
+    if (d > from) return d.toISOString().slice(0, 10)
+  }
+  return null
+}
