@@ -31,21 +31,23 @@ category's sum, save once — built on aggregate `source='monthly'` transaction
 rows so the Overview needed no second aggregation path. Also resequenced the
 roadmap: **Billing slides to Phase 16 (`v0.16.0`)** and absorbs the free/premium
 boundary decision from the former trackers-go-live phase (see
-`docs/ROADMAP.md`). Next up: **Phase 16 — Billing**, the keystone; its epic
-tickets are pre-filed (#189–#197), not yet promoted to a milestone.
+`docs/ROADMAP.md`). Billing was next — then the first user feedback
+(2026-11-05) put a **Trust & first-run** cycle in front of it as Phase 16;
+billing is Phase 17 (`v0.17.0`, #189–#197 pre-filed).
 
 ## Current cycle
 
 > Canonical cycle state = the single **open GitHub Milestone**. This line mirrors
 > it for at-a-glance reading in the editor; if they disagree, the milestone wins.
 
-**Between cycles — Phase 15 shipped** (`v0.15.0` tagged 2026-07-14, milestone
-closed), followed by five build-in-public patches `v0.15.1`–`v0.15.5` (latest:
-`v0.15.5`, 2026-07-26 — snapshot editing + recurring overview; see the
-Patch-releases table). **Next up: Phase 16 — Billing (`v0.16.0`)**, pre-filed
-as #189–#197 plus the free/premium boundary decision (see `docs/ROADMAP.md`
-§ Phase 16); deliberately **not yet opened as a milestone** — a marketing-copy
-pass on the landing page comes first.
+**Phase 16 — Trust & first-run (`v0.16.0`) — in progress** (milestone opened
+2026-11-05 from the first round of user feedback): mobile-first cockpit, PWA
+install, tracker demo mode, trust messaging at the signup wall, data-first
+calculator curation, I&E monthly-grid discoverability. **Billing slides to
+Phase 17 (`v0.17.0`)** (pre-filed #189–#197 + #198–#210), bridge + Score to
+Phase 18 — see `docs/ROADMAP.md` § Phase 16 for the rationale. Five
+build-in-public patches `v0.15.1`–`v0.15.5` followed `v0.15.0` (latest
+`v0.15.5`, 2026-07-26 — see the Patch-releases table).
 Operator to-dos still pending from Phase 14: Sentry + PostHog keys, external
 uptime monitor on `/api/health/ready`, `pooling_check.py` against the real
 Neon strings. Backlog on the
@@ -164,8 +166,10 @@ issues are the cycle's scope. Patches (`vX.Y.Z`, Z > 0) skip milestones.
 - **Design-system refresh** — extract shared primitives once the visual language settles.
 
 > **Planned cycle sequence** now lives in `docs/ROADMAP.md` (resequenced
-> 2026-07-14: `v0.15` I&E bulk data entry → `v0.16` Billing + free/premium
-> boundary → `v0.17` bridge + Score → `v1.0`, then the growth loops). The
+> 2026-07-14, and again 2026-11-05 on first user feedback: `v0.15` I&E bulk
+> data entry → `v0.16` Trust & first-run (cockpit, PWA, demo mode, curation)
+> → `v0.17` Billing + free/premium boundary → `v0.18` bridge + Score →
+> `v1.0`, then the growth loops). The
 > sequence that used to sit here (Test & CI → trackers → cleanup/security →
 > product review → referral) shipped as `v0.9.0`–`v0.14.x`; the referral engine
 > moved to `v1.1` in the roadmap.
