@@ -201,11 +201,11 @@ export default function LandingPage({ auth }) {
                   }
                 )}
 
-                {/* Live trackers — real, revealed tracker tools (from trackers.js).
-                  Solid cards that open the tracker. Empty in production while
-                  Net Worth ships dark. */}
+                {/* Live trackers — real, revealed tracker tools (from trackers.js,
+                  which carries each tracker's copy from upcomingFeatures.js —
+                  nothing hand-written here, #286). Solid cards that open the tracker. */}
                 {activeCategory === 'All' &&
-                  liveTrackers.map(({ slug, label, Icon, to }) => (
+                  liveTrackers.map(({ slug, label, Icon, to, description }) => (
                     <div
                       key={slug}
                       onClick={() => navigate(to)}
@@ -222,7 +222,7 @@ export default function LandingPage({ auth }) {
                       </div>
                       <h3 className="text-base font-bold text-gray-800 mb-2">{label}</h3>
                       <p className="text-sm sm:text-xs text-gray-500 leading-relaxed mb-4 flex-1">
-                        Track everything you own and owe, and watch your net worth trend over time.
+                        {description}
                       </p>
                       <div className="flex items-center gap-1 text-indigo-600 text-xs font-medium">
                         Open <ArrowRight className="w-3.5 h-3.5" />

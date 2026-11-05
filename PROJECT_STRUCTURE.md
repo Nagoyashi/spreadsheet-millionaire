@@ -127,7 +127,7 @@ frontend/
     ├── posthog.test.js         # vitest — initPostHog() no-ops without a key
     ├── index.css               # Tailwind directives + base styles
     ├── constants.js            # Shared storage key generators (CALC_STORAGE_KEY, FAVOURITES_KEY, ANALYTICS_SESSION_KEY, ANALYTICS_ONCE_KEY)
-    ├── upcomingFeatures.js     # UPCOMING_FEATURES tracker teasers (Net Worth, Income/Expense) — deliberately NOT in the calculator registry; raw source for trackers.js
+    ├── upcomingFeatures.js     # UPCOMING_FEATURES tracker metadata (Net Worth, Income/Expense): label, Icon, one-line `description` (card copy), coming-soon `blurb` — deliberately NOT in the calculator registry; raw source for trackers.js
     ├── setupTests.js           # vitest setup — jest-dom matchers + a ResizeObserver stub (for recharts in jsdom); wired via vite.config test.setupFiles
     ├── trackers.js             # Published-tracker surface: useLiveTrackers() + useVisibleUpcoming() — runtime hooks over usePublishedTypes (DB-backed publish), replacing the deleted build-time featureFlags.js. Every nav/grid consumer derives from these, never re-filters UPCOMING_FEATURES
     ├── api/

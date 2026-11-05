@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
-import { ArrowRight, Wallet, ArrowRightLeft } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import { usePublishedCalculators } from '../calculators/usePublished'
+import { useLiveTrackers } from '../trackers'
 import Carousel from './Carousel'
 
 // One card per published calculator, driven by the runtime published set
@@ -13,7 +14,10 @@ import Carousel from './Carousel'
 // whole pitch is that the calculators work without an account, so the landing
 // page lets a visitor prove that to themselves in one click. A paginated
 // Carousel keeps a full page of cards visible (no cut-off) as more are added.
-// Below the carousel: the two live trackers, then a "see all" link into the app.
+// Below the carousel: the live trackers (useLiveTrackers — the same runtime
+// publish state, with title/description from upcomingFeatures.js via
+// trackers.js, so a tracker toggled off in /admin drops off the landing page
+// too — #287), then a "see all" link into the app.
 
 // Light icon-tile tint per color family, keyed by the registry's `color` class
 // so the mapping derives from the single source (a color-family lookup, not a
@@ -58,23 +62,7 @@ function CalculatorCard({ type, label, subtitle, description, Icon, gradient, co
   )
 }
 
-// The two live trackers, shown as wide cards under the calculator carousel.
-const TRACKER_CARDS = [
-  {
-    to: '/app/net-worth',
-    Icon: Wallet,
-    title: 'Net Worth Tracker',
-    description: 'Track everything you own and owe, and watch your net worth trend over time.',
-  },
-  {
-    to: '/app/income-expenses',
-    Icon: ArrowRightLeft,
-    title: 'Income & Expense Tracker',
-    description:
-      'Log income and spending with a monthly bookkeeping grid, and see where your money actually goes.',
-  },
-]
-
+// A live tracker as a wide card under the calculator carousel.
 function TrackerCard({ to, Icon, title, description }) {
   return (
     <Link
@@ -99,6 +87,7 @@ function TrackerCard({ to, Icon, title, description }) {
 
 export default function CalculatorShowcase() {
   const { publishedCalculators } = usePublishedCalculators()
+  const liveTrackers = useLiveTrackers()
   return (
     <section id="calculators" className="border-t border-gray-100">
       <div className="max-w-6xl mx-auto px-6 py-20 sm:py-[88px]">
@@ -121,11 +110,13 @@ export default function CalculatorShowcase() {
           renderItem={(calc) => <CalculatorCard key={calc.type} {...calc} />}
         />
 
-        <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-5">
-          {TRACKER_CARDS.map((t) => (
-            <TrackerCard key={t.to} {...t} />
-          ))}
-        </div>
+        {liveTrackers.length > 0 && (
+          <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-5">
+            {liveTrackers.map((t) => (
+              <TrackerCard key={t.slug} {...t} />
+            ))}
+          </div>
+        )}
 
         <div className="mt-7 text-center">
           <Link
