@@ -40,10 +40,12 @@ tickets are pre-filed (#189–#197), not yet promoted to a milestone.
 > it for at-a-glance reading in the editor; if they disagree, the milestone wins.
 
 **Between cycles — Phase 15 shipped** (`v0.15.0` tagged 2026-07-14, milestone
-closed; same-day patch `v0.15.1` — custom categories, grid color coding, bulk
-teaser, year-selector fix — follows the patch ritual). **Next up: Phase 16 —
-Billing (`v0.16.0`)**, pre-filed as #189–#197 plus the free/premium boundary
-decision (see `docs/ROADMAP.md` § Phase 16); not yet opened as a milestone.
+closed), followed by five build-in-public patches `v0.15.1`–`v0.15.5` (latest:
+`v0.15.5`, 2026-07-26 — snapshot editing + recurring overview; see the
+Patch-releases table). **Next up: Phase 16 — Billing (`v0.16.0`)**, pre-filed
+as #189–#197 plus the free/premium boundary decision (see `docs/ROADMAP.md`
+§ Phase 16); deliberately **not yet opened as a milestone** — a marketing-copy
+pass on the landing page comes first.
 Operator to-dos still pending from Phase 14: Sentry + PostHog keys, external
 uptime monitor on `/api/health/ready`, `pooling_check.py` against the real
 Neon strings. Backlog on the
