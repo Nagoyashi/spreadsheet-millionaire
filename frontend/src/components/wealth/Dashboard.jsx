@@ -15,6 +15,7 @@ import {
 } from 'recharts'
 import { Camera, TrendingUp, TrendingDown } from 'lucide-react'
 import { fmt, fmtPct } from '../../utils/format'
+import { localIsoDate } from '../../utils/dates'
 import { debtToAssetRatio, snapshotDelta, liabilitiesBreakdown } from './overviewSelectors'
 import SnapshotManager from './SnapshotManager'
 
@@ -96,7 +97,9 @@ export default function Dashboard({
 
   async function handleSnapshot() {
     setSnapping(true)
-    await onSnapshot({})
+    // The client owns the calendar date (user-local, #285) — the server's
+    // CURRENT_DATE is UTC and only a fallback for callers that omit it.
+    await onSnapshot({ snapshot_date: localIsoDate() })
     setSnapping(false)
   }
 
