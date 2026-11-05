@@ -28,7 +28,7 @@ python -m venv venv
 source venv/bin/activate                              # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
-cp .env.example .env                                  # then edit and set FLASK_SECRET_KEY
+cp .env.example .env                                  # then edit: FLASK_SECRET_KEY + DATABASE_URL (every var is commented)
 python -c "import secrets; print(secrets.token_hex(32))"   # generate a key
 
 python db_init.py                                     # initialise the database
@@ -49,7 +49,7 @@ Vite proxies `/api/*` to the Flask backend on `:5000`.
 
 ## Environment variables
 
-Create `backend/.env`. The app **will not start** if `FLASK_SECRET_KEY` is missing or set to the placeholder.
+Create `backend/.env` from `backend/.env.example` (every var, with a one-line comment each). The app **will not start** if `FLASK_SECRET_KEY` is missing or set to the placeholder.
 
 | Variable | Dev value | Prod value |
 |----------|-----------|------------|
@@ -63,7 +63,7 @@ Create `backend/.env`. The app **will not start** if `FLASK_SECRET_KEY` is missi
 | `APP_BASE_URL` | `http://localhost:5173` | public frontend origin — used to build password-reset links |
 | `SESSION_COOKIE_SECURE` | `False` | `True` |
 
-**Frontend** (`frontend/.env` locally, or the Vercel project env):
+**Frontend** (`frontend/.env` locally — template in `frontend/.env.example` — or the Vercel project env):
 
 | Variable | Dev value | Prod value |
 |----------|-----------|------------|
