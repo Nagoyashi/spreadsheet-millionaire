@@ -15,6 +15,9 @@ import {
 // config from categories.js (fields + columns), so all five tabs share one
 // correct implementation. CRUD goes through the callbacks WealthPage wires to
 // useNetWorthData; each returns { success, error?, errors? } (never throws).
+// Delete uses the in-app two-step confirm (Trash → "Delete?" / Cancel inline),
+// the pattern the admin Users screen set — never window.confirm (#284): native
+// dialogs are unstyleable, block the whole tab, and freeze E2E tooling.
 
 export default function CategoryManager({ config, items, onAdd, onUpdate, onDelete }) {
   const { title, fields, columns, fixed = {} } = config
@@ -24,6 +27,7 @@ export default function CategoryManager({ config, items, onAdd, onUpdate, onDele
   const [editingId, setEditingId] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState('')
+  const [confirmingId, setConfirmingId] = useState(null)
 
   // WealthPage reuses this one instance across category tabs, so the form must
   // be re-seeded when the category changes — otherwise the previous tab's field
@@ -32,6 +36,7 @@ export default function CategoryManager({ config, items, onAdd, onUpdate, onDele
     setForm(initialForm(fields))
     setEditingId(null)
     setFormError('')
+    setConfirmingId(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.resource])
 
@@ -71,9 +76,9 @@ export default function CategoryManager({ config, items, onAdd, onUpdate, onDele
     }
   }
 
-  async function handleDelete(row) {
-    if (!window.confirm(`Delete "${row.name || row.ticker || row.property_name}"?`)) return
+  async function confirmDelete(row) {
     await onDelete(row.id)
+    setConfirmingId(null)
     if (editingId === row.id) resetForm()
   }
 
@@ -111,20 +116,39 @@ export default function CategoryManager({ config, items, onAdd, onUpdate, onDele
                       )
                     })}
                     <td className="px-4 py-3 text-right whitespace-nowrap">
-                      <button
-                        onClick={() => startEdit(row)}
-                        className="text-gray-400 hover:text-indigo-600 transition mr-3"
-                        aria-label="Edit"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(row)}
-                        className="text-gray-400 hover:text-red-600 transition"
-                        aria-label="Delete"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {confirmingId === row.id ? (
+                        <span className="inline-flex items-center gap-1">
+                          <button
+                            onClick={() => confirmDelete(row)}
+                            className="text-xs font-medium text-red-600 hover:text-red-700 px-1.5 py-0.5 rounded bg-red-50"
+                          >
+                            Delete?
+                          </button>
+                          <button
+                            onClick={() => setConfirmingId(null)}
+                            className="text-xs text-gray-500 hover:text-gray-700 px-1"
+                          >
+                            Cancel
+                          </button>
+                        </span>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => startEdit(row)}
+                            className="text-gray-400 hover:text-indigo-600 transition mr-3"
+                            aria-label="Edit"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => setConfirmingId(row.id)}
+                            className="text-gray-400 hover:text-red-600 transition"
+                            aria-label="Delete"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </>
+                      )}
                     </td>
                   </tr>
                 ))}

@@ -64,18 +64,24 @@ describe('CategoryManager', () => {
     expect(within(form).getByRole('button', { name: /add/i })).toBeEnabled()
   })
 
-  it('deletes via onDelete after confirmation', () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
+  it('deletes via onDelete after the in-app two-step confirm (never window.confirm)', () => {
+    const confirmSpy = vi.spyOn(window, 'confirm')
     const { onDelete } = setup([{ id: 7, asset_type: 'cash', name: 'Checking', current_value: 1 }])
     fireEvent.click(screen.getByLabelText('Delete'))
+    // First click only arms the inline confirm.
+    expect(onDelete).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Delete?' }))
     expect(onDelete).toHaveBeenCalledWith(7)
+    expect(confirmSpy).not.toHaveBeenCalled()
   })
 
-  it('does not delete when confirmation is cancelled', () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(false)
+  it('does not delete when the inline confirm is cancelled', () => {
     const { onDelete } = setup([{ id: 7, asset_type: 'cash', name: 'Checking', current_value: 1 }])
     fireEvent.click(screen.getByLabelText('Delete'))
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(onDelete).not.toHaveBeenCalled()
+    // Back to the idle row actions.
+    expect(screen.getByLabelText('Delete')).toBeInTheDocument()
   })
 
   it('edit populates the form and submits via onUpdate', () => {

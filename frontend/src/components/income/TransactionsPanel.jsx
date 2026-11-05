@@ -60,6 +60,7 @@ export default function TransactionsPanel({
   const [editingId, setEditingId] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState('')
+  const [confirmingId, setConfirmingId] = useState(null)
 
   // Client-side list filters (the year/month pair is server-side via setFilters).
   const [typeFilter, setTypeFilter] = useState('all')
@@ -141,9 +142,10 @@ export default function TransactionsPanel({
     }
   }
 
-  async function handleDelete(t) {
-    if (!window.confirm('Delete this transaction?')) return
+  // Two-step inline confirm (Trash → "Delete?" / Cancel) — never window.confirm (#284).
+  async function confirmDelete(t) {
     await onDelete(t.id)
+    setConfirmingId(null)
     if (editingId === t.id) reset()
   }
 
@@ -499,20 +501,39 @@ export default function TransactionsPanel({
                       {t.note || '—'}
                     </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">
-                      <button
-                        onClick={() => startEdit(t)}
-                        className="text-gray-400 hover:text-emerald-600 transition mr-3"
-                        aria-label="Edit"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(t)}
-                        className="text-gray-400 hover:text-red-600 transition"
-                        aria-label="Delete"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {confirmingId === t.id ? (
+                        <span className="inline-flex items-center gap-1">
+                          <button
+                            onClick={() => confirmDelete(t)}
+                            className="text-xs font-medium text-red-600 hover:text-red-700 px-1.5 py-0.5 rounded bg-red-50"
+                          >
+                            Delete?
+                          </button>
+                          <button
+                            onClick={() => setConfirmingId(null)}
+                            className="text-xs text-gray-500 hover:text-gray-700 px-1"
+                          >
+                            Cancel
+                          </button>
+                        </span>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => startEdit(t)}
+                            className="text-gray-400 hover:text-emerald-600 transition mr-3"
+                            aria-label="Edit"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => setConfirmingId(t.id)}
+                            className="text-gray-400 hover:text-red-600 transition"
+                            aria-label="Delete"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </>
+                      )}
                     </td>
                   </tr>
                 ))}

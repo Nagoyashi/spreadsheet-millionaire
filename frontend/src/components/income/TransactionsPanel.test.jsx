@@ -131,13 +131,26 @@ describe('TransactionsPanel', () => {
     expect(within(form()).getByRole('button', { name: /add/i })).toBeEnabled()
   })
 
-  it('deletes after confirmation', () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
+  it('deletes after the in-app two-step confirm (never window.confirm)', () => {
+    const confirmSpy = vi.spyOn(window, 'confirm')
     const { onDelete } = setup([
       { id: 7, type: 'expense', category: 'food', amount: 12, occurred_on: '2026-02-01' },
     ])
     fireEvent.click(screen.getByLabelText('Delete'))
+    expect(onDelete).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Delete?' }))
     expect(onDelete).toHaveBeenCalledWith(7)
+    expect(confirmSpy).not.toHaveBeenCalled()
+  })
+
+  it('cancelling the inline confirm keeps the row', () => {
+    const { onDelete } = setup([
+      { id: 7, type: 'expense', category: 'food', amount: 12, occurred_on: '2026-02-01' },
+    ])
+    fireEvent.click(screen.getByLabelText('Delete'))
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(onDelete).not.toHaveBeenCalled()
+    expect(screen.getByLabelText('Delete')).toBeInTheDocument()
   })
 
   it('year filter calls setFilters', () => {
