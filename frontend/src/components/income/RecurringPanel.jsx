@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Pencil, Ban, Repeat } from 'lucide-react'
 import { fmt } from '../../utils/format'
+import { localIsoDate } from '../../utils/dates'
 import { recurrenceLabel } from './incomeExpenseOptions'
 import { nextOccurrence } from './recurrence'
 
@@ -22,7 +23,7 @@ export default function RecurringPanel({ transactions = [], onUpdate, onEdit }) 
 
   if (!recurring.length) return null
 
-  const todayIso = new Date().toISOString().slice(0, 10)
+  const todayIso = localIsoDate()
 
   async function stopRule(t) {
     setBusy(true)

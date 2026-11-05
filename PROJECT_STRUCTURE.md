@@ -146,6 +146,7 @@ frontend/
     │   └── netWorthApi.test.js # vitest — asserts each endpoint's verb + path + body wiring
     ├── utils/
     │   ├── format.js           # Shared fmt() — replaces 12 local copies, supports custom currency
+    │   ├── dates.js            # localIsoDate() — the ONE client-side "today → YYYY-MM-DD" (user-local, never toISOString()/UTC; #285)
     │   ├── format.test.js      # vitest unit tests for fmt() (compact ladder, currency, display ceiling)
     │   ├── migrateCalcData.js  # migrate() / stripVersion() / injectVersion() — saved-data versioning
     │   └── migrateCalcData.test.js # vitest unit tests for the migration engine (sankey v1→v2, idempotency, version guards)

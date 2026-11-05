@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import Dashboard from './Dashboard'
+import { localIsoDate } from '../../utils/dates'
 
 const SUMMARY = {
   net_worth: 150000,
@@ -43,6 +44,8 @@ describe('Dashboard', () => {
     render(<Dashboard summary={SUMMARY} snapshots={[]} onSnapshot={onSnapshot} />)
     fireEvent.click(screen.getByRole('button', { name: /take snapshot/i }))
     expect(onSnapshot).toHaveBeenCalledTimes(1)
+    // Stamped with the user's LOCAL calendar date, not the server's UTC day (#285).
+    expect(onSnapshot).toHaveBeenCalledWith({ snapshot_date: localIsoDate() })
   })
 
   it('returns null without a summary', () => {
