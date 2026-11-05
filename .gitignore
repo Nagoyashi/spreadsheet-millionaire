@@ -12,6 +12,7 @@ env/
 
 # ── Flask / Backend ───────────────────────────────────────
 backend/.env
+!backend/.env.example
 backend/fintrackr.db
 backend/fintrackr.db-shm
 backend/fintrackr.db-wal
@@ -22,12 +23,14 @@ __MACOSX/
 frontend/node_modules/
 frontend/dist/
 frontend/.env
+!frontend/.env.example
 frontend/.env.local
 frontend/.env.*.local
 
 # ── Secrets / credential dumps (backstop — never commit) ──
 .env
 *.env
+!.env.example
 archive.md
 *.creds
 *.secrets

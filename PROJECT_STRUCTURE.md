@@ -33,6 +33,7 @@ money-calculators/
 ```
 backend/
 ├── .env                        # Secret key + Neon/Upstash/Resend config — never committed
+├── .env.example                # Committed template: every var config.py reads, required vs optional, placeholder values
 ├── requirements.txt            # flask, flask-cors, flask-session, flask-limiter, flask-talisman, bcrypt, marshmallow, python-dotenv, psycopg, redis, resend, gunicorn
 ├── requirements-dev.txt        # Test deps (pytest) — pulls in requirements.txt; never installed in prod
 ├── pytest.ini                  # pytest config — testpaths=tests; run as `cd backend && pytest`
@@ -99,8 +100,9 @@ backend/
 ### Backend .env variables
 
 The canonical env-var reference (dev vs prod values, generation, and config
-nuances) lives in `README.md` § "Environment variables". `backend/.env` is
-git-ignored — never commit it.
+nuances) lives in `README.md` § "Environment variables"; `backend/.env.example`
+is the committed template (and `frontend/.env.example` for the optional
+`VITE_*` vars). `backend/.env` is git-ignored — never commit it.
 
 ---
 
