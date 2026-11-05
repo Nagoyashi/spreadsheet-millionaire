@@ -18,11 +18,13 @@ import { Wallet, ArrowRightLeft } from 'lucide-react'
 // DECISIONS.md § "Decisions still to make → Tracker architecture". This module
 // is teaser metadata only, not that decision.
 //
-// Shape: { slug, label, Icon, blurb, eta, published }
-//   slug      — URL segment for /coming-soon/:slug (unique)
-//   label     — display name
-//   Icon      — lucide-react icon component
-//   blurb     — one-paragraph description for the coming-soon page
+// Shape: { slug, label, Icon, description, blurb, eta, published }
+//   slug        — URL segment for /coming-soon/:slug (unique)
+//   label       — display name
+//   Icon        — lucide-react icon component
+//   description — one-line card copy (the /app grid + marketing showcase cards,
+//                 via trackers.js) — the ONE place it's written (#286)
+//   blurb       — one-paragraph description for the coming-soon page
 //   eta       — short status string, e.g. "In development"
 //   published — build-time DEFAULT only, mirroring the backend seed
 //               (publishable.DEFAULT_PUBLISHED_PUBLISHABLE) — the offline
@@ -34,6 +36,7 @@ export const UPCOMING_FEATURES = [
     slug: 'net-worth',
     label: 'Net Worth Tracker',
     Icon: Wallet,
+    description: 'Track everything you own and owe, and watch your net worth trend over time.',
     blurb:
       'Track everything you own and owe in one place, watch your net worth trend over time, and see the single number that matters most move in the right direction.',
     eta: 'In development',
@@ -43,6 +46,8 @@ export const UPCOMING_FEATURES = [
     slug: 'income-expenses',
     label: 'Income & Expense Tracker',
     Icon: ArrowRightLeft,
+    description:
+      'Log income and spending with a monthly bookkeeping grid, and see where your money actually goes.',
     blurb:
       'Log what comes in and what goes out, categorise your spending, and finally see where your money actually goes each month — the foundation every budget is built on.',
     eta: 'In development',

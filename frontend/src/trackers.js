@@ -13,13 +13,22 @@ import { usePublishedTypes } from './calculators/usePublished'
 // Both derive from the single runtime published set (usePublishedTypes) — hard
 // rule #3's single-source discipline, extended to trackers.
 
-// Nav metadata: short labels + route. The Icon comes from upcomingFeatures.js
-// (the single source for tracker label/Icon) so it can't drift. Slugs match
+// Nav metadata: short labels + route. Icon, the full title, and the one-line
+// card description come from upcomingFeatures.js (the single source for tracker
+// copy) so no consumer hand-writes them (#286/#287). Slugs match
 // upcomingFeatures.js and the /app/<slug> routes.
+//
+// Shape: { slug, label, to, Icon, title, description }
+//   label       — short nav label ("Net Worth")
+//   title       — full product name ("Net Worth Tracker")
+//   description — one-line card copy
 const TRACKERS = [
   { slug: 'net-worth', label: 'Net Worth', to: '/app/net-worth' },
   { slug: 'income-expenses', label: 'Income & Expenses', to: '/app/income-expenses' },
-].map((t) => ({ ...t, Icon: UPCOMING_MAP[t.slug].Icon }))
+].map((t) => {
+  const { Icon, label: title, description } = UPCOMING_MAP[t.slug]
+  return { ...t, Icon, title, description }
+})
 
 export function useLiveTrackers() {
   const published = new Set(usePublishedTypes())
